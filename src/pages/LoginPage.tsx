@@ -35,11 +35,19 @@ export function LoginPage({ onAuthenticated }: { onAuthenticated: () => void }) 
 
   const sendCode = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (!identity.trim() || loading) return
+    const cleanEmail = identity.trim().toLowerCase()
+    if (!cleanEmail || loading) return
+
+    // Validação básica de formato de e-mail
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setErrorMessage('Por favor, digite um e-mail válido (ex: nome@empresa.com)')
+      return
+    }
+
     setErrorMessage(null)
     setLoading(true)
     try {
-      const res = await api.sendOtp(identity.trim())
+      const res = await api.sendOtp(cleanEmail)
       if (res.debugCode) {
         setSentCodeHint(res.debugCode)
       }
@@ -171,11 +179,12 @@ export function LoginPage({ onAuthenticated }: { onAuthenticated: () => void }) 
             <div className="auth-input-wrap" data-node-id="4:2">
               <input
                 id="identity"
+                type="email"
                 value={identity}
                 onChange={(event) => setIdentity(event.target.value)}
-                placeholder="Digite seu email ou celular"
-                aria-label="Email ou celular"
-                autoComplete="username"
+                placeholder="Digite seu e-mail"
+                aria-label="E-mail"
+                autoComplete="email"
                 disabled={loading}
               />
               <button disabled={!identity.trim() || isLeaving || loading} aria-label="Continuar">
@@ -193,7 +202,7 @@ export function LoginPage({ onAuthenticated }: { onAuthenticated: () => void }) 
         {step === 'code' && (
           <section className={`auth-content auth-content--code auth-otp-enter ${isLeaving ? 'auth-step-leave' : ''}`}>
             <p>
-              Digite o código que você recebeu no seu email:
+              Digite o código enviado para <strong style={{ color: '#ffffff' }}>{identity.trim().toLowerCase()}</strong>:
               {sentCodeHint && (
                 <span style={{ display: 'block', fontSize: '13px', color: '#d7ff70', marginTop: '6px' }}>
                   Código gerado: <strong>{sentCodeHint}</strong>
