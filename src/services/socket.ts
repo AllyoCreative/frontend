@@ -25,7 +25,10 @@ class WebSocketService {
     if (token) query.set('token', token)
     if (projectId) query.set('projectId', projectId)
 
-    const wsUrl = `ws://localhost:4000/ws?${query.toString()}`
+    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
+    const wsDefault = apiBase.replace(/^http/, 'ws').replace(/\/api\/?$/, '/ws')
+    const wsBase = import.meta.env.VITE_WS_URL || wsDefault
+    const wsUrl = `${wsBase}?${query.toString()}`
 
     try {
       this.ws = new WebSocket(wsUrl)
