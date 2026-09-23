@@ -1,6 +1,7 @@
 import { type CSSProperties, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { ArrowLeft, ChevronRight, Download, Plus, Upload } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
 
@@ -126,10 +127,17 @@ function ResourcePreview({ folder, resource }: { folder: BrandFolder; resource: 
 
 export function BrandKitPage() {
   const { notify, brands } = useApp()
-  const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null)
-  const [activeFolder, setActiveFolder] = useState<FolderPreview | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [folderState, setFolderState] = useState<{ brandId: string; folder: FolderPreview } | null>(null)
+  const selectedBrandId = searchParams.get('marca')
+  const activeFolder = folderState?.brandId === selectedBrandId ? folderState.folder : null
   const selectedFolder = folders.find((folder) => folder.preview === activeFolder)
   const selectedBrand = brands.find((brand) => brand.id === selectedBrandId)
+
+  const selectBrand = (brandId: string | null) => {
+    setFolderState(null)
+    setSearchParams(brandId ? { marca: brandId } : {})
+  }
 
   const changeFolder = (folder: FolderPreview | null) => {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -138,12 +146,12 @@ export function BrandKitPage() {
     }).startViewTransition
 
     if (!startViewTransition || reducedMotion) {
-      setActiveFolder(folder)
+      setFolderState(folder && selectedBrandId ? { brandId: selectedBrandId, folder } : null)
       return
     }
 
     startViewTransition.call(document, () => {
-      flushSync(() => setActiveFolder(folder))
+      flushSync(() => setFolderState(folder && selectedBrandId ? { brandId: selectedBrandId, folder } : null))
     })
   }
 
@@ -154,14 +162,14 @@ export function BrandKitPage() {
         <p>Selecione uma marca para acessar seus recursos oficiais.</p>
       </header>
       <div className="brand-selector__grid">
-        {brands.map((brand) => <button type="button" key={brand.id} onClick={() => setSelectedBrandId(brand.id)}>
+        {brands.map((brand) => <button type="button" key={brand.id} onClick={() => selectBrand(brand.id)}>
           <span className="brand-selector__mark" style={{ background: brand.color }}>{brand.initials}</span>
           <span><strong>{brand.name}</strong><small>{brand.description}</small><em>5 coleções de recursos</em></span>
           <ChevronRight size={20} />
         </button>)}
       </div>
     </section> : !selectedFolder ? <>
-      <button type="button" className="brand-back brand-back--brands" onClick={() => setSelectedBrandId(null)}>
+      <button type="button" className="brand-back brand-back--brands" onClick={() => selectBrand(null)}>
         <ArrowLeft size={18} /> Todas as marcas
       </button>
       <header className="brand-header">

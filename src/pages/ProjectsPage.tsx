@@ -286,7 +286,7 @@ export function ProjectsPage() {
 
   return (
     <div className="page projects-page" data-node-id="1:395">
-      <div className={`projects-screen${view === 'calendar' ? ' projects-screen--calendar' : ''}`}>
+      <div className="projects-screen">
         <main className="projects-screen__main">
           <header className="projects-topbar">
             <div className="projects-title-tabs">
@@ -367,7 +367,7 @@ export function ProjectsPage() {
           )}
         </main>
 
-        {view === 'list' && <AllocationPanel />}
+        <AllocationPanel />
       </div>
     </div>
   )

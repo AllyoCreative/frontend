@@ -64,6 +64,19 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .sidebar__nav-chevron { width: 14px !important; height: 14px !important; margin-left: auto; transform: rotate(-90deg); }
 .sidebar__nav a::before { left: -20px; width: 4px; height: 24px; background: #004c46; }
 .sidebar__nav a:hover, .sidebar__nav a.active { color: #004c46; background: #e7ebe7; }
+.sidebar-nav-group { display: grid; }
+.sidebar-nav-group__trigger { position: relative; width: 100%; min-height: 40px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: #131f15; font-size: 14px; font-weight: 650; text-align: left; transition: background-color .15s ease, color .15s ease; }
+.sidebar-nav-group__trigger::before { content: ''; position: absolute; left: -20px; width: 4px; height: 24px; background: #004c46; transform: scaleY(0); }
+.sidebar-nav-group__trigger:hover, .sidebar-nav-group__trigger.active { color: #004c46; background: #e7ebe7; }
+.sidebar-nav-group__trigger.active::before { transform: scaleY(1); }
+.sidebar-nav-group__trigger > img { flex: none; width: 18px; height: 18px; object-fit: contain; }
+.sidebar-nav-group__trigger .sidebar__nav-chevron { margin-left: auto; transform: rotate(-90deg); transition: transform .18s ease; }
+.sidebar-nav-group__trigger[aria-expanded='true'] .sidebar__nav-chevron { transform: rotate(0deg); }
+.sidebar-brand-list { display: grid; margin: 4px 0 4px 28px; padding-left: 10px; border-left: 1px solid #d8dcd5; }
+.sidebar-brand-list button { width: 100%; min-height: 36px; display: flex; align-items: center; gap: 9px; padding: 0 9px; overflow: hidden; border: 0; border-radius: 7px; background: transparent; color: #53605a; font-size: 12px; font-weight: 600; text-align: left; transition: background-color .15s ease, color .15s ease; }
+.sidebar-brand-list button:hover, .sidebar-brand-list button.active { background: #e7ebe7; color: #004c46; }
+.sidebar-brand-list button i { width: 9px; height: 9px; flex: none; border-radius: 3px; }
+.sidebar-brand-list button span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .sidebar-section { margin: 20px 0 0; }
 .sidebar-section__title { width: 100%; min-height: 32px; display: flex; align-items: center; justify-content: space-between; margin: 0; padding: 0 8px; border: 0; border-radius: 7px; background: transparent; color: #737b77; font-size: 11px; font-weight: 700; line-height: 16px; letter-spacing: .06em; text-align: left; }
 .sidebar-section__title:hover { background: #e8ece7; color: #004c46; }
@@ -89,10 +102,10 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .allyo-team > div img { width: 26px; height: 26px; margin-left: -7px; border: 0; }
 .allyo-team b { width: 26px; height: 26px; display: grid; place-items: center; margin-left: -7px; border-radius: 50%; background: #d8dcd5; color: #68726c; font-size: 9px; }
 .account-button { min-height: 52px !important; margin: 0 !important; padding: 8px 20px !important; }
-.account-button > span { display: block !important; }
+.account-button__identity { min-width: 0; flex: 1; display: grid; align-items: center; text-align: left; }
 .account-button strong { color: #131f15; font-size: 13px; font-weight: 500; line-height: 18px; }
-.account-button__avatar { width: 28px; height: 28px; }
-.account-button svg { width: 16px; height: 16px; margin-left: auto; transform: rotate(-90deg); }
+.account-button__avatar { width: 28px; height: 28px; flex: none; display: grid !important; place-items: center; overflow: hidden; border-radius: 50%; color: #111; font-size: 11px; font-weight: 700; line-height: 1; }
+.account-button svg { width: 16px; height: 16px; flex: none; margin-left: auto; transform: rotate(-90deg); }
 .new-project-button img { width: 19px; height: 19px; }
 
 .primary-button, .secondary-button {
@@ -555,7 +568,6 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 /* Project list */
 .projects-page { min-height: 830px; padding: 28px 20px 80px; }
 .projects-screen { width: min(1240px, 100%); display: grid; grid-template-columns: minmax(0, 1fr) 354px; align-items: start; gap: 24px; margin: 0 auto; }
-.projects-screen--calendar { width: min(1440px, 100%); grid-template-columns: minmax(0, 1fr); }
 .projects-screen__main { min-width: 0; }
 .projects-topbar { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .projects-title-tabs, .projects-view-tabs, .projects-display-controls, .projects-display-by { display: flex; align-items: center; }

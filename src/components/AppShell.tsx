@@ -17,9 +17,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [favoritesOpen, setFavoritesOpen] = useState(true)
   const [recentOpen, setRecentOpen] = useState(true)
+  const [brandKitOpen, setBrandKitOpen] = useState(() => window.location.pathname === '/brand-kit')
   const navigate = useNavigate()
   const location = useLocation()
-  const { toast, projects, currentUser, members, notify } = useApp()
+  const { toast, projects, currentUser, members, brands, notify } = useApp()
   const isHome = location.pathname === '/'
 
   const go = (path: string) => {
@@ -50,11 +51,40 @@ export function AppShell({ children }: { children: ReactNode }) {
         </button>
 
         <nav className="sidebar__nav" aria-label="Navegação principal">
-          {navItems.map(({ to, label, asset, expandable }) => (
+          {navItems.map(({ to, label, asset, expandable }) => expandable ? (
+            <div className="sidebar-nav-group" key={to}>
+              <button
+                type="button"
+                className={`sidebar-nav-group__trigger${location.pathname === to ? ' active' : ''}`}
+                aria-expanded={brandKitOpen}
+                onClick={() => {
+                  setBrandKitOpen((current) => !current)
+                  if (location.pathname !== to) navigate(to)
+                }}
+              >
+                <img src={figmaAsset(asset)} alt="" />
+                <span>{label}</span>
+                <ChevronDown className="sidebar__nav-chevron" size={14} />
+              </button>
+              {brandKitOpen && <div className="sidebar-brand-list" aria-label="Marcas do Brand Kit">
+                {brands.map((brand) => {
+                  const selectedBrand = new URLSearchParams(location.search).get('marca')
+                  return <button
+                    type="button"
+                    key={brand.id}
+                    className={selectedBrand === brand.id ? 'active' : ''}
+                    onClick={() => go(`/brand-kit?marca=${encodeURIComponent(brand.id)}`)}
+                  >
+                    <i style={{ background: brand.color }} />
+                    <span>{brand.name}</span>
+                  </button>
+                })}
+              </div>}
+            </div>
+          ) : (
             <NavLink key={to} to={to} end={to === '/'} onClick={() => setMobileOpen(false)}>
               <img src={figmaAsset(asset)} alt="" />
               <span>{label}</span>
-              {expandable && <ChevronDown className="sidebar__nav-chevron" size={9} />}
             </NavLink>
           ))}
         </nav>
@@ -104,23 +134,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <button className="account-button" onClick={() => go('/perfil')}>
             <span
+              className="account-button__avatar"
               style={{
-                width: 28,
-                height: 28,
-                borderRadius: '50%',
                 background: currentUser?.avatarColor || '#d7ff70',
-                color: '#111',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: 12,
-                flexShrink: 0,
               }}
             >
               {currentUser?.avatarUrl ? <img src={currentUser.avatarUrl} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : currentUser?.avatarInitials || (currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : 'AS')}
             </span>
-            <span><strong>{currentUser?.name || 'Minha Conta'}</strong></span>
+            <span className="account-button__identity"><strong>{currentUser?.name || 'Minha Conta'}</strong></span>
             <ChevronDown size={13} />
           </button>
         </div>
