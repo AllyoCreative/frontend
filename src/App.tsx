@@ -37,7 +37,7 @@ export default function App() {
   if (!authenticated) return <LoginPage onAuthenticated={login} />
 
   return <>
-    <AppProvider><Suspense fallback={<LoadingScreen />}>
+    <AppProvider onLogout={logout}><Suspense fallback={<LoadingScreen />}>
       {location.pathname === '/novo-projeto' ? <Routes><Route path="/novo-projeto" element={<NewProjectPage />} /><Route path="*" element={<Navigate to="/novo-projeto" replace />} /></Routes> : <AppShell><Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/projetos" element={<ProjectsPage />} />

@@ -62,8 +62,35 @@ function loadPreferences(serverPreferences?: UserSummary['notificationPreference
 }
 
 export function ProfilePage() {
-  const { currentUser } = useApp()
-  if (!currentUser) return <div className="page profile-page"><div className="loading-screen"><span /><p>Carregando perfil...</p></div></div>
+  const { currentUser, isLoading, logout } = useApp()
+
+  if (isLoading) {
+    return (
+      <div className="page profile-page">
+        <div className="loading-screen">
+          <span />
+          <p>Carregando perfil...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="page profile-page">
+        <div style={{ maxWidth: 440, margin: '80px auto', textAlign: 'center', background: '#141416', border: '1px solid #242426', borderRadius: 16, padding: '36px 28px' }}>
+          <h2 style={{ color: '#ffffff', fontSize: 20, marginBottom: 12 }}>Sessão expirada</h2>
+          <p style={{ color: '#a1a1a6', fontSize: 14, marginBottom: 24, lineHeight: 1.5 }}>
+            Não foi possível carregar as informações do seu perfil. Por favor, acesse novamente com seu e-mail.
+          </p>
+          <button type="button" className="primary-button" style={{ width: '100%' }} onClick={logout}>
+            Entrar novamente
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return <ProfileEditor key={currentUser.id} currentUser={currentUser} />
 }
 

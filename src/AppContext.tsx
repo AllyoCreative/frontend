@@ -54,7 +54,7 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | null>(null)
 
-export function AppProvider({ children }: { children: ReactNode }) {
+export function AppProvider({ children, onLogout }: { children: ReactNode; onLogout?: () => void }) {
   const [projects, setProjects] = useState<Project[]>([])
   const [toast, setToast] = useState<Toast | null>(null)
   const [currentUser, setCurrentUser] = useState<UserSummary | null>(null)
@@ -76,6 +76,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     window.setTimeout(() => setToast((current) => current?.id === next.id ? null : current), 3200)
   }, [])
 
+  const logout = useCallback(() => {
+    clearAuthToken()
+    setCurrentUser(null)
+    if (onLogout) {
+      onLogout()
+    } else {
+      window.location.reload()
+    }
+  }, [onLogout])
+
   const refreshUser = useCallback(async () => {
     try {
       const data = await api.getMe()
@@ -90,9 +100,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setMembers(memberList)
       }
     } catch {
-      // Offline / unauthenticated
+      logout()
     }
-  }, [])
+  }, [logout])
 
   const refreshProjects = useCallback(async () => {
     try {
@@ -121,6 +131,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (meResult.status === 'fulfilled' && meResult.value) {
         if (meResult.value.user) setCurrentUser(meResult.value.user)
         if (meResult.value.workspace) setWorkspace(meResult.value.workspace)
+      } else if (meResult.status === 'rejected') {
+        console.warn('Sessão expirada ou não encontrada no servidor:', meResult.reason)
+        logout()
       }
 
       if (membersResult.status === 'fulfilled' && membersResult.value) {
@@ -129,7 +142,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       setIsLoading(false)
     })
-      .catch(() => {})
+      .catch(() => {
+        setIsLoading(false)
+      })
 
     // Conecta WebSocket para atualizações em tempo real do ManySpace
     socket.connect()
@@ -165,7 +180,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       socket.off('STATUS_UPDATED', handleStatusUpdate)
       socket.off('TEAM_ASSIGNED', handleTeamAssigned)
     }
-  }, [notify])
+  }, [notify, logout])
 
   const addProject = useCallback(async (projectData: Partial<Project> & { objective?: string; audience?: string; tone?: string }) => {
     try {
@@ -270,11 +285,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [notify])
 
-  const logout = useCallback(() => {
-    clearAuthToken()
-    setCurrentUser(null)
-    window.location.reload()
-  }, [])
 
   const value = useMemo(() => ({
     projects,
