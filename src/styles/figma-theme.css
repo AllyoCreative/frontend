@@ -1454,21 +1454,22 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .sidebar-team-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
 /* Profile, Account Administration, and Multi-brand Entry */
-.profile-page, .account-admin-page { max-width: 1380px; color: #131f15; }
-.profile-page__header, .account-admin-header { display: flex; align-items: flex-end; justify-content: space-between; padding-bottom: 24px; border-bottom: 1px solid #d8dcd5; gap: 20px; }
-.profile-page__header .eyebrow, .account-admin-header .eyebrow { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #004c46; margin-bottom: 6px; display: inline-block; }
-.profile-page__header h1, .account-admin-header h1 { margin: 0; font-size: 32px; font-weight: 800; letter-spacing: -.03em; color: #131f15; line-height: 1.2; }
-.profile-page__header p, .account-admin-header p { margin: 6px 0 0; color: #53605a; font-size: 15px; line-height: 1.5; }
+.profile-page, .account-admin-page { width: min(1240px, 100%); max-width: none; min-height: 830px; margin: 0 auto; padding: 28px 20px 80px; color: #131f15; }
+.profile-page__header, .account-admin-header { min-height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0; border: 0; gap: 24px; }
+.profile-page__header .eyebrow, .account-admin-header .eyebrow { display: block; margin-bottom: 3px; color: #778078; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+.profile-page__header h1, .account-admin-header h1 { margin: 0; color: #131f15; font-size: 24px; font-weight: 700; line-height: 32px; letter-spacing: 0; }
+.profile-page__header p, .account-admin-header p { margin: 3px 0 0; color: #68726c; font-size: 12px; line-height: 17px; }
 
 /* Tabs Navigation */
-.profile-tabs, .account-tabs { display: flex; gap: 8px; margin: 28px 0 32px; border-bottom: 1px solid #d8dcd5; padding-bottom: 14px; overflow-x: auto; }
-.profile-tabs button, .account-tabs button { min-height: 44px; display: inline-flex; align-items: center; gap: 9px; padding: 0 20px; border: 1px solid transparent; border-radius: 999px; background: transparent; color: #53605a; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all .16s ease; }
-.profile-tabs button:hover, .account-tabs button:hover { background: #eef1ec; color: #004c46; }
-.profile-tabs button.active, .account-tabs button.active { border-color: transparent; background: #004c46; color: #ffffff; font-weight: 650; box-shadow: 0 4px 14px rgba(0,76,70,.18); }
+.profile-tabs, .account-tabs { min-height: 40px; display: flex; align-items: center; gap: 6px; margin: 20px 0 24px; padding: 0; border: 0; overflow-x: auto; }
+.profile-tabs button, .account-tabs button { min-height: 40px; display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; border: 0; border-radius: 7px; background: transparent; color: #0d1e1d; font-size: 13px; font-weight: 650; line-height: 18px; cursor: pointer; white-space: nowrap; transition: background-color .16s ease, color .16s ease, transform .16s ease; }
+.profile-tabs button:hover, .account-tabs button:hover { background: #e8ece7; color: #004c46; }
+.profile-tabs button:active, .account-tabs button:active { transform: scale(.97); }
+.profile-tabs button.active, .account-tabs button.active { background: #edf4ed; color: #004c46; box-shadow: inset 0 -2px #004c46; }
 
 /* Common Section & Card Structure (Home Card Style) */
-.profile-form { display: grid; gap: 24px; }
-.profile-section, .preferences-panel, .account-section { padding: 32px; border: 1px solid #d8dcd5; border-radius: 14px; background: #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,.02); }
+.profile-form { display: grid; gap: 20px; }
+.profile-section, .preferences-panel, .account-section { padding: 24px; border: 0; border-radius: 10px; background: #ffffff; box-shadow: none; }
 .profile-section__heading { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 26px; padding-bottom: 18px; border-bottom: 1px solid #eef1ec; }
 .profile-section__heading h2, .preferences-panel header h2, .account-section h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.02em; color: #131f15; line-height: 1.3; }
 .profile-section__heading p, .preferences-panel header p, .account-section__header p { margin: 4px 0 0; color: #53605a; font-size: 14px; line-height: 1.5; }
@@ -1487,9 +1488,9 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 /* Form Fields (Consistent Briefing Input Style) */
 .profile-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 24px; }
 .profile-fields label, .account-modal label { display: grid; gap: 8px; color: #13231e; font-size: 14px; font-weight: 600; line-height: 1.4; }
-.profile-fields input, .profile-fields select, .account-modal input, .account-modal select, .teams-card input { width: 100%; height: 48px; padding: 0 16px; outline: 0; border: 1px solid #d8dcd5; border-radius: 8px; background: #ffffff; color: #131f15; font-size: 14px; font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; transition: border-color .16s ease, box-shadow .16s ease; }
+.profile-fields input, .profile-fields select, .account-modal input, .account-modal select, .teams-card input { width: 100%; height: 46px; padding: 0 14px; outline: 0; border: 1px solid transparent; border-radius: 7px; background: #f4f5f4; color: #131f15; font-size: 13px; font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease; }
 .profile-fields input:focus, .profile-fields select:focus, .account-modal input:focus, .account-modal select:focus, .teams-card input:focus { border-color: #004c46; box-shadow: 0 0 0 3px rgba(0,76,70,.12); }
-.profile-fields input[readonly] { color: #53605a; background: #f4f6f2; border-color: #d8dcd5; cursor: default; }
+.profile-fields input[readonly] { color: #7f8982; background: #e9ece8; border-color: transparent; cursor: default; }
 .profile-fields select { cursor: pointer; }
 .profile-fields--password { max-width: 760px; }
 .field-with-icon { position: relative; }
@@ -1523,8 +1524,8 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 /* Account Administration */
 .account-overview { display: grid; gap: 24px; }
 .account-metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
-.account-metric-grid article { min-height: 170px; display: flex; flex-direction: column; justify-content: space-between; padding: 24px; border: 1px solid #d8dcd5; border-radius: 14px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,.02); transition: border-color .16s ease, transform .16s ease; }
-.account-metric-grid article:hover { border-color: #b8c1b5; transform: translateY(-1px); }
+.account-metric-grid article { min-height: 170px; display: flex; flex-direction: column; justify-content: space-between; padding: 22px; border: 0; border-radius: 10px; background: #ffffff; box-shadow: none; transition: background-color .16s ease, transform .16s ease; }
+.account-metric-grid article:hover { background: #fafbf9; transform: translateY(-1px); }
 .account-metric-grid article > span { color: #53605a; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 .account-metric-grid article > strong { margin: 12px 0 4px; font-size: 32px; font-weight: 800; letter-spacing: -.03em; color: #131f15; }
 .account-metric-grid article > small { color: #68726c; font-size: 13px; line-height: 1.4; }
@@ -1532,7 +1533,7 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .account-metric-grid article button:hover { gap: 8px; }
 
 /* Contract Banner */
-.contract-highlight { min-height: 190px; display: grid; grid-template-columns: 1.2fr 1fr; align-items: center; gap: 40px; padding: 36px 38px; border-radius: 16px; background: #003f3a; color: #ffffff; box-shadow: 0 12px 28px rgba(0,63,58,.15); }
+.contract-highlight { min-height: 190px; display: grid; grid-template-columns: 1.2fr 1fr; align-items: center; gap: 40px; padding: 34px 36px; border-radius: 10px; background: #003f3a; color: #ffffff; box-shadow: none; }
 .plan-badge { width: max-content; padding: 4px 10px; border-radius: 6px; background: #d7ff70; color: #13231e; font-size: 11px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
 .contract-highlight h2 { margin: 14px 0 8px; font-size: 24px; font-weight: 750; color: #ffffff; line-height: 1.25; }
 .contract-highlight p { margin: 0; color: #c4d7d0; font-size: 14px; line-height: 1.5; }
@@ -1544,7 +1545,7 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 /* Credits Layout */
 .account-section__header { min-height: 68px; display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 28px; padding-bottom: 18px; border-bottom: 1px solid #eef1ec; }
 .credits-layout { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 28px; }
-.credits-summary { padding: 28px; border: 1px solid #d8dcd5; border-radius: 14px; background: #fbfcf9; }
+.credits-summary { padding: 26px; border: 0; border-radius: 10px; background: #f4f5f4; }
 .credits-summary > small { display: block; margin-top: 24px; color: #53605a; font-size: 13px; font-weight: 600; }
 .credits-summary > strong { display: block; margin: 8px 0 4px; font-size: 38px; font-weight: 800; letter-spacing: -.04em; color: #131f15; }
 .credits-summary > p { margin: 0; color: #68726c; font-size: 13px; line-height: 1.4; }
@@ -1562,7 +1563,7 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .statement-row strong { font-size: 14px; font-weight: 700; color: #17773d; }
 
 /* Current Contract & History */
-.current-contract { display: grid; grid-template-columns: 1fr auto; align-items: start; overflow: hidden; border: 1px solid #d8dcd5; border-radius: 14px; background: #ffffff; }
+.current-contract { display: grid; grid-template-columns: 1fr auto; align-items: start; overflow: hidden; border: 1px solid #d8dcd5; border-radius: 10px; background: #ffffff; }
 .current-contract > div { display: grid; gap: 8px; padding: 28px; }
 .current-contract > div > strong { font-size: 30px; font-weight: 800; color: #131f15; letter-spacing: -.03em; }
 .current-contract > div > small { color: #53605a; font-size: 13px; }
@@ -1587,7 +1588,7 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 
 /* Team Administration */
 .team-admin-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(320px, .8fr); gap: 28px; }
-.team-members-card, .teams-card { padding: 26px; border: 1px solid #d8dcd5; border-radius: 14px; background: #ffffff; }
+.team-members-card, .teams-card { padding: 22px; border: 0; border-radius: 10px; background: #f4f5f4; }
 .team-members-card h3, .teams-card h3 { margin: 0 0 18px; font-size: 17px; font-weight: 700; color: #131f15; }
 .member-row { min-height: 68px; display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 14px; border-top: 1px solid #eef1ec; padding: 10px 0; }
 .member-avatar { width: 38px; height: 38px; display: grid; place-items: center; overflow: hidden; border-radius: 50%; font-size: 13px; font-weight: 700; color: #111; flex-shrink: 0; }
@@ -1608,8 +1609,8 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 
 /* Managed Brands Grid */
 .managed-brand-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
-.managed-brand-grid article { min-height: 110px; display: grid; grid-template-columns: 60px minmax(0, 1fr) auto; align-items: center; gap: 18px; padding: 22px; border: 1px solid #d8dcd5; border-radius: 14px; background: #ffffff; transition: all .16s ease; }
-.managed-brand-grid article:hover { border-color: #b8c1b5; box-shadow: 0 4px 16px rgba(0,0,0,.04); }
+.managed-brand-grid article { min-height: 110px; display: grid; grid-template-columns: 60px minmax(0, 1fr) auto; align-items: center; gap: 18px; padding: 20px; border: 0; border-radius: 10px; background: #f4f5f4; transition: background-color .16s ease, box-shadow .16s ease, transform .16s ease; }
+.managed-brand-grid article:hover { background: #ffffff; box-shadow: 0 10px 24px rgba(13,30,29,.06); transform: translateY(-2px); }
 .managed-brand-grid article > span { width: 60px; height: 60px; display: grid; place-items: center; border-radius: 14px; color: #ffffff; font-size: 18px; font-weight: 800; flex-shrink: 0; }
 .managed-brand-grid h3 { margin: 0 0 6px; font-size: 16px; font-weight: 700; color: #131f15; }
 .managed-brand-grid p { margin: 0; color: #53605a; font-size: 13px; line-height: 1.4; }
