@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Project } from './types'
-import { api, type UserSummary, type WorkspaceSummary, clearAuthToken } from './services/api'
+import { api, type ProfileUpdate, type UserSummary, type WorkspaceSummary, clearAuthToken } from './services/api'
 import { socket, type SocketEventPayload } from './services/socket'
 
 interface Toast {
@@ -20,6 +20,18 @@ export interface AppTask {
 
 export type ProjectWithTasks = Project & { tasksList?: AppTask[] }
 
+export interface ManagedBrand {
+  id: string
+  name: string
+  description: string
+  color: string
+  initials: string
+}
+
+const DEFAULT_BRANDS: ManagedBrand[] = [
+  { id: 'fauves', name: 'Fauves', description: 'Marca principal', color: '#004c46', initials: 'FV' },
+]
+
 interface AppContextValue {
   projects: Project[]
   addProject: (project: Partial<Project> & { objective?: string; audience?: string; tone?: string }) => Promise<Project>
@@ -28,11 +40,13 @@ interface AppContextValue {
   currentUser: UserSummary | null
   workspace: WorkspaceSummary | null
   members: UserSummary[]
+  brands: ManagedBrand[]
   isLoading: boolean
   refreshUser: () => Promise<void>
   refreshProjects: () => Promise<void>
-  updateProfile: (data: Partial<UserSummary>) => Promise<void>
+  updateProfile: (data: ProfileUpdate) => Promise<void>
   addMember: (data: { name: string; email: string; jobTitle?: string }) => Promise<void>
+  addBrand: (data: Pick<ManagedBrand, 'name' | 'description' | 'color'>) => void
   createTask: (projectId: string, title: string, team?: string) => Promise<void>
   toggleTaskStatus: (projectId: string, taskId: string, currentStatus: string) => Promise<void>
   logout: () => void
@@ -46,6 +60,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<UserSummary | null>(null)
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null)
   const [members, setMembers] = useState<UserSummary[]>([])
+  const [brands, setBrands] = useState<ManagedBrand[]>(() => {
+    try {
+      const saved = window.localStorage.getItem('allyo-managed-brands')
+      return saved ? JSON.parse(saved) as ManagedBrand[] : DEFAULT_BRANDS
+    } catch {
+      return DEFAULT_BRANDS
+    }
+  })
   const [isLoading, setIsLoading] = useState(true)
 
   const notify = useCallback((message: string) => {
@@ -172,7 +194,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [notify])
 
-  const updateProfile = useCallback(async (data: Partial<UserSummary>) => {
+  const updateProfile = useCallback(async (data: ProfileUpdate) => {
     try {
       const res = await api.updateMe(data)
       if (res.user) {
@@ -182,6 +204,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch {
       notify('Erro ao atualizar perfil')
     }
+  }, [notify])
+
+  const addBrand = useCallback((data: Pick<ManagedBrand, 'name' | 'description' | 'color'>) => {
+    const initials = data.name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()
+    const brand: ManagedBrand = { ...data, id: `${data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`, initials }
+    setBrands((current) => {
+      const next = [...current, brand]
+      window.localStorage.setItem('allyo-managed-brands', JSON.stringify(next))
+      return next
+    })
+    notify(`${data.name} adicionada às marcas gerenciadas`)
   }, [notify])
 
   const addMember = useCallback(async (data: { name: string; email: string; jobTitle?: string }) => {
@@ -251,11 +284,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     currentUser,
     workspace,
     members,
+    brands,
     isLoading,
     refreshUser,
     refreshProjects,
     updateProfile,
     addMember,
+    addBrand,
     createTask,
     toggleTaskStatus,
     logout,
@@ -267,11 +302,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     currentUser,
     workspace,
     members,
+    brands,
     isLoading,
     refreshUser,
     refreshProjects,
     updateProfile,
     addMember,
+    addBrand,
     createTask,
     toggleTaskStatus,
     logout,

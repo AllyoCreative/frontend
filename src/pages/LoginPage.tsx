@@ -66,7 +66,7 @@ export function LoginPage({ onAuthenticated }: { onAuthenticated: () => void }) 
     setErrorMessage(null)
     setLoading(true)
     try {
-      await api.verifyOtp(identity.trim() || 'levycamara@hotmail.com', codeString)
+      await api.verifyOtp(identity.trim(), codeString)
       changeStep('welcome')
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : 'Código incorreto ou expirado. Tente novamente.'
@@ -202,7 +202,7 @@ export function LoginPage({ onAuthenticated }: { onAuthenticated: () => void }) 
         {step === 'code' && (
           <section className={`auth-content auth-content--code auth-otp-enter ${isLeaving ? 'auth-step-leave' : ''}`}>
             <p>
-              Digite o código enviado para <strong style={{ color: '#ffffff' }}>{identity.trim().toLowerCase()}</strong>:
+              Se houver uma conta cadastrada, enviaremos um código para <strong style={{ color: '#ffffff' }}>{identity.trim().toLowerCase()}</strong>.
               {sentCodeHint && (
                 <span style={{ display: 'block', fontSize: '13px', color: '#d7ff70', marginTop: '6px' }}>
                   Código gerado: <strong>{sentCodeHint}</strong>

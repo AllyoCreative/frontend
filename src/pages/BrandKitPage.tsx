@@ -1,6 +1,6 @@
 import { type CSSProperties, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { ArrowLeft, Download, Plus, Upload } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Download, Plus, Upload } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
 
@@ -125,9 +125,11 @@ function ResourcePreview({ folder, resource }: { folder: BrandFolder; resource: 
 }
 
 export function BrandKitPage() {
-  const { notify } = useApp()
+  const { notify, brands } = useApp()
+  const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null)
   const [activeFolder, setActiveFolder] = useState<FolderPreview | null>(null)
   const selectedFolder = folders.find((folder) => folder.preview === activeFolder)
+  const selectedBrand = brands.find((brand) => brand.id === selectedBrandId)
 
   const changeFolder = (folder: FolderPreview | null) => {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -146,9 +148,24 @@ export function BrandKitPage() {
   }
 
   return <div className={`page brand-page${selectedFolder ? ' brand-page--open' : ''}`}>
-    {!selectedFolder ? <>
+    {!selectedBrand ? <section className="brand-selector">
       <header className="brand-header">
-        <h1>Brand Kit <span>›</span> <b>Fauves</b></h1>
+        <h1>Brand Kit</h1>
+        <p>Selecione uma marca para acessar seus recursos oficiais.</p>
+      </header>
+      <div className="brand-selector__grid">
+        {brands.map((brand) => <button type="button" key={brand.id} onClick={() => setSelectedBrandId(brand.id)}>
+          <span className="brand-selector__mark" style={{ background: brand.color }}>{brand.initials}</span>
+          <span><strong>{brand.name}</strong><small>{brand.description}</small><em>5 coleções de recursos</em></span>
+          <ChevronRight size={20} />
+        </button>)}
+      </div>
+    </section> : !selectedFolder ? <>
+      <button type="button" className="brand-back brand-back--brands" onClick={() => setSelectedBrandId(null)}>
+        <ArrowLeft size={18} /> Todas as marcas
+      </button>
+      <header className="brand-header">
+        <h1>Brand Kit <span>›</span> <b>{selectedBrand.name}</b></h1>
         <p>Todos os recursos oficiais da marca, organizados em um só lugar.</p>
       </header>
 
@@ -173,7 +190,7 @@ export function BrandKitPage() {
       <header className="brand-folder-view__header">
         <BrandFolderArt preview={selectedFolder.preview} shared />
         <div>
-          <span className="brand-folder-view__eyebrow">Brand Kit · Fauves</span>
+          <span className="brand-folder-view__eyebrow">Brand Kit · {selectedBrand.name}</span>
           <h1 id="brand-folder-title">{selectedFolder.name}</h1>
           <p>{selectedFolder.description} · {selectedFolder.count}</p>
         </div>

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { ChevronDown, Menu, X } from 'lucide-react'
+import { ChevronDown, HelpCircle, Menu, X } from 'lucide-react'
 import { figmaAsset } from '../assets/figma'
 import { canAccessBrandBrain } from '../config/productAccess'
 import { Logo } from './Logo'
@@ -19,7 +19,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [recentOpen, setRecentOpen] = useState(true)
   const navigate = useNavigate()
   const location = useLocation()
-  const { toast, projects, currentUser } = useApp()
+  const { toast, projects, currentUser, members, notify } = useApp()
   const isHome = location.pathname === '/'
 
   const go = (path: string) => {
@@ -32,8 +32,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="mobile-header">
         <button className="icon-button" onClick={() => setMobileOpen(true)} aria-label="Abrir menu"><Menu size={21} /></button>
         <Logo />
-        <button className="avatar avatar--0" onClick={() => go('/conta')} aria-label="Abrir conta">
-          {currentUser?.avatarInitials || (currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : 'AS')}
+        <button className="avatar avatar--0" onClick={() => go('/perfil')} aria-label="Abrir perfil">
+          {currentUser?.avatarUrl ? <img src={currentUser.avatarUrl} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : currentUser?.avatarInitials || (currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : 'AS')}
         </button>
       </header>
 
@@ -96,13 +96,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="sidebar__footer">
           <button className="account-summary" onClick={() => go('/conta')}><img src={figmaAsset('home.imgVector10')} alt="" /><span>Conta</span></button>
           <div className="allyo-team">
-            <img className="allyo-team__tools" src={figmaAsset('home.imgFrame1410119637')} alt="" />
-            <div>
-              {[1, 2, 3, 4].map((item) => <img key={item} src={figmaAsset(item === 4 ? 'home.imgEllipse15' : 'home.imgEllipse14')} alt="" />)}
-              <b>+4</b>
+            <button type="button" className="sidebar-faq" onClick={() => notify('A Central de Ajuda será aberta aqui')} aria-label="Abrir FAQ"><HelpCircle size={18} /><span>FAQ</span></button>
+            <div aria-label={`${members.length} pessoas no seu time`}>
+              {members.slice(0, 4).map((member) => <span className="sidebar-team-avatar" key={member.id} style={{ background: member.avatarColor || '#d7ff70' }}>{member.avatarUrl ? <img src={member.avatarUrl} alt="" /> : member.avatarInitials}</span>)}
+              {members.length > 4 && <b>+{members.length - 4}</b>}
             </div>
           </div>
-          <button className="account-button" onClick={() => go('/conta')}>
+          <button className="account-button" onClick={() => go('/perfil')}>
             <span
               style={{
                 width: 28,
@@ -118,7 +118,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 flexShrink: 0,
               }}
             >
-              {currentUser?.avatarInitials || (currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : 'AS')}
+              {currentUser?.avatarUrl ? <img src={currentUser.avatarUrl} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : currentUser?.avatarInitials || (currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : 'AS')}
             </span>
             <span><strong>{currentUser?.name || 'Minha Conta'}</strong></span>
             <ChevronDown size={13} />

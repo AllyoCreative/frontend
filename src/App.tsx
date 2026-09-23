@@ -13,6 +13,7 @@ const BrandKitPage = lazy(() => import('./pages/BrandKitPage').then((module) => 
 const BrandBrainPage = lazy(() => import('./pages/BrandBrainPage').then((module) => ({ default: module.BrandBrainPage })))
 const NewProjectPage = lazy(() => import('./pages/NewProjectPage').then((module) => ({ default: module.NewProjectPage })))
 const AccountPage = lazy(() => import('./pages/AccountPage').then((module) => ({ default: module.AccountPage })))
+const ProfilePage = lazy(() => import('./pages/ProfilePage').then((module) => ({ default: module.ProfilePage })))
 
 function LoadingScreen() {
   return <div className="loading-screen"><span /><p>Preparando seu espaço...</p></div>
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="/brand-kit" element={<BrandKitPage />} />
         {canAccessBrandBrain && <Route path="/brand-brain" element={<BrandBrainPage />} />}
         <Route path="/conta" element={<AccountPage onLogout={logout} />} />
+        <Route path="/perfil" element={<ProfilePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes></AppShell>}
     </Suspense></AppProvider>

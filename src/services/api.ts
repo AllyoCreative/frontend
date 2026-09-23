@@ -11,7 +11,13 @@ export interface UserSummary {
   avatarColor?: string
   jobTitle?: string
   language?: string
+  phone?: string
+  timezone?: string
+  avatarUrl?: string | null
+  notificationPreferences?: Record<string, Record<string, boolean>>
 }
+
+export type ProfileUpdate = Partial<UserSummary> & { newPassword?: string }
 
 export interface WorkspaceSummary {
   id: string
@@ -236,7 +242,7 @@ export const api = {
   },
 
   // Team & Profile
-  async updateMe(data: Partial<UserSummary>) {
+  async updateMe(data: ProfileUpdate) {
     return request<{ success: boolean; user: UserSummary }>('/auth/me', {
       method: 'PATCH',
       body: JSON.stringify(data),
