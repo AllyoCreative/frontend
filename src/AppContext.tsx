@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Project } from './types'
-import { api, type AccountOverview, type ManagedBrandSummary, type ProfileUpdate, type UserSummary, type WorkspaceSummary, clearAuthToken } from './services/api'
+import { api, type AccountOverview, type CatalogScope, type ManagedBrandSummary, type ProfileUpdate, type UserSummary, type WorkspaceSummary, clearAuthToken } from './services/api'
 import { socket, type SocketEventPayload } from './services/socket'
 
 interface Toast {
@@ -24,7 +24,7 @@ export type ManagedBrand = ManagedBrandSummary
 
 interface AppContextValue {
   projects: Project[]
-  addProject: (project: Partial<Project> & { objective?: string; audience?: string; tone?: string }) => Promise<Project>
+  addProject: (project: Partial<Project> & { objective?: string; audience?: string; tone?: string; catalogCode?: string; catalogScope?: CatalogScope }) => Promise<Project>
   toast: Toast | null
   notify: (message: string) => void
   currentUser: UserSummary | null
@@ -191,30 +191,15 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
     }
   }, [notify, logout])
 
-  const addProject = useCallback(async (projectData: Partial<Project> & { objective?: string; audience?: string; tone?: string }) => {
+  const addProject = useCallback(async (projectData: Partial<Project> & { objective?: string; audience?: string; tone?: string; catalogCode?: string; catalogScope?: CatalogScope }) => {
     try {
       const created = await api.createProject(projectData)
       setProjects((current) => [created, ...current])
       notify('Projeto criado com sucesso!')
       return created
-    } catch (err) {
-      console.warn('Could not sync project with backend:', err)
-      const fallback: Project = {
-        id: projectData.id || `proj-${Date.now()}`,
-        name: projectData.name || 'Novo Projeto',
-        service: projectData.service || 'Design',
-        status: 'Rascunho',
-        deadline: 'A definir',
-        progress: 8,
-        tasks: 0,
-        unread: 0,
-        accent: projectData.accent || '#d7ff70',
-        team: ['LC'],
-        description: projectData.description || '',
-      }
-      setProjects((current) => [fallback, ...current])
-      notify('Projeto criado!')
-      return fallback
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : 'Não foi possível criar o projeto')
+      throw error
     }
   }, [notify])
 

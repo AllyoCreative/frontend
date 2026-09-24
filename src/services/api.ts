@@ -159,6 +159,94 @@ export interface ProjectFileSummary {
   createdAt: string
 }
 
+export interface CatalogAddonRule {
+  name: string
+  step?: number
+  unit?: string
+  credits?: number
+  additionalCredits?: number
+  included?: number
+  deliveryLimit?: string
+}
+
+export interface CatalogAddon {
+  code: string
+  name: string
+  credits: number
+  billable: boolean
+  rule: CatalogAddonRule | null
+}
+
+export interface CatalogProduct {
+  code: string
+  name: string
+  description: string
+  category: string
+  subcategory: string | null
+  specialistRole: string
+  slaHours: number
+  deliveryQuantity: number | null
+  billing: {
+    label: string | null
+    ruleKey: string | null
+    unit: string
+    step: number
+    includedGroups: number
+    includedQuantity: number
+    countablePieces: boolean
+    maxQuantity: number | null
+    unitNote: string | null
+    wordsPerUnit: number | null
+    characterCredits: number | null
+  }
+  credits: {
+    original: number
+    additional: number | null
+    resize: number | null
+    variation: number | null
+    additionalAllowed: boolean
+    resizeAllowed: boolean
+    variationAllowed: boolean
+  }
+  formats: {
+    editable: string[]
+    final: string[]
+    available: string[]
+    sizesAndRatios: string[]
+    channels: string[]
+  }
+  addons: CatalogAddon[]
+  relatedOptions: string[]
+  version: number
+}
+
+export interface CatalogScope {
+  quantity: number
+  taskRepeats: number
+  resizeCount: number
+  variationCount: number
+  characterCount: number
+  addons: Record<string, number>
+}
+
+export interface CatalogQuote {
+  catalogCode: string
+  productName: string
+  scope: CatalogScope
+  totalCredits: number
+  slaHours: number
+  breakdown: {
+    base: number
+    additional: number
+    resize: number
+    variation: number
+    characters: number
+    addons: number
+    taskRepeats: number
+    addonItems: Array<{ code: string; name: string; quantity: number; credits: number }>
+  }
+}
+
 export function getAuthToken(): string | null {
   return localStorage.getItem('allyo-auth-token')
 }
@@ -243,10 +331,22 @@ export const api = {
     return request<Project & { briefing: Record<string, unknown> | null; designs: DesignSummary[] }>(`/projects/${id}`)
   },
 
-  async createProject(data: Partial<Project> & { objective?: string; audience?: string; tone?: string }): Promise<Project> {
+  async createProject(data: Partial<Project> & { objective?: string; audience?: string; tone?: string; catalogCode?: string; catalogScope?: CatalogScope }): Promise<Project> {
     return request<Project>('/projects', {
       method: 'POST',
       body: JSON.stringify(data),
+    })
+  },
+
+  // Catalog
+  async getCatalog() {
+    return request<{ schemaVersion: string; products: CatalogProduct[] }>('/catalog')
+  },
+
+  async quoteCatalogProduct(catalogCode: string, scope: CatalogScope) {
+    return request<CatalogQuote>('/catalog/quote', {
+      method: 'POST',
+      body: JSON.stringify({ catalogCode, ...scope }),
     })
   },
 
