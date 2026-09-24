@@ -8,6 +8,9 @@ import type { Project, ProjectStatus } from '../types'
 type AssetName = Parameters<typeof figmaAsset>[0]
 
 interface ProjectTask {
+  title?: string
+  team?: string
+  deadlineDays?: number
   status: 'Concluído' | 'Em andamento'
   delivery?: 'Aprovado' | 'Aguardando aprovação'
 }
@@ -64,18 +67,49 @@ function FigmaIcon({ asset, className = '' }: { asset: AssetName; className?: st
   return <img className={className} src={figmaAsset(asset)} alt="" />
 }
 
-function FilterChip({ children, expandable = false, active = false, onClick }: {
+function FilterChip({ children, active = false, onClick }: {
   children: string
-  expandable?: boolean
   active?: boolean
   onClick?: () => void
 }) {
   return (
     <button className={`projects-filter-chip ${active ? 'is-active' : ''}`} onClick={onClick}>
       {children}
-      {expandable && <FigmaIcon asset="projects.imgWeuiArrowOutlined1" />}
     </button>
   )
+}
+
+function FilterDropdown({ label, value, options, onChange, display = false }: {
+  label: string
+  value: string
+  options: Array<{ value: string; label: string }>
+  onChange: (value: string) => void
+  display?: boolean
+}) {
+  const selected = options.find((option) => option.value === value)
+  return <details className={`projects-filter-dropdown${display ? ' projects-filter-dropdown--display' : ''}${value ? ' is-active' : ''}`}>
+    <summary className={display ? 'projects-display-by' : 'projects-filter-chip'}>
+      {display && <span>Exibir por</span>}
+      <strong>{selected?.label || label}</strong>
+      <FigmaIcon asset={display ? 'projects.imgWeuiArrowOutlined' : 'projects.imgWeuiArrowOutlined1'} />
+    </summary>
+    <div className="projects-filter-menu" role="menu">
+      {options.map((option) => <button
+        type="button"
+        className={option.value === value ? 'is-selected' : ''}
+        onClick={(event) => {
+          onChange(option.value)
+          event.currentTarget.closest('details')?.removeAttribute('open')
+        }}
+        role="menuitemradio"
+        aria-checked={option.value === value}
+        key={option.value || 'all'}
+      >
+        {option.label}
+        {option.value === value && <span aria-hidden="true">✓</span>}
+      </button>)}
+    </div>
+  </details>
 }
 
 function DeliveryCard({ state }: { state: 'Aprovado' | 'Aguardando aprovação' }) {
@@ -83,17 +117,16 @@ function DeliveryCard({ state }: { state: 'Aprovado' | 'Aguardando aprovação' 
     <div className="projects-delivery">
       <img src={figmaAsset('projects.imgRectangle161124126')} alt="Prévia do design entregue" />
       <span><strong>DESIGN ENTREGUE</strong><small>{state}</small></span>
-      <time>1h</time>
     </div>
   )
 }
 
 function ProjectStatusBadge({ status }: { status: ProjectStatus | 'Concluído' | 'Em andamento' }) {
   const isDone = status === 'Concluído'
-  return <b className={isDone ? 'is-done' : 'is-progress'}>{isDone ? 'Concluído' : 'Em andamento'}</b>
+  return <b className={isDone ? 'is-done' : 'is-progress'}>{status}</b>
 }
 
-function ProjectRow({ project, status }: { project: Project; status: 'Concluído' | 'Em andamento' }) {
+function ProjectRow({ project }: { project: Project }) {
   const navigate = useNavigate()
 
   return (
@@ -102,11 +135,11 @@ function ProjectRow({ project, status }: { project: Project; status: 'Concluído
         <FigmaIcon asset="projects.imgVector11" />
         <FigmaIcon asset="projects.imgVector12" />
         <h3>{project.name}</h3>
-        <small>3</small>
+        <small>{project.tasks}</small>
       </span>
       <span className="projects-row-meta">
-        <small>com prazo de 6 dias</small>
-        <ProjectStatusBadge status={status} />
+        <small>{project.deadline === 'A definir' ? 'sem prazo definido' : `prazo ${project.deadline}`}</small>
+        <ProjectStatusBadge status={project.status} />
       </span>
       <span className="projects-delivery-spacer" />
     </button>
@@ -122,11 +155,11 @@ function TaskRow({ project, task, separated = false }: { project: Project; task:
       onClick={() => navigate(`/projetos/${project.id}`)}
     >
       <span className="projects-row-name">
-        <strong>Nome da Tarefa</strong>
-        <small><i /> Design team</small>
+        <strong>{task.title || 'Tarefa do projeto'}</strong>
+        <small><i /> {task.team || 'Sem equipe'}</small>
       </span>
       <span className="projects-row-meta">
-        <small>com prazo de 2 dias</small>
+        <small>{task.deadlineDays !== undefined ? `prazo de ${task.deadlineDays} dia(s)` : 'sem prazo definido'}</small>
         <ProjectStatusBadge status={task.status} />
       </span>
       {task.delivery ? <DeliveryCard state={task.delivery} /> : <span className="projects-delivery-spacer" />}
@@ -134,10 +167,9 @@ function TaskRow({ project, task, separated = false }: { project: Project; task:
   )
 }
 
-function ProjectGroup({ title, project, projectStatus, tasks }: {
+function ProjectGroup({ title, project, tasks }: {
   title: string
   project: Project
-  projectStatus: 'Concluído' | 'Em andamento'
   tasks: ProjectTask[]
 }) {
   return (
@@ -147,7 +179,7 @@ function ProjectGroup({ title, project, projectStatus, tasks }: {
         <FigmaIcon asset="projects.imgWeuiArrowOutlined1" />
       </button>
       <div className="projects-group__rows">
-        <ProjectRow project={project} status={projectStatus} />
+        <ProjectRow project={project} />
         {tasks.map((task, index) => <TaskRow key={`${task.status}-${index}`} project={project} task={task} separated={index === 2} />)}
       </div>
     </section>
@@ -155,29 +187,29 @@ function ProjectGroup({ title, project, projectStatus, tasks }: {
 }
 
 function AllocationPanel() {
-  const { workspace } = useApp()
-  const hoursEstimated = workspace?.hoursEstimated ?? 120
-  const hoursUsed = workspace?.hoursUsed ?? 0
-  const availableHours = Math.max(0, Math.round(hoursEstimated - hoursUsed))
-  const percentUsed = Math.min(100, Math.round((hoursUsed / (hoursEstimated || 1)) * 100))
+  const { account } = useApp()
+  const allowance = account?.workspace.creditAllowance ?? 0
+  const availableCredits = account?.workspace.creditsAvailable ?? 0
+  const creditsUsed = account?.workspace.creditsUsed ?? 0
+  const teams = account?.teams ?? []
+  const percentUsed = allowance > 0 ? Math.min(100, Math.round((creditsUsed / allowance) * 100)) : 0
 
   return (
     <aside className="home-allocation-stack projects-allocation-panel">
       <section className="home-allocation-card home-allocation-card--subscription">
         <header><FigmaIcon asset="projects.imgGroup1410119714" /><h2>Assinatura</h2></header>
         <div className="home-allocation-progress"><i style={{ width: `${percentUsed}%` }} /></div>
-        <footer><span>Disponível</span><strong>{availableHours} <FigmaIcon asset="projects.imgBasilArrowRightOutline" /> {hoursEstimated}</strong></footer>
+        <footer><span>Disponível</span><strong>{availableCredits} <FigmaIcon asset="projects.imgBasilArrowRightOutline" /> {allowance}</strong></footer>
       </section>
 
-      <section className="home-allocation-card">
-        <header><i className="home-team-color home-team-color--design" /><h2>Design Team</h2></header>
-        <footer><span>Usado</span><strong>{hoursUsed > 0 ? Math.round(hoursUsed * 0.6) : 0}</strong></footer>
-      </section>
-
-      <section className="home-allocation-card">
-        <header><i className="home-team-color home-team-color--sales" /><h2>Sales Team</h2></header>
-        <footer><span>Usado</span><strong>{hoursUsed > 0 ? Math.round(hoursUsed * 0.4) : 0}</strong></footer>
-      </section>
+      {teams.map((team) => <section className="home-allocation-card" key={team.id}>
+        <header><i className="home-team-color" style={{ background: team.color }} /><h2>{team.name}</h2></header>
+        <footer><span>Usado</span><strong>{team.creditsUsed}</strong></footer>
+      </section>)}
+      {teams.length === 0 && <section className="home-allocation-card home-allocation-card--empty">
+        <header><h2>Nenhuma equipe criada</h2></header>
+        <footer><span>Crie equipes em Conta</span></footer>
+      </section>}
     </aside>
   )
 }
@@ -260,7 +292,7 @@ function ProjectsCalendar({ projects, cursor, showWeekends, onCursorChange, onSh
 }
 
 export function ProjectsPage() {
-  const { projects, notify } = useApp()
+  const { projects, members } = useApp()
   const [view, setView] = useState<ProjectsView>('list')
   const [calendarCursor, setCalendarCursor] = useState(() => {
     const today = new Date()
@@ -270,19 +302,63 @@ export function ProjectsPage() {
   const [query, setQuery] = useState('')
   const [attentionOnly, setAttentionOnly] = useState(false)
   const [unreadOnly, setUnreadOnly] = useState(false)
-  const [statusOnly, setStatusOnly] = useState(false)
+  const [statusFilter, setStatusFilter] = useState('')
+  const [collaboratorFilter, setCollaboratorFilter] = useState('')
+  const [deadlineFilter, setDeadlineFilter] = useState('')
+  const [teamFilter, setTeamFilter] = useState('')
+  const [sortBy, setSortBy] = useState('status')
   const [reverse, setReverse] = useState(false)
+
+  const statusOptions = useMemo(() => [
+    { value: '', label: 'Todos os status' },
+    ...Array.from(new Set(projects.map((project) => project.status))).sort().map((status) => ({ value: status, label: status })),
+  ], [projects])
+
+  const collaboratorOptions = useMemo(() => {
+    const projectInitials = new Set(projects.flatMap((project) => project.team))
+    return [
+      { value: '', label: 'Todos os colaboradores' },
+      ...members.filter((member) => member.avatarInitials && projectInitials.has(member.avatarInitials)).map((member) => ({ value: member.avatarInitials!, label: member.name })),
+    ]
+  }, [members, projects])
+
+  const teamOptions = useMemo(() => {
+    const names = new Set(projects.flatMap((project) => (project as Project & { tasksList?: ProjectTask[] }).tasksList?.map((task) => task.team).filter(Boolean) || []))
+    return [{ value: '', label: 'Todos os times' }, ...Array.from(names).sort().map((name) => ({ value: name!, label: name! }))]
+  }, [projects])
 
   const visible = useMemo(() => {
     const filtered = projects.filter((project) => {
       const matchesQuery = `${project.name} ${project.service}`.toLowerCase().includes(query.toLowerCase())
       const matchesAttention = !attentionOnly || project.status === 'Em revisão'
       const matchesUnread = !unreadOnly || project.unread > 0
-      const matchesStatus = !statusOnly || project.status === 'Em andamento'
-      return matchesQuery && matchesAttention && matchesUnread && matchesStatus
+      const matchesStatus = !statusFilter || project.status === statusFilter
+      const matchesCollaborator = !collaboratorFilter || project.team.includes(collaboratorFilter)
+      const projectDeadline = deadlineDate(project.deadline, startOfDay(new Date()))
+      const today = startOfDay(new Date())
+      const sevenDays = new Date(today)
+      sevenDays.setDate(today.getDate() + 7)
+      const matchesDeadline = !deadlineFilter
+        || (deadlineFilter === 'today' && projectDeadline && dateKey(projectDeadline) === dateKey(today))
+        || (deadlineFilter === 'week' && projectDeadline && projectDeadline >= today && projectDeadline <= sevenDays)
+        || (deadlineFilter === 'overdue' && projectDeadline && projectDeadline < today)
+        || (deadlineFilter === 'unscheduled' && !projectDeadline)
+      const taskTeams = (project as Project & { tasksList?: ProjectTask[] }).tasksList?.map((task) => task.team) || []
+      const matchesTeam = !teamFilter || taskTeams.includes(teamFilter)
+      return matchesQuery && matchesAttention && matchesUnread && matchesStatus && matchesCollaborator && matchesDeadline && matchesTeam
     })
-    return reverse ? [...filtered].reverse() : filtered
-  }, [attentionOnly, projects, query, reverse, statusOnly, unreadOnly])
+    const sorted = [...filtered].sort((left, right) => {
+      if (sortBy === 'name') return left.name.localeCompare(right.name, 'pt-BR')
+      if (sortBy === 'deadline') {
+        const today = startOfDay(new Date())
+        const leftDate = deadlineDate(left.deadline, today)?.getTime() ?? Number.MAX_SAFE_INTEGER
+        const rightDate = deadlineDate(right.deadline, today)?.getTime() ?? Number.MAX_SAFE_INTEGER
+        return leftDate - rightDate
+      }
+      return left.status.localeCompare(right.status, 'pt-BR') || left.name.localeCompare(right.name, 'pt-BR')
+    })
+    return reverse ? sorted.reverse() : sorted
+  }, [attentionOnly, collaboratorFilter, deadlineFilter, projects, query, reverse, sortBy, statusFilter, teamFilter, unreadOnly])
 
   return (
     <div className="page projects-page" data-node-id="1:395">
@@ -298,9 +374,7 @@ export function ProjectsPage() {
             </div>
 
             <div className="projects-display-controls">
-              {view === 'list' && <button className="projects-display-by" onClick={() => setReverse((current) => !current)}>
-                <span>Exibir por</span><strong>Status</strong><FigmaIcon asset="projects.imgWeuiArrowOutlined" />
-              </button>}
+              {view === 'list' && <FilterDropdown display label="Exibir por" value={sortBy} onChange={setSortBy} options={[{ value: 'status', label: 'Status' }, { value: 'name', label: 'Nome' }, { value: 'deadline', label: 'Deadline' }]} />}
               <label className="projects-icon-control projects-search-control" aria-label="Buscar projetos">
                 <FigmaIcon asset="projects.imgIconamoonSearchBold" />
                 <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar projetos" />
@@ -314,10 +388,10 @@ export function ProjectsPage() {
           {view === 'list' && <div className="projects-filterbar">
             <FilterChip active={attentionOnly} onClick={() => setAttentionOnly((current) => !current)}>Ação necessária</FilterChip>
             <FilterChip active={unreadOnly} onClick={() => setUnreadOnly((current) => !current)}>Mensagens não lidas</FilterChip>
-            <FilterChip expandable active={statusOnly} onClick={() => setStatusOnly((current) => !current)}>Status</FilterChip>
-            <FilterChip expandable onClick={() => notify('Filtro de colaborador aberto')}>Colaborador</FilterChip>
-            <FilterChip expandable onClick={() => notify('Filtro de prazo aberto')}>Deadline</FilterChip>
-            <FilterChip expandable onClick={() => notify('Filtro de time aberto')}>Time</FilterChip>
+            <FilterDropdown label="Status" value={statusFilter} onChange={setStatusFilter} options={statusOptions} />
+            <FilterDropdown label="Colaborador" value={collaboratorFilter} onChange={setCollaboratorFilter} options={collaboratorOptions} />
+            <FilterDropdown label="Deadline" value={deadlineFilter} onChange={setDeadlineFilter} options={[{ value: '', label: 'Todos os prazos' }, { value: 'today', label: 'Hoje' }, { value: 'week', label: 'Próximos 7 dias' }, { value: 'overdue', label: 'Atrasados' }, { value: 'unscheduled', label: 'Sem data' }]} />
+            <FilterDropdown label="Time" value={teamFilter} onChange={setTeamFilter} options={teamOptions} />
           </div>}
 
           {view === 'calendar' ? (
@@ -326,29 +400,15 @@ export function ProjectsPage() {
             <div className="projects-groups">
               {visible.map((project) => {
                 const projectWithTasks = project as Project & {
-                  tasksList?: Array<{ status: 'Concluído' | 'Em andamento'; delivery?: 'Aprovado' | 'Aguardando aprovação' }>
+                  tasksList?: Array<{ title?: string; team?: string; deadlineDays?: number; status: 'Concluído' | 'Em andamento'; delivery?: 'Aprovado' | 'Aguardando aprovação' }>
                 }
                 const rawTasks = projectWithTasks.tasksList
-                const tasks: ProjectTask[] =
-                  rawTasks && rawTasks.length > 0
-                    ? rawTasks
-                    : [
-                        {
-                          status: project.progress >= 100 ? 'Concluído' : 'Em andamento',
-                          delivery:
-                            project.status === 'Em revisão'
-                              ? 'Aguardando aprovação'
-                              : project.status === 'Concluído'
-                              ? 'Aprovado'
-                              : undefined,
-                        },
-                      ]
+                const tasks: ProjectTask[] = rawTasks ?? []
                 return (
                   <ProjectGroup
                     key={project.id}
                     title={project.status}
                     project={project}
-                    projectStatus={project.status === 'Concluído' ? 'Concluído' : 'Em andamento'}
                     tasks={tasks}
                   />
                 )

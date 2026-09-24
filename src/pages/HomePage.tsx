@@ -26,7 +26,7 @@ function DesignDelivery({ state }: { state: string }) {
 }
 
 export function HomePage() {
-  const { projects, currentUser, workspace, members, notify } = useApp()
+  const { projects, currentUser, account, members, notify } = useApp()
   const navigate = useNavigate()
   const [prompt, setPrompt] = useState('')
 
@@ -40,10 +40,11 @@ export function HomePage() {
 
   const firstName = currentUser?.name ? currentUser.name.split(' ')[0] : 'você'
 
-  const hoursEstimated = workspace?.hoursEstimated ?? 120
-  const hoursUsed = workspace?.hoursUsed ?? 0
-  const availableHours = Math.max(0, Math.round(hoursEstimated - hoursUsed))
-  const percentUsed = Math.min(100, Math.round((hoursUsed / (hoursEstimated || 1)) * 100))
+  const allowance = account?.workspace.creditAllowance ?? 0
+  const availableCredits = account?.workspace.creditsAvailable ?? 0
+  const creditsUsed = account?.workspace.creditsUsed ?? 0
+  const teams = account?.teams ?? []
+  const percentUsed = allowance > 0 ? Math.min(100, Math.round((creditsUsed / allowance) * 100)) : 0
 
   const submitPrompt = (event: React.FormEvent) => {
     event.preventDefault()
@@ -222,18 +223,17 @@ export function HomePage() {
             <section className="home-allocation-card home-allocation-card--subscription">
               <header><FigmaIcon asset="home.imgGroup1410119714" /><h2>Assinatura</h2></header>
               <div className="home-allocation-progress"><i style={{ width: `${percentUsed}%` }} /></div>
-              <footer><span>Disponível</span><strong>{availableHours} <FigmaIcon asset="home.imgBasilArrowRightOutline" /> {hoursEstimated}</strong></footer>
+              <footer><span>Disponível</span><strong>{availableCredits} <FigmaIcon asset="home.imgBasilArrowRightOutline" /> {allowance}</strong></footer>
             </section>
 
-            <section className="home-allocation-card">
-              <header><i className="home-team-color home-team-color--design" /><h2>Design Team</h2></header>
-              <footer><span>Usado</span><strong>{hoursUsed > 0 ? Math.round(hoursUsed * 0.6) : 0}</strong></footer>
-            </section>
-
-            <section className="home-allocation-card">
-              <header><i className="home-team-color home-team-color--sales" /><h2>Sales Team</h2></header>
-              <footer><span>Usado</span><strong>{hoursUsed > 0 ? Math.round(hoursUsed * 0.4) : 0}</strong></footer>
-            </section>
+            {teams.map((team) => <section className="home-allocation-card" key={team.id}>
+              <header><i className="home-team-color" style={{ background: team.color }} /><h2>{team.name}</h2></header>
+              <footer><span>Usado</span><strong>{team.creditsUsed}</strong></footer>
+            </section>)}
+            {teams.length === 0 && <section className="home-allocation-card home-allocation-card--empty">
+              <header><h2>Nenhuma equipe criada</h2></header>
+              <footer><span>Crie equipes em Conta</span></footer>
+            </section>}
           </div>
         </aside>
       </div>

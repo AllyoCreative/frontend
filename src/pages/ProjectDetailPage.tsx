@@ -1,18 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useParams } from 'react-router-dom'
-import { ExternalLink } from 'lucide-react'
+import { Download, ExternalLink, FileText, Upload } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
 import { DesignReviewModal, type ReviewOrigin } from '../components/DesignReviewModal'
-import { api } from '../services/api'
+import { api, type DesignSummary, type ProjectFileSummary } from '../services/api'
 import { socket, type SocketEventPayload } from '../services/socket'
-
-const designs = [
-  { id: 1, name: 'Key visual • Conceito B', version: 'v3', color: '#d7ff70', approved: false },
-  { id: 2, name: 'Post Instagram • 1080×1350', version: 'v2', color: '#ff917b', approved: true },
-  { id: 3, name: 'Story • 1080×1920', version: 'v1', color: '#9ea8ff', approved: false },
-  { id: 4, name: 'LinkedIn • 1200×627', version: 'v1', color: '#74d9c7', approved: false },
-]
 
 const timelineEvents = [
   { left: '1%', time: '9:00h', lines: ['Briefing enviado'] },
@@ -139,10 +132,15 @@ export function ProjectDetailPage() {
   const { projects, currentUser, createTask, toggleTaskStatus, notify } = useApp()
   const project = useMemo(() => projects.find((item) => item.id === id), [id, projects])
   const [messageList, setMessageList] = useState<ChatMessage[]>([])
+  const [designList, setDesignList] = useState<DesignSummary[]>([])
+  const [projectFiles, setProjectFiles] = useState<ProjectFileSummary[]>([])
+  const [loadedAssetsFor, setLoadedAssetsFor] = useState<string | null>(null)
+  const [uploadingFile, setUploadingFile] = useState(false)
   const [draft, setDraft] = useState('')
-  const [approved, setApproved] = useState<number[]>(designs.filter((item) => item.approved).map((item) => item.id))
+  const [approved, setApproved] = useState<number[]>([])
   const [reviewing, setReviewing] = useState<number | null>(null)
   const [reviewOrigin, setReviewOrigin] = useState<ReviewOrigin | null>(null)
+  const projectFileInputRef = useRef<HTMLInputElement>(null)
 
   // Task creation state
   const [newTaskTitle, setNewTaskTitle] = useState('')
@@ -153,13 +151,21 @@ export function ProjectDetailPage() {
     if (!project) return
     let isMounted = true
 
-    api.getMessages(project.id)
-      .then((serverMessages) => {
-        if (isMounted && serverMessages) {
-          setMessageList(serverMessages)
-        }
-      })
-      .catch(() => {})
+    Promise.allSettled([
+      api.getMessages(project.id),
+      api.getDesigns(project.id),
+      api.getProjectFiles(project.id),
+    ]).then(([messagesResult, designsResult, filesResult]) => {
+      if (!isMounted) return
+      if (messagesResult.status === 'fulfilled') setMessageList(messagesResult.value)
+      if (designsResult.status === 'fulfilled') {
+        setDesignList(designsResult.value)
+        setApproved(designsResult.value.filter((item) => item.approved).map((item) => item.id))
+      }
+      if (filesResult.status === 'fulfilled') setProjectFiles(filesResult.value)
+    }).finally(() => {
+      if (isMounted) setLoadedAssetsFor(project.id)
+    })
 
     const handleNewMessage = (event: SocketEventPayload) => {
       if (event.projectId === project.id && event.data?.message) {
@@ -239,6 +245,28 @@ export function ProjectDetailPage() {
     setReviewOrigin(null)
   }
 
+  const uploadProjectFile = async (file: File) => {
+    if (!project || uploadingFile) return
+    setUploadingFile(true)
+    try {
+      const uploaded = await api.uploadFile(file, 'project-files')
+      const saved = await api.addProjectFile(project.id, {
+        name: file.name,
+        fileKey: uploaded.fileKey,
+        contentType: uploaded.contentType,
+        sizeBytes: uploaded.sizeBytes,
+        category: 'arquivo',
+      })
+      setProjectFiles((current) => [saved, ...current])
+      notify(`${file.name} enviado com sucesso`)
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : 'Não foi possível enviar o arquivo')
+    } finally {
+      setUploadingFile(false)
+      if (projectFileInputRef.current) projectFileInputRef.current.value = ''
+    }
+  }
+
   if (!project) {
     return (
       <div className="page project-detail-page" style={{ padding: 48, textAlign: 'center' }}>
@@ -256,9 +284,19 @@ export function ProjectDetailPage() {
   }
 
   const projectTasks = (project as { tasksList?: Array<{ id: string; title: string; team: string; status: 'Concluído' | 'Em andamento' }> }).tasksList || []
+  const loadingAssets = loadedAssetsFor !== project.id
 
   return (
     <div className={`page project-detail-page project-detail-page--${tab}`}>
+      <input
+        ref={projectFileInputRef}
+        className="project-visually-hidden"
+        type="file"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          if (file) void uploadProjectFile(file)
+        }}
+      />
       <header className="project-compact-header">
         <h1>{project.name}</h1>
         <span className="project-compact-deadline">com prazo de <strong>{project.deadline || 'A definir'}</strong></span>
@@ -269,6 +307,7 @@ export function ProjectDetailPage() {
         <NavLink to={`/projetos/${project.id}/visao-geral`} className={tab === 'visao-geral' ? 'active' : ''}>Visão geral</NavLink>
         <NavLink to={`/projetos/${project.id}/mensagens`} className={tab === 'mensagens' ? 'active' : ''}>Mensagens</NavLink>
         <NavLink to={`/projetos/${project.id}/designs`} className={tab === 'designs' ? 'active' : ''}>Designs</NavLink>
+        <NavLink to={`/projetos/${project.id}/arquivos`} className={tab === 'arquivos' ? 'active' : ''}>Arquivos</NavLink>
       </nav>
 
       {tab === 'visao-geral' && (
@@ -435,7 +474,12 @@ export function ProjectDetailPage() {
             <textarea value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Escreva sua mensagem..." aria-label="Escreva sua mensagem" />
             <footer>
               <div className="project-message-tools">
-                {messageTools.map((tool) => <button type="button" aria-label={tool.label} key={tool.label}><img src={figmaAsset(tool.asset)} alt="" /></button>)}
+                {messageTools.map((tool) => <button
+                  type="button"
+                  aria-label={tool.label}
+                  key={tool.label}
+                  onClick={tool.label === 'Anexar arquivo' ? () => projectFileInputRef.current?.click() : undefined}
+                ><img src={figmaAsset(tool.asset)} alt="" /></button>)}
               </div>
               <button type="submit" className="project-message-send"><img src={figmaAsset('messages.imgGroup4')} alt="" />Enviar</button>
             </footer>
@@ -445,19 +489,50 @@ export function ProjectDetailPage() {
 
       {(tab === 'designs' || tab === 'arquivos') && (
         <section className="project-designs-gallery">
-          <h2 className="project-visually-hidden">{tab === 'arquivos' ? 'Arquivos do projeto' : 'Designs para revisão'}</h2>
-          <div className="project-designs-grid">
-            {designs.map((design) => {
+          <header className="project-assets-header">
+            <div>
+              <h2>{tab === 'arquivos' ? 'Arquivos do projeto' : 'Designs para revisão'}</h2>
+              <p>{tab === 'arquivos' ? 'Documentos e imagens ficam salvos no armazenamento seguro do projeto.' : 'Entregas enviadas pela equipe para avaliação.'}</p>
+            </div>
+            {tab === 'arquivos' && <button className="secondary-button project-assets-upload" disabled={uploadingFile} onClick={() => projectFileInputRef.current?.click()}>
+              <Upload size={16} /> {uploadingFile ? 'Enviando...' : 'Enviar arquivo'}
+            </button>}
+          </header>
+
+          {loadingAssets && <div className="project-gallery-empty">Carregando arquivos...</div>}
+
+          {!loadingAssets && tab === 'designs' && (designList.length > 0 ? <div className="project-designs-grid">
+            {designList.map((design) => {
               const isApproved = approved.includes(design.id)
-              return <article key={design.id} className="project-design-tile"><header><span>no...vo.jpg</span><b className={isApproved ? 'is-approved' : ''}>{isApproved ? 'Aprovado' : 'Aguardando aprovação'}</b></header><button onClick={(event) => openReview(design.id, event.currentTarget)} aria-label={`Abrir ${design.name}`}><img src={figmaAsset('designs.imgImage8')} alt={design.name} /><span><ExternalLink size={15} /> Abrir</span></button></article>
+              const previewUrl = design.thumbnailUrl || design.fileUrl
+              return <article key={design.id} className="project-design-tile">
+                <header><span>{design.name}</span><b className={isApproved ? 'is-approved' : ''}>{isApproved ? 'Aprovado' : 'Aguardando aprovação'}</b></header>
+                <button onClick={(event) => openReview(design.id, event.currentTarget)} aria-label={`Abrir ${design.name}`}>
+                  {previewUrl ? <img src={previewUrl} alt={design.name} /> : <span className="project-file-placeholder"><FileText size={34} /> Prévia indisponível</span>}
+                  <span className="project-design-open"><ExternalLink size={15} /> Abrir</span>
+                </button>
+              </article>
             })}
-          </div>
+          </div> : <div className="project-gallery-empty">Nenhum design foi enviado para revisão ainda.</div>)}
+
+          {!loadingAssets && tab === 'arquivos' && (projectFiles.length > 0 ? <div className="project-files-grid">
+            {projectFiles.map((file) => <article key={file.id} className="project-file-card">
+              <div className="project-file-preview">
+                {file.contentType.startsWith('image/') ? <img src={file.fileUrl} alt="" /> : <FileText size={36} />}
+              </div>
+              <div className="project-file-info">
+                <span title={file.name}>{file.name}</span>
+                <small>{Math.max(1, Math.round(file.sizeBytes / 1024))} KB</small>
+              </div>
+              <a href={file.fileUrl} target="_blank" rel="noreferrer" aria-label={`Abrir ${file.name}`}><Download size={17} /></a>
+            </article>)}
+          </div> : <div className="project-gallery-empty">Nenhum arquivo enviado neste projeto.</div>)}
         </section>
       )}
 
       {reviewing !== null && <DesignReviewModal
-        designTitle={designs.find((item) => item.id === reviewing)?.name ?? 'Design'}
-        initialVersion={Number((designs.find((item) => item.id === reviewing)?.version ?? 'v3').slice(1))}
+        designTitle={designList.find((item) => item.id === reviewing)?.name ?? 'Design'}
+        initialVersion={Number((designList.find((item) => item.id === reviewing)?.version ?? 'v1').slice(1))}
         isApproved={approved.includes(reviewing)}
         origin={reviewOrigin}
         notify={notify}

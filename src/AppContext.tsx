@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Project } from './types'
-import { api, type ProfileUpdate, type UserSummary, type WorkspaceSummary, clearAuthToken } from './services/api'
+import { api, type AccountOverview, type ManagedBrandSummary, type ProfileUpdate, type UserSummary, type WorkspaceSummary, clearAuthToken } from './services/api'
 import { socket, type SocketEventPayload } from './services/socket'
 
 interface Toast {
@@ -20,17 +20,7 @@ export interface AppTask {
 
 export type ProjectWithTasks = Project & { tasksList?: AppTask[] }
 
-export interface ManagedBrand {
-  id: string
-  name: string
-  description: string
-  color: string
-  initials: string
-}
-
-const DEFAULT_BRANDS: ManagedBrand[] = [
-  { id: 'fauves', name: 'Fauves', description: 'Marca principal', color: '#004c46', initials: 'FV' },
-]
+export type ManagedBrand = ManagedBrandSummary
 
 interface AppContextValue {
   projects: Project[]
@@ -41,12 +31,14 @@ interface AppContextValue {
   workspace: WorkspaceSummary | null
   members: UserSummary[]
   brands: ManagedBrand[]
+  account: AccountOverview | null
   isLoading: boolean
   refreshUser: () => Promise<void>
   refreshProjects: () => Promise<void>
+  refreshAccount: () => Promise<void>
   updateProfile: (data: ProfileUpdate) => Promise<void>
   addMember: (data: { name: string; email: string; jobTitle?: string }) => Promise<void>
-  addBrand: (data: Pick<ManagedBrand, 'name' | 'description' | 'color'>) => void
+  addBrand: (data: Pick<ManagedBrand, 'name' | 'description' | 'color'>) => Promise<void>
   createTask: (projectId: string, title: string, team?: string) => Promise<void>
   toggleTaskStatus: (projectId: string, taskId: string, currentStatus: string) => Promise<void>
   logout: () => void
@@ -60,14 +52,8 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
   const [currentUser, setCurrentUser] = useState<UserSummary | null>(null)
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null)
   const [members, setMembers] = useState<UserSummary[]>([])
-  const [brands, setBrands] = useState<ManagedBrand[]>(() => {
-    try {
-      const saved = window.localStorage.getItem('allyo-managed-brands')
-      return saved ? JSON.parse(saved) as ManagedBrand[] : DEFAULT_BRANDS
-    } catch {
-      return DEFAULT_BRANDS
-    }
-  })
+  const [brands, setBrands] = useState<ManagedBrand[]>([])
+  const [account, setAccount] = useState<AccountOverview | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   const notify = useCallback((message: string) => {
@@ -113,6 +99,22 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
     }
   }, [])
 
+  const refreshAccount = useCallback(async () => {
+    try {
+      const data = await api.getAccount()
+      setAccount(data)
+      setBrands(data.brands)
+      setMembers(data.members)
+      setWorkspace((current) => current ? {
+        ...current,
+        plan: data.workspace.plan,
+        credits: data.workspace.creditsAvailable,
+      } : current)
+    } catch (error) {
+      console.warn('Não foi possível carregar os dados da conta:', error)
+    }
+  }, [])
+
   // Carrega projetos e usuário reais do backend
   useEffect(() => {
     let isMounted = true
@@ -121,7 +123,8 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
       api.getProjects(),
       api.getMe(),
       api.getMembers(),
-    ]).then(([projectsResult, meResult, membersResult]) => {
+      api.getAccount(),
+    ]).then(([projectsResult, meResult, membersResult, accountResult]) => {
       if (!isMounted) return
 
       if (projectsResult.status === 'fulfilled' && projectsResult.value) {
@@ -138,6 +141,12 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
 
       if (membersResult.status === 'fulfilled' && membersResult.value) {
         setMembers(membersResult.value)
+      }
+
+      if (accountResult.status === 'fulfilled' && accountResult.value) {
+        setAccount(accountResult.value)
+        setBrands(accountResult.value.brands)
+        setMembers(accountResult.value.members)
       }
 
       setIsLoading(false)
@@ -216,30 +225,34 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
         setCurrentUser(res.user)
         notify('Perfil atualizado com sucesso no backend!')
       }
-    } catch {
+    } catch (error) {
       notify('Erro ao atualizar perfil')
+      throw error
     }
   }, [notify])
 
-  const addBrand = useCallback((data: Pick<ManagedBrand, 'name' | 'description' | 'color'>) => {
-    const initials = data.name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()
-    const brand: ManagedBrand = { ...data, id: `${data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`, initials }
-    setBrands((current) => {
-      const next = [...current, brand]
-      window.localStorage.setItem('allyo-managed-brands', JSON.stringify(next))
-      return next
-    })
-    notify(`${data.name} adicionada às marcas gerenciadas`)
+  const addBrand = useCallback(async (data: Pick<ManagedBrand, 'name' | 'description' | 'color'>) => {
+    try {
+      const brand = await api.createBrand(data)
+      setBrands((current) => [...current, brand])
+      setAccount((current) => current ? { ...current, brands: [...current.brands, brand] } : current)
+      notify(`${data.name} adicionada às marcas gerenciadas`)
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : 'Erro ao criar marca')
+      throw error
+    }
   }, [notify])
 
   const addMember = useCallback(async (data: { name: string; email: string; jobTitle?: string }) => {
     try {
       const newMember = await api.addMember(data)
       setMembers((current) => [...current, newMember])
+      setAccount((current) => current ? { ...current, members: [...current.members, newMember] } : current)
       notify(`Membro ${newMember.name} adicionado com sucesso!`)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro ao adicionar membro'
       notify(msg)
+      throw err
     }
   }, [notify])
 
@@ -295,9 +308,11 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
     workspace,
     members,
     brands,
+    account,
     isLoading,
     refreshUser,
     refreshProjects,
+    refreshAccount,
     updateProfile,
     addMember,
     addBrand,
@@ -313,9 +328,11 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
     workspace,
     members,
     brands,
+    account,
     isLoading,
     refreshUser,
     refreshProjects,
+    refreshAccount,
     updateProfile,
     addMember,
     addBrand,

@@ -1,83 +1,16 @@
-import { type CSSProperties, useState } from 'react'
+import { type CSSProperties, useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { ArrowLeft, ChevronRight, Download, Plus, Upload } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
+import { api, type BrandKitFolder as ApiBrandKitFolder } from '../services/api'
 
 type FolderPreview = 'logos' | 'colors' | 'type' | 'images' | 'ui'
 
-type BrandResource = {
-  name: string
-  meta: string
-  tone?: string
-}
-
-type BrandFolder = {
-  name: string
-  description: string
-  count: string
-  preview: FolderPreview
-  resources: BrandResource[]
-}
-
-const folders: BrandFolder[] = [
-  {
-    name: 'Logotipo',
-    description: 'Versões principais, reduzidas e aplicações',
-    count: '8 arquivos',
-    preview: 'logos',
-    resources: [
-      { name: 'Logo principal', meta: 'SVG · Fundo claro' },
-      { name: 'Logo monocromático', meta: 'AI · Vetor editável' },
-      { name: 'Símbolo reduzido', meta: 'PNG · 2048 × 2048 px' },
-    ],
-  },
-  {
-    name: 'Cores',
-    description: 'Paleta principal, apoio e combinações',
-    count: '12 cores',
-    preview: 'colors',
-    resources: [
-      { name: 'Verde Allyo', meta: '#004C46', tone: '#004c46' },
-      { name: 'Lima Fauves', meta: '#D0F08E', tone: '#d0f08e' },
-      { name: 'Rosa apoio', meta: '#FCAEEA', tone: '#fcaeea' },
-    ],
-  },
-  {
-    name: 'Tipografias',
-    description: 'Famílias, pesos e hierarquia',
-    count: '2 famílias',
-    preview: 'type',
-    resources: [
-      { name: 'Plus Jakarta Sans', meta: 'Títulos e interface' },
-      { name: 'Season Mix', meta: 'Destaques editoriais' },
-      { name: 'Escala tipográfica', meta: 'Tokens e exemplos' },
-    ],
-  },
-  {
-    name: 'Imagens',
-    description: 'Fotografia, direção de arte e referências',
-    count: '24 arquivos',
-    preview: 'images',
-    resources: [
-      { name: 'Campanha institucional', meta: '8 imagens' },
-      { name: 'Retratos do time', meta: '10 imagens' },
-      { name: 'Direção de arte', meta: '6 referências' },
-    ],
-  },
-  {
-    name: 'UI Comp.',
-    description: 'Elementos e padrões de produto',
-    count: '16 componentes',
-    preview: 'ui',
-    resources: [
-      { name: 'Botões', meta: '6 variantes' },
-      { name: 'Campos', meta: '4 componentes' },
-      { name: 'Cards', meta: '6 padrões' },
-    ],
-  },
-]
+type BrandResource = ApiBrandKitFolder['resources'][number]
+type BrandFolder = Omit<ApiBrandKitFolder, 'preview'> & { preview: FolderPreview }
+const folderPreviews: FolderPreview[] = ['logos', 'colors', 'type', 'images', 'ui']
 
 function BrandFolderArt({ preview, shared = false }: { preview: FolderPreview; shared?: boolean }) {
   const style = shared ? ({ viewTransitionName: `brand-folder-${preview}` } as CSSProperties) : undefined
@@ -118,6 +51,7 @@ function BrandFolderArt({ preview, shared = false }: { preview: FolderPreview; s
 }
 
 function ResourcePreview({ folder, resource }: { folder: BrandFolder; resource: BrandResource }) {
+  if (resource.fileUrl && resource.contentType?.startsWith('image/')) return <img className="brand-resource__uploaded-image" src={resource.fileUrl} alt="" />
   if (folder.preview === 'colors') return <span className="brand-resource__color" style={{ background: resource.tone }} />
   if (folder.preview === 'type') return <span className="brand-resource__type">Aa</span>
   if (folder.preview === 'images') return <span className="brand-resource__image" />
@@ -129,10 +63,35 @@ export function BrandKitPage() {
   const { notify, brands } = useApp()
   const [searchParams, setSearchParams] = useSearchParams()
   const [folderState, setFolderState] = useState<{ brandId: string; folder: FolderPreview } | null>(null)
+  const [folderResult, setFolderResult] = useState<{ brandId: string; items: BrandFolder[] } | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const fileInput = useRef<HTMLInputElement>(null)
   const selectedBrandId = searchParams.get('marca')
+  const folders = folderResult?.brandId === selectedBrandId ? folderResult.items : []
+  const loadingFolders = Boolean(selectedBrandId && folderResult?.brandId !== selectedBrandId)
   const activeFolder = folderState?.brandId === selectedBrandId ? folderState.folder : null
   const selectedFolder = folders.find((folder) => folder.preview === activeFolder)
   const selectedBrand = brands.find((brand) => brand.id === selectedBrandId)
+
+  useEffect(() => {
+    let active = true
+    if (!selectedBrandId) return () => { active = false }
+    api.getBrandKit(selectedBrandId)
+      .then((items) => {
+        if (!active) return
+        setFolderResult({
+          brandId: selectedBrandId,
+          items: items.filter((item) => folderPreviews.includes(item.preview as FolderPreview)) as BrandFolder[],
+        })
+      })
+      .catch(() => {
+        if (active) {
+          setFolderResult({ brandId: selectedBrandId, items: [] })
+          notify('Não foi possível carregar os recursos desta marca')
+        }
+      })
+    return () => { active = false }
+  }, [notify, selectedBrandId])
 
   const selectBrand = (brandId: string | null) => {
     setFolderState(null)
@@ -155,6 +114,34 @@ export function BrandKitPage() {
     })
   }
 
+  const uploadResource = async (file?: File) => {
+    if (!file || !selectedFolder || !selectedBrandId) return
+    setUploading(true)
+    try {
+      notify(`Enviando ${file.name} para o Brand Kit...`)
+      const uploaded = await api.uploadFile(file, 'brand-kit')
+      await api.addBrandKitResource({
+        folderId: selectedFolder.id,
+        name: file.name,
+        meta: `${file.type || 'Arquivo'} · ${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(file.size / 1024)} KB`,
+        fileKey: uploaded.fileKey,
+        contentType: uploaded.contentType,
+        sizeBytes: uploaded.sizeBytes,
+      })
+      const items = await api.getBrandKit(selectedBrandId)
+      setFolderResult({
+        brandId: selectedBrandId,
+        items: items.filter((item) => folderPreviews.includes(item.preview as FolderPreview)) as BrandFolder[],
+      })
+      notify('Arquivo adicionado ao Brand Kit')
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : 'Não foi possível enviar o arquivo')
+    } finally {
+      setUploading(false)
+      if (fileInput.current) fileInput.current.value = ''
+    }
+  }
+
   return <div className={`page brand-page${selectedFolder ? ' brand-page--open' : ''}`}>
     {!selectedBrand ? <section className="brand-selector">
       <header className="brand-header">
@@ -164,7 +151,7 @@ export function BrandKitPage() {
       <div className="brand-selector__grid">
         {brands.map((brand) => <button type="button" key={brand.id} onClick={() => selectBrand(brand.id)}>
           <span className="brand-selector__mark" style={{ background: brand.color }}>{brand.initials}</span>
-          <span><strong>{brand.name}</strong><small>{brand.description}</small><em>5 coleções de recursos</em></span>
+          <span><strong>{brand.name}</strong><small>{brand.description}</small><em>Abrir Brand Kit</em></span>
           <ChevronRight size={20} />
         </button>)}
       </div>
@@ -190,6 +177,8 @@ export function BrandKitPage() {
           <span className="brand-folder__meta">{folder.count}</span>
         </button>)}
       </div>
+      {loadingFolders && <div className="brand-kit-empty">Carregando recursos...</div>}
+      {!loadingFolders && folders.length === 0 && <div className="brand-kit-empty"><strong>Brand Kit vazio</strong><span>Esta marca ainda não possui coleções ou arquivos.</span></div>}
     </> : <section className="brand-folder-view" aria-labelledby="brand-folder-title">
       <button type="button" className="brand-back" onClick={() => changeFolder(null)}>
         <ArrowLeft size={18} /> Voltar ao Brand Kit
@@ -202,9 +191,10 @@ export function BrandKitPage() {
           <h1 id="brand-folder-title">{selectedFolder.name}</h1>
           <p>{selectedFolder.description} · {selectedFolder.count}</p>
         </div>
-        <button type="button" className="primary-button" onClick={() => notify(`Upload em ${selectedFolder.name} iniciado`)}>
-          <Upload size={17} /> Adicionar arquivo
+        <button type="button" className="primary-button" disabled={uploading} onClick={() => fileInput.current?.click()}>
+          <Upload size={17} /> {uploading ? 'Enviando...' : 'Adicionar arquivo'}
         </button>
+        <input ref={fileInput} type="file" hidden accept="image/*,video/*,.pdf,.zip,.ai,.eps,.svg,.woff,.woff2,.txt" onChange={(event) => uploadResource(event.target.files?.[0])} />
       </header>
 
       <div className="brand-folder-view__toolbar">
@@ -213,7 +203,7 @@ export function BrandKitPage() {
       </div>
 
       <div className={`brand-resource-grid brand-resource-grid--${selectedFolder.preview}`}>
-        {selectedFolder.resources.map((resource) => <button type="button" className="brand-resource" key={resource.name} onClick={() => notify(`${resource.name} aberto`)}>
+        {selectedFolder.resources.map((resource) => <button type="button" className="brand-resource" key={resource.id} disabled={!resource.fileUrl} onClick={() => resource.fileUrl && window.open(resource.fileUrl, '_blank', 'noopener,noreferrer')}>
           <span className="brand-resource__preview"><ResourcePreview folder={selectedFolder} resource={resource} /></span>
           <span className="brand-resource__copy"><strong>{resource.name}</strong><small>{resource.meta}</small></span>
           <Download size={18} aria-hidden="true" />

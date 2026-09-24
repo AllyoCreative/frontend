@@ -14,6 +14,7 @@ export interface UserSummary {
   phone?: string
   timezone?: string
   avatarUrl?: string | null
+  avatarFileKey?: string | null
   notificationPreferences?: Record<string, Record<string, boolean>>
 }
 
@@ -27,6 +28,76 @@ export interface WorkspaceSummary {
   hoursEstimated?: number
   hoursUsed?: number
   productAccess?: Record<string, unknown>
+}
+
+export interface ManagedBrandSummary {
+  id: string
+  name: string
+  description: string
+  color: string
+  initials: string
+}
+
+export interface TeamSummary {
+  id: string
+  name: string
+  color: string
+  creditsUsed: number
+  memberIds: string[]
+  members: UserSummary[]
+}
+
+export interface ContractSummary {
+  id: string
+  title: string
+  plan: string
+  amountCents: number
+  startsAt: string
+  endsAt: string | null
+  status: string
+  changeType: string
+  documentUrl: string | null
+}
+
+export interface CreditTransactionSummary {
+  id: string
+  description: string
+  type: string
+  status: string
+  amount: number
+  createdAt: string
+}
+
+export interface CreditPackageSummary {
+  id: string
+  name: string
+  credits: number
+  priceCents: number
+  bonusPercent: number
+  recommended: boolean
+}
+
+export interface AccountOverview {
+  workspace: {
+    id: string
+    name: string
+    plan: string
+    creditsAvailable: number
+    creditAllowance: number
+    creditBank: number
+    creditsUsed: number
+    boosters: number
+    cycleStart: string | null
+    cycleEnd: string | null
+    contractStart: string | null
+    contractEnd: string | null
+  }
+  members: UserSummary[]
+  brands: ManagedBrandSummary[]
+  teams: TeamSummary[]
+  contracts: ContractSummary[]
+  creditTransactions: CreditTransactionSummary[]
+  creditPackages: CreditPackageSummary[]
 }
 
 export interface DesignSummary {
@@ -62,7 +133,30 @@ export interface BrandKitFolder {
     meta: string
     tone?: string
     fileUrl?: string
+    contentType?: string
+    sizeBytes?: number
   }>
+}
+
+export interface UploadedFile {
+  fileKey: string
+  readUrl: string
+  sizeBytes: number
+  contentType: string
+  etag: string | null
+}
+
+export interface ProjectFileSummary {
+  id: string
+  projectId: string
+  name: string
+  fileKey: string
+  fileUrl: string
+  contentType: string
+  sizeBytes: number
+  category: 'arquivo' | 'design' | 'briefing'
+  uploadedBy: string
+  createdAt: string
 }
 
 export function getAuthToken(): string | null {
@@ -221,8 +315,65 @@ export const api = {
   },
 
   // Brand Kit
-  async getBrandKit(): Promise<BrandKitFolder[]> {
-    return request<BrandKitFolder[]>('/brand-kit')
+  async getBrandKit(brandId?: string): Promise<BrandKitFolder[]> {
+    const query = brandId ? `?brandId=${encodeURIComponent(brandId)}` : ''
+    return request<BrandKitFolder[]>(`/brand-kit${query}`)
+  },
+
+  async addBrandKitResource(data: {
+    folderId: string
+    name: string
+    meta: string
+    fileKey: string
+    contentType: string
+    sizeBytes: number
+  }) {
+    return request<BrandKitFolder['resources'][number]>('/brand-kit/resources', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  // Storage
+  async uploadFile(file: File, folder: 'designs' | 'brand-kit' | 'briefings' | 'project-files' | 'avatars'): Promise<UploadedFile> {
+    const ticket = await request<{ uploadUrl: string; fileKey: string; expiresIn: number }>('/storage/presigned-url', {
+      method: 'POST',
+      body: JSON.stringify({
+        folder,
+        filename: file.name,
+        contentType: file.type || 'application/octet-stream',
+        sizeBytes: file.size,
+      }),
+    })
+
+    const upload = await fetch(ticket.uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      body: file,
+    })
+    if (!upload.ok) throw new Error(`Falha ao enviar arquivo para o R2 (HTTP ${upload.status})`)
+
+    return request<UploadedFile>('/storage/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ fileKey: ticket.fileKey }),
+    })
+  },
+
+  async getProjectFiles(projectId: string) {
+    return request<ProjectFileSummary[]>(`/projects/${projectId}/files`)
+  },
+
+  async addProjectFile(projectId: string, data: {
+    name: string
+    fileKey: string
+    contentType: string
+    sizeBytes: number
+    category?: ProjectFileSummary['category']
+  }) {
+    return request<ProjectFileSummary>(`/projects/${projectId}/files`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
   },
 
   // Brand Brain
@@ -257,6 +408,39 @@ export const api = {
     return request<UserSummary>('/auth/members', {
       method: 'POST',
       body: JSON.stringify(data),
+    })
+  },
+
+  // Account
+  async getAccount(): Promise<AccountOverview> {
+    return request<AccountOverview>('/account/overview')
+  },
+
+  async createBrand(data: { name: string; description: string; color: string }) {
+    return request<ManagedBrandSummary>('/account/brands', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  async createTeam(data: { name: string; color: string }) {
+    return request<TeamSummary>('/account/teams', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  async updateTeamMembers(teamId: string, memberIds: string[]) {
+    return request<TeamSummary>(`/account/teams/${teamId}/members`, {
+      method: 'PUT',
+      body: JSON.stringify({ memberIds }),
+    })
+  },
+
+  async purchaseCredits(packageId: string) {
+    return request<{ creditsAvailable: number; transaction: CreditTransactionSummary }>('/account/credits/purchase', {
+      method: 'POST',
+      body: JSON.stringify({ packageId }),
     })
   },
 

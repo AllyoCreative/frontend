@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { Bell, Camera, Check, KeyRound, LockKeyhole, Mail, MessageCircle, UserRound } from 'lucide-react'
 import { useApp } from '../AppContext'
-import type { UserSummary } from '../services/api'
+import { api, type UserSummary } from '../services/api'
 
 type ProfileTab = 'dados' | 'preferencias'
 type Channel = 'whatsapp' | 'email'
@@ -102,6 +102,8 @@ function ProfileEditor({ currentUser }: { currentUser: UserSummary }) {
   const [timezone, setTimezone] = useState(currentUser?.timezone || 'America/Sao_Paulo')
   const [language, setLanguage] = useState(currentUser?.language || 'pt')
   const [avatarUrl, setAvatarUrl] = useState(currentUser?.avatarUrl || '')
+  const [pendingAvatar, setPendingAvatar] = useState<File | null>(null)
+  const [saving, setSaving] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordError, setPasswordError] = useState('')
@@ -116,9 +118,9 @@ function ProfileEditor({ currentUser }: { currentUser: UserSummary }) {
       notify('Escolha uma imagem de até 1,5 MB')
       return
     }
-    const reader = new FileReader()
-    reader.onload = () => setAvatarUrl(String(reader.result || ''))
-    reader.readAsDataURL(file)
+    if (avatarUrl.startsWith('blob:')) URL.revokeObjectURL(avatarUrl)
+    setPendingAvatar(file)
+    setAvatarUrl(URL.createObjectURL(file))
   }
 
   const saveProfile = async (event: React.FormEvent) => {
@@ -132,9 +134,36 @@ function ProfileEditor({ currentUser }: { currentUser: UserSummary }) {
       return
     }
     setPasswordError('')
-    await updateProfile({ name, phone, timezone, language, avatarUrl: avatarUrl || null, ...(newPassword ? { newPassword } : {}) })
-    setNewPassword('')
-    setConfirmPassword('')
+    setSaving(true)
+    try {
+      let avatarFileKey: string | undefined
+      let uploadedAvatarUrl = avatarUrl
+      if (pendingAvatar) {
+        notify('Enviando avatar para o armazenamento seguro...')
+        const uploaded = await api.uploadFile(pendingAvatar, 'avatars')
+        avatarFileKey = uploaded.fileKey
+        uploadedAvatarUrl = uploaded.readUrl
+      }
+      await updateProfile({
+        name,
+        phone,
+        timezone,
+        language,
+        ...(avatarFileKey ? { avatarFileKey, avatarUrl: null } : {}),
+        ...(newPassword ? { newPassword } : {}),
+      })
+      if (pendingAvatar) {
+        if (avatarUrl.startsWith('blob:')) URL.revokeObjectURL(avatarUrl)
+        setAvatarUrl(uploadedAvatarUrl)
+        setPendingAvatar(null)
+      }
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : 'Não foi possível enviar o avatar')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const togglePreference = (key: PreferenceKey, channel: Channel) => {
@@ -173,7 +202,7 @@ function ProfileEditor({ currentUser }: { currentUser: UserSummary }) {
             {avatarUrl ? <img src={avatarUrl} alt="Foto de perfil" /> : <span>{initials}</span>}
             <i><Camera size={15} /></i>
           </button>
-          <div><strong>Avatar ou foto</strong><p>JPG ou PNG com até 1,5 MB.</p><button type="button" className="text-button" onClick={() => fileInput.current?.click()}>Escolher imagem</button></div>
+          <div><strong>Avatar ou foto</strong><p>{pendingAvatar ? `${pendingAvatar.name} pronto para enviar.` : 'JPG, PNG ou WebP com até 1,5 MB.'}</p><button type="button" className="text-button" onClick={() => fileInput.current?.click()}>Escolher imagem</button></div>
           <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(event) => handleAvatar(event.target.files?.[0])} />
         </div>
         <div className="profile-fields">
@@ -194,7 +223,7 @@ function ProfileEditor({ currentUser }: { currentUser: UserSummary }) {
         {passwordError && <p className="form-error">{passwordError}</p>}
       </section>
 
-      <footer className="profile-save"><button className="primary-button" type="submit"><Check size={16} /> Salvar alterações</button></footer>
+      <footer className="profile-save"><button className="primary-button" type="submit" disabled={saving}><Check size={16} /> {saving ? 'Salvando...' : 'Salvar alterações'}</button></footer>
     </form> : <section className="preferences-panel">
       <header><div><h2>Preferências de notificações</h2><p>Escolha quais avisos quer receber e por qual canal.</p></div><div className="preference-channel-head"><span><MessageCircle size={17} /> WhatsApp</span><span><Mail size={17} /> E-mail</span></div></header>
       {preferenceGroups.map((group) => <div className="preference-group" key={group.title}>

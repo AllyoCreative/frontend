@@ -59,7 +59,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                 aria-expanded={brandKitOpen}
                 onClick={() => {
                   setBrandKitOpen((current) => !current)
-                  if (location.pathname !== to) navigate(to)
                 }}
               >
                 <img src={figmaAsset(asset)} alt="" />
