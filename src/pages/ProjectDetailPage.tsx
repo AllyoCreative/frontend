@@ -4,8 +4,9 @@ import { Download, ExternalLink, FileText, Upload } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
 import { DesignReviewModal, type ReviewOrigin } from '../components/DesignReviewModal'
-import { api, type DesignSummary, type ProjectFileSummary } from '../services/api'
+import { api, type DesignSummary, type ProjectBriefingSummary, type ProjectFileSummary } from '../services/api'
 import { socket, type SocketEventPayload } from '../services/socket'
+import type { Project } from '../types'
 
 const timelineEvents = [
   { left: '1%', time: '9:00h', lines: ['Briefing enviado'] },
@@ -73,46 +74,36 @@ function OverviewTimeline() {
   )
 }
 
-function ProjectBriefing({ onDuplicate }: { onDuplicate: () => void }) {
+function ProjectBriefing({ project, briefing, files, onDuplicate }: { project: Project; briefing: ProjectBriefingSummary | null; files: ProjectFileSummary[]; onDuplicate: () => void }) {
+  if (!briefing) return <article className="project-briefing-card project-briefing-card--empty"><header><div><h2>Briefing do projeto</h2><p>O briefing ainda não foi disponibilizado.</p></div></header></article>
+  const links = briefing.creativeDirection.filter((item) => item.startsWith('Referência: ')).map((item) => item.replace('Referência: ', ''))
+  const directions = briefing.creativeDirection.filter((item) => !item.startsWith('Referência: '))
+  const briefingFiles = files.filter((file) => file.category === 'briefing')
   return (
     <article className="project-briefing-card">
       <header>
         <div>
           <h2>Briefing do projeto</h2>
-          <p>data de entrega 27 de outubro de 2026 às 14:00h <b>•</b> Projeto de mais de 12 horas</p>
+          <p>{briefing.deliveryDate || project.deadline} <b>•</b> {briefing.creditsEstimated} créditos estimados <b>•</b> {briefing.estimatedHours} horas úteis</p>
         </div>
         <button onClick={onDuplicate}>duplicar briefing do projeto</button>
       </header>
       <img className="project-briefing-divider" src={figmaAsset('overview.imgLine29')} alt="" />
       <section>
         <h3>Visão geral do projeto</h3>
-        <p>Lorem ipsum dolor sit amet consectetur. Libero duis habitant ullamcorper nisl fringilla dis pellentesque morbi. Consequat quis in turpis urna. Risus hac egestas ut massa. In nisl pulvinar ac hendrerit.</p>
+        <p>{briefing.overview || project.description}</p>
       </section>
+      <section><h3>Pedido</h3><p>{briefing.objective}</p>{briefing.audience && <p><strong>Público:</strong> {briefing.audience}</p>}{briefing.tone && <p><strong>Tom:</strong> {briefing.tone}</p>}</section>
       <section>
         <h3>Entregável</h3>
-        <ol>
-          <li>3 peças criativas estáticas para anúncios no LinkedIn</li>
-          <li>1 anúncio em vídeo curto para o LinkedIn (15 a 30 segundos)</li>
-          <li>Variações de texto de anúncio (título + corpo) para testes A/B</li>
-        </ol>
+        <ol>{briefing.deliverables.map((item) => <li key={item}>{item}</li>)}</ol>
       </section>
       <section>
         <h3>Formatos</h3>
-        <ol>
-          <li>Estáticos: 1200 x 637 px (Formato de anúncio de imagem única do LinkedIn)</li>
-          <li>Video: Proporção 1:1 ou 16:9, máx. 30s, com legendas</li>
-          <li>Copy: Headlines (max 70 caracteres), Body (max 150 caracteres)</li>
-        </ol>
+        <ol>{briefing.formats.map((item) => <li key={item}>{item}</li>)}</ol>
       </section>
-      <section>
-        <h3>Direção criativa</h3>
-        <ol>
-          <li>Visual limpo, moderno e focado na interface</li>
-          <li>indícios sutis de movimento/interação (para o vídeo)</li>
-          <li>Paleta de cores alinhada à marca (use detalhes vibrantes para atrair a atenção)</li>
-          <li>Ênfase em clareza, profissionalismo e inovação</li>
-        </ol>
-      </section>
+      {directions.length > 0 && <section><h3>Direção criativa</h3><ol>{directions.map((item) => <li key={item}>{item}</li>)}</ol></section>}
+      {(links.length > 0 || briefingFiles.length > 0) && <section className="project-briefing-references"><h3>Referências</h3><div>{links.map((link) => <a href={link} target="_blank" rel="noreferrer" key={link}><ExternalLink size={14} />{link}</a>)}{briefingFiles.map((file) => <a href={file.fileUrl} target="_blank" rel="noreferrer" key={file.id}><FileText size={14} />{file.name}</a>)}</div></section>}
     </article>
   )
 }
@@ -134,6 +125,7 @@ export function ProjectDetailPage() {
   const [messageList, setMessageList] = useState<ChatMessage[]>([])
   const [designList, setDesignList] = useState<DesignSummary[]>([])
   const [projectFiles, setProjectFiles] = useState<ProjectFileSummary[]>([])
+  const [briefing, setBriefing] = useState<ProjectBriefingSummary | null>(null)
   const [loadedAssetsFor, setLoadedAssetsFor] = useState<string | null>(null)
   const [uploadingFile, setUploadingFile] = useState(false)
   const [draft, setDraft] = useState('')
@@ -152,11 +144,13 @@ export function ProjectDetailPage() {
     let isMounted = true
 
     Promise.allSettled([
+      api.getProject(project.id),
       api.getMessages(project.id),
       api.getDesigns(project.id),
       api.getProjectFiles(project.id),
-    ]).then(([messagesResult, designsResult, filesResult]) => {
+    ]).then(([projectResult, messagesResult, designsResult, filesResult]) => {
       if (!isMounted) return
+      if (projectResult.status === 'fulfilled') setBriefing(projectResult.value.briefing)
       if (messagesResult.status === 'fulfilled') setMessageList(messagesResult.value)
       if (designsResult.status === 'fulfilled') {
         setDesignList(designsResult.value)
@@ -424,7 +418,7 @@ export function ProjectDetailPage() {
           </article>
 
           <OverviewTimeline />
-          <ProjectBriefing onDuplicate={() => notify('Briefing duplicado com sucesso')} />
+          <ProjectBriefing project={project} briefing={briefing} files={projectFiles} onDuplicate={() => notify('Briefing pronto para ser reutilizado em um novo projeto')} />
         </section>
       )}
 

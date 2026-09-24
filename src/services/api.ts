@@ -247,6 +247,40 @@ export interface CatalogQuote {
   }
 }
 
+export interface ProjectBriefingInput {
+  objective?: string
+  audience?: string
+  tone?: string
+  overview?: string
+  projectGoal?: string
+  creativePath?: 'new-direction' | 'follow-references'
+  referenceLinks?: string[]
+  selectedFormats?: string[]
+  catalogCode?: string
+  catalogScope?: CatalogScope
+}
+
+export interface ProjectBriefingSummary {
+  id: string
+  projectId: string
+  serviceId?: string | null
+  catalogCode?: string | null
+  catalogSnapshot: Record<string, unknown>
+  scope: Partial<CatalogScope>
+  objective: string
+  audience?: string | null
+  tone?: string | null
+  overview?: string | null
+  deliverables: string[]
+  formats: string[]
+  creativeDirection: string[]
+  estimatedHours: number
+  creditsConsumed: number
+  creditsEstimated: number
+  durationHours: number
+  deliveryDate: string
+}
+
 export function getAuthToken(): string | null {
   return localStorage.getItem('allyo-auth-token')
 }
@@ -328,10 +362,10 @@ export const api = {
   },
 
   async getProject(id: string) {
-    return request<Project & { briefing: Record<string, unknown> | null; designs: DesignSummary[] }>(`/projects/${id}`)
+    return request<Project & { briefing: ProjectBriefingSummary | null; designs: DesignSummary[] }>(`/projects/${id}`)
   },
 
-  async createProject(data: Partial<Project> & { objective?: string; audience?: string; tone?: string; catalogCode?: string; catalogScope?: CatalogScope }): Promise<Project> {
+  async createProject(data: Partial<Project> & ProjectBriefingInput): Promise<Project> {
     return request<Project>('/projects', {
       method: 'POST',
       body: JSON.stringify(data),

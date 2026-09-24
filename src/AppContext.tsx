@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Project } from './types'
-import { api, type AccountOverview, type CatalogScope, type ManagedBrandSummary, type ProfileUpdate, type UserSummary, type WorkspaceSummary, clearAuthToken } from './services/api'
+import { api, type AccountOverview, type ManagedBrandSummary, type ProfileUpdate, type ProjectBriefingInput, type UserSummary, type WorkspaceSummary, clearAuthToken } from './services/api'
 import { socket, type SocketEventPayload } from './services/socket'
 
 interface Toast {
@@ -24,7 +24,7 @@ export type ManagedBrand = ManagedBrandSummary
 
 interface AppContextValue {
   projects: Project[]
-  addProject: (project: Partial<Project> & { objective?: string; audience?: string; tone?: string; catalogCode?: string; catalogScope?: CatalogScope }) => Promise<Project>
+  addProject: (project: Partial<Project> & ProjectBriefingInput) => Promise<Project>
   toast: Toast | null
   notify: (message: string) => void
   currentUser: UserSummary | null
@@ -191,7 +191,7 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
     }
   }, [notify, logout])
 
-  const addProject = useCallback(async (projectData: Partial<Project> & { objective?: string; audience?: string; tone?: string; catalogCode?: string; catalogScope?: CatalogScope }) => {
+  const addProject = useCallback(async (projectData: Partial<Project> & ProjectBriefingInput) => {
     try {
       const created = await api.createProject(projectData)
       setProjects((current) => [created, ...current])
