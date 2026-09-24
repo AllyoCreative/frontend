@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Check, Clock, Coins, Minus, Plus, Search, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Clock, Coins, Minus, Plus, X } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
 import { api, type CatalogProduct, type CatalogQuote, type CatalogScope } from '../services/api'
@@ -12,7 +12,22 @@ type Clarification = {
   placeholder: string
 }
 
-const categoryOrder = ['Redes Sociais', 'Digital', 'Impresso', 'Vídeo & Áudio', 'Criação', 'Copywriting', 'Feitos com IA']
+type CatalogFilter = 'all' | 'design' | 'production' | 'ai' | 'fast'
+
+const catalogFilters: Array<{
+  id: CatalogFilter
+  label: string
+  title: string
+  description: string
+  asset?: 'catalog.imgGravityUiBrush' | 'catalog.imgTablerVideo' | 'catalog.imgGroup' | 'catalog.imgMaterialSymbolsBoltBoostRounded'
+}> = [
+  { id: 'all', label: 'Todos os serviços', title: 'Todos os serviços', description: 'Explore o catálogo completo e encontre o formato ideal para o seu projeto.' },
+  { id: 'design', label: 'Criação e Design', title: 'Criação e Design', description: 'Ativos com precisão de pixel e alinhados à marca, em velocidade relâmpago.', asset: 'catalog.imgGravityUiBrush' },
+  { id: 'production', label: 'Produção', title: 'Produção', description: 'Conteúdos audiovisuais produzidos para cada canal e objetivo.', asset: 'catalog.imgTablerVideo' },
+  { id: 'ai', label: 'IA Disponível', title: 'IA Disponível', description: 'Soluções criativas potencializadas por inteligência artificial.', asset: 'catalog.imgGroup' },
+  { id: 'fast', label: 'Entrega Rápida', title: 'Entrega Rápida', description: 'Produtos com prazo estimado de até 8 horas úteis.', asset: 'catalog.imgMaterialSymbolsBoltBoostRounded' },
+]
+
 const categoryAccent: Record<string, string> = {
   'Redes Sociais': '#bde8e1',
   Digital: '#cfe5f4',
@@ -63,8 +78,7 @@ export function NewProjectPage() {
   const [products, setProducts] = useState<CatalogProduct[]>([])
   const [loaded, setLoaded] = useState(false)
   const [catalogError, setCatalogError] = useState('')
-  const [filter, setFilter] = useState('all')
-  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<CatalogFilter>('design')
   const [selected, setSelected] = useState<CatalogProduct | null>(null)
   const [step, setStep] = useState<'catalog' | 'brief' | 'success'>('catalog')
   const [scope, setScope] = useState<CatalogScope>({ quantity: 1, taskRepeats: 1, resizeCount: 0, variationCount: 0, characterCount: 1, addons: {} })
@@ -115,23 +129,17 @@ export function NewProjectPage() {
     }
   }, [scope, selected, step])
 
-  const categories = useMemo(() => [...new Set(products.map((product) => product.category))]
-    .sort((left, right) => {
-      const leftIndex = categoryOrder.indexOf(left)
-      const rightIndex = categoryOrder.indexOf(right)
-      return (leftIndex < 0 ? 99 : leftIndex) - (rightIndex < 0 ? 99 : rightIndex)
-    }), [products])
-
   const visible = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase('pt-BR')
     return products.filter((product) => {
-      if (filter !== 'all' && product.category !== filter) return false
-      if (!normalizedQuery) return true
-      return [product.name, product.code, product.category, product.subcategory, product.specialistRole, product.description]
-        .filter(Boolean)
-        .some((value) => String(value).toLocaleLowerCase('pt-BR').includes(normalizedQuery))
+      if (filter === 'production') return product.category === 'Vídeo & Áudio'
+      if (filter === 'ai') return product.category === 'Feitos com IA'
+      if (filter === 'fast') return product.slaHours <= 8
+      if (filter === 'design') return product.category !== 'Vídeo & Áudio' && product.category !== 'Feitos com IA'
+      return true
     })
-  }, [filter, products, query])
+  }, [filter, products])
+
+  const activeFilter = catalogFilters.find((item) => item.id === filter) || catalogFilters[0]
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -227,25 +235,25 @@ export function NewProjectPage() {
       <header className="new-project-dialog__header">
         {step === 'catalog' ? <strong id="new-project-title">Novo projeto</strong> : <button type="button" className="new-project-dialog__back" onClick={() => setStep('catalog')}><ArrowLeft size={18} /><strong id="new-project-title">{selected?.name}</strong></button>}
         {step === 'catalog' ? <nav className="new-project-filters" aria-label="Filtrar catálogo">
-          <button type="button" className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>Todos</button>
-          {categories.map((category) => <button type="button" key={category} className={filter === category ? 'active' : ''} onClick={() => setFilter(category)}>{category}</button>)}
+          {catalogFilters.map((item) => <button type="button" key={item.id} className={filter === item.id ? 'active' : ''} aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>
+            {item.asset && <img src={figmaAsset(item.asset)} alt="" />}{item.label}
+          </button>)}
         </nav> : <p>Configure o escopo e preencha o briefing para calcular os créditos.</p>}
         <button type="button" className="new-project-dialog__close" onClick={() => navigate(-1)} aria-label="Fechar"><img src={figmaAsset(step === 'catalog' ? 'catalog.imgMaterialSymbolsClose' : 'brief.imgMaterialSymbolsClose')} alt="" /></button>
       </header>
 
       {step === 'catalog' ? <main className="new-project-catalog">
         <header className="new-project-catalog__heading">
-          <div><h1>{filter === 'all' ? 'Catálogo criativo' : filter}</h1><p>{visible.length} produtos disponíveis para criar um novo projeto.</p></div>
-          <label className="new-project-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por nome, categoria ou código" /></label>
+          <h1>{activeFilter.title}</h1>
+          <p>{activeFilter.description}</p>
         </header>
         {!loaded && <div className="new-project-catalog-state">Carregando catálogo...</div>}
         {loaded && catalogError && <div className="new-project-catalog-state is-error"><strong>Catálogo indisponível</strong><span>{catalogError}</span><button className="secondary-button" onClick={() => window.location.reload()}>Tentar novamente</button></div>}
         {loaded && !catalogError && visible.length === 0 && <div className="new-project-catalog-state">Nenhum produto encontrado.</div>}
         <div className="new-project-services">
           {visible.map((product) => <button type="button" key={product.code} className="new-project-service" onClick={() => selectProduct(product)} aria-label={`${product.name}: ${product.description}`}>
-            <span className="new-project-service__preview" style={{ background: categoryAccent[product.category] || '#d9d9d9' }}><small>{product.category}</small><b>{product.code}</b></span>
-            <span className="new-project-service__copy"><h2>{product.name}</h2><small>{product.billing.label || product.billing.unit}</small></span>
-            <span className="new-project-service__meta"><b><Coins size={13} /> {formatCredits(product.credits.original)} cr.</b><small><Clock size={13} /> {formatCredits(product.slaHours)}h úteis</small></span>
+            <span className="new-project-service__preview" />
+            <h2>{product.name}</h2>
           </button>)}
         </div>
       </main> : selected && <main className="new-project-brief">
