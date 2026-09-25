@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useParams } from 'react-router-dom'
-import { Check, Circle, Clock3, Download, ExternalLink, FileText, Plus, Upload } from 'lucide-react'
+import { ChevronDown, ChevronUp, Circle, Download, ExternalLink, FileText, Layers3, Pencil, Plus, Upload } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
 import { DesignReviewModal, type ReviewOrigin } from '../components/DesignReviewModal'
 import { api, type DesignSummary, type ProjectBriefingSummary, type ProjectFileSummary } from '../services/api'
 import { socket, type SocketEventPayload } from '../services/socket'
-import type { Project, ProjectTask } from '../types'
+import type { Project, ProjectTask, TaskBriefing } from '../types'
 
 const messageTools = [
   { asset: 'messages.imgOcticonBold16' as const, label: 'Negrito' },
@@ -67,21 +67,38 @@ function projectTimeline(project: Project, tasks: ProjectTask[], designs: Design
 }
 
 function OverviewTimeline({ project, tasks, designs }: { project: Project; tasks: ProjectTask[]; designs: DesignSummary[] }) {
-  const events = projectTimeline(project, tasks, designs)
+  const events = projectTimeline(project, tasks, designs).slice(-6)
+  const positions = ['1%', '17%', '33.5%', '50%', '66%', '82%']
+  const labelDates = [...events.map((event) => event.date), validDate(project.updatedAt) || new Date()].slice(0, 7)
+  const month = (events[0]?.date || validDate(project.createdAt) || new Date()).toLocaleDateString('pt-BR', { month: 'long' }).toUpperCase()
   return (
     <article className="overview-timeline-card">
-      <header className="overview-timeline-heading"><div><h2>Timeline</h2><p>Histórico real do projeto e das entregas.</p></div><span>{events.length} {events.length === 1 ? 'evento' : 'eventos'}</span></header>
-      {events.length === 0 ? <div className="overview-timeline-empty"><Clock3 size={18} /><span>Os eventos aparecerão aqui conforme o projeto avançar.</span></div> : (
-        <div className="overview-real-timeline">
-          {events.map((event, index) => (
-            <article className={`overview-real-event${event.completed ? ' is-complete' : ''}`} key={event.id}>
-              <div className="overview-real-event__date"><strong>{event.date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')}</strong><span>{event.date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span></div>
-              <span className="overview-real-event__node">{event.completed ? <Check size={12} /> : index === events.length - 1 ? <Circle size={9} /> : null}</span>
-              <div className="overview-real-event__card"><strong>{event.title}</strong><span>{event.detail}</span></div>
-            </article>
-          ))}
+      <h2>Timeline</h2>
+      <span className="overview-timeline-month">{month}</span>
+      <div className="overview-timeline-viewport">
+        <div className="overview-timeline-plot">
+          <div className="overview-timeline-labels" aria-hidden="true">
+            {labelDates.map((date, index) => <span key={`${date.toISOString()}-${index}`}>{index === 0 || index === labelDates.length - 1 ? <><b>{date.toLocaleDateString('pt-BR', { day: '2-digit' })}</b>{date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}<small>{date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</small></> : <b>{date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</b>}</span>)}
+          </div>
+          <div className="overview-timeline-track" aria-hidden="true">
+            <span className="overview-timeline-endpoint overview-timeline-endpoint--start"><img src={figmaAsset('overview.imgLucideFlag')} alt="" /></span>
+            <img className="timeline-line timeline-line--1" src={figmaAsset('overview.imgLine21')} alt="" />
+            <img className="timeline-line timeline-line--2" src={figmaAsset('overview.imgLine22')} alt="" />
+            <img className="timeline-line timeline-line--3" src={figmaAsset('overview.imgLine23')} alt="" />
+            <img className="timeline-line timeline-line--4" src={figmaAsset('overview.imgLine25')} alt="" />
+            <img className="timeline-line timeline-line--5" src={figmaAsset('overview.imgLine26')} alt="" />
+            <img className="timeline-line timeline-line--6" src={figmaAsset('overview.imgLine27')} alt="" />
+            <img className="timeline-line timeline-line--7" src={figmaAsset('overview.imgLine28')} alt="" />
+            {['16.67%', '33.33%', '50%'].map((left) => <img key={left} className="timeline-node" style={{ left }} src={figmaAsset('overview.imgEllipse18')} alt="" />)}
+            {['66.67%', '83.33%'].map((left) => <img key={left} className="timeline-node" style={{ left }} src={figmaAsset('overview.imgEllipse21')} alt="" />)}
+            <img className="timeline-arrow" src={figmaAsset('overview.imgVector11')} alt="" />
+            <span className="overview-timeline-endpoint overview-timeline-endpoint--finish"><img src={figmaAsset('overview.imgMaterialSymbolsRocketLaunchOutline')} alt="" /></span>
+          </div>
+          <div className="overview-timeline-events">
+            {events.map((event, index) => <div className={`overview-timeline-event${event.completed ? '' : ' has-clock'}`} style={{ left: positions[index] }} key={event.id}><strong>{event.date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</strong><span><span>{event.title}</span><span>{event.detail}</span></span>{!event.completed && <img src={figmaAsset('overview.imgGroup2')} alt="Em andamento" />}</div>)}
+          </div>
         </div>
-      )}
+      </div>
     </article>
   )
 }
@@ -132,7 +149,7 @@ interface ChatMessage {
 
 export function ProjectDetailPage() {
   const { id = '', tab = 'visao-geral' } = useParams()
-  const { projects, currentUser, createTask, toggleTaskStatus, notify } = useApp()
+  const { projects, currentUser, createTask, notify } = useApp()
   const project = useMemo(() => projects.find((item) => item.id === id), [id, projects])
   const [messageList, setMessageList] = useState<ChatMessage[]>([])
   const [designList, setDesignList] = useState<DesignSummary[]>([])
@@ -151,6 +168,11 @@ export function ProjectDetailPage() {
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskTeam, setNewTaskTeam] = useState('Design team')
   const [isSubmittingTask, setIsSubmittingTask] = useState(false)
+  const [showTaskForm, setShowTaskForm] = useState(false)
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
+  const [taskBriefingDraft, setTaskBriefingDraft] = useState<TaskBriefing | null>(null)
+  const [savingTaskBriefing, setSavingTaskBriefing] = useState(false)
 
   useEffect(() => {
     if (!project) return
@@ -211,6 +233,7 @@ export function ProjectDetailPage() {
       const task = await createTask(project.id, newTaskTitle.trim(), newTaskTeam)
       setProjectTasks((current) => current.some((item) => item.id === task.id) ? current : [...current, task])
       setNewTaskTitle('')
+      setShowTaskForm(false)
     } catch {
       // O contexto global já apresenta a mensagem de erro.
     } finally {
@@ -218,13 +241,36 @@ export function ProjectDetailPage() {
     }
   }
 
-  const handleToggleTask = async (task: ProjectTask) => {
-    if (!project) return
+  const startEditingTaskBriefing = (task: ProjectTask) => {
+    setExpandedTaskId(task.id)
+    setEditingTaskId(task.id)
+    setTaskBriefingDraft({
+      inheritedFromProject: false,
+      catalogCode: task.briefing?.catalogCode,
+      overview: task.briefing?.overview || briefing?.overview || project?.description || '',
+      objective: task.briefing?.objective || briefing?.objective || '',
+      audience: task.briefing?.audience || briefing?.audience || '',
+      tone: task.briefing?.tone || briefing?.tone || '',
+      deliverables: task.briefing?.deliverables || [],
+      formats: task.briefing?.formats || [],
+      creativeDirection: task.briefing?.creativeDirection || [],
+      projectDeliverables: task.briefing?.projectDeliverables,
+    })
+  }
+
+  const saveTaskBriefing = async (task: ProjectTask) => {
+    if (!project || !taskBriefingDraft || savingTaskBriefing) return
+    setSavingTaskBriefing(true)
     try {
-      const updatedTask = await toggleTaskStatus(project.id, task.id, task.status)
+      const updatedTask = await api.updateTask(project.id, task.id, { briefing: taskBriefingDraft })
       setProjectTasks((current) => current.map((item) => item.id === updatedTask.id ? updatedTask : item))
-    } catch {
-      // O contexto global já apresenta a mensagem de erro.
+      setEditingTaskId(null)
+      setTaskBriefingDraft(null)
+      notify(`Briefing da tarefa #${updatedTask.publicId} atualizado`)
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : 'Não foi possível atualizar o briefing da tarefa')
+    } finally {
+      setSavingTaskBriefing(false)
     }
   }
 
@@ -339,12 +385,13 @@ export function ProjectDetailPage() {
           <article className="project-briefing-card project-task-card">
             <header>
               <div>
-                <h2>Tarefas do projeto ({projectTasks.length})</h2>
-                <p>Gerencie as entregas e marcos deste projeto em tempo real no banco de dados.</p>
+                <h2>Stack do projeto ({projectTasks.length})</h2>
+                <p>Cada tarefa é uma entrega independente, com ID, status e briefing próprios.</p>
               </div>
+              <button className="project-task-add-trigger" type="button" onClick={() => setShowTaskForm((current) => !current)}><Plus size={15} /> Nova tarefa</button>
             </header>
 
-            <form className="project-task-form" onSubmit={handleCreateTask}>
+            {showTaskForm && <form className="project-task-form" onSubmit={handleCreateTask}>
               <label className="project-task-field"><span>Nova tarefa</span><input value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="Ex.: Ajuste final do carrossel" /></label>
               <label className="project-task-field project-task-field--team"><span>Especialidade</span><select value={newTaskTeam} onChange={(e) => setNewTaskTeam(e.target.value)}>
                 <option value="Design team">Design team</option>
@@ -353,19 +400,47 @@ export function ProjectDetailPage() {
                 <option value="Dev team">Dev team</option>
               </select></label>
               <button className="project-task-submit" type="submit" disabled={!newTaskTitle.trim() || isSubmittingTask}><Plus size={15} />{isSubmittingTask ? 'Adicionando...' : 'Adicionar tarefa'}</button>
-            </form>
+            </form>}
 
-            <div className="project-task-list">
+            <div className="project-task-stack">
               {projectTasks.length === 0 ? (
                 <div className="project-task-empty"><Circle size={16} /><span>Nenhuma tarefa cadastrada neste projeto.</span></div>
               ) : (
-                projectTasks.map((t) => (
-                  <button className={`project-task-row${t.status === 'Concluído' ? ' is-complete' : ''}`} type="button" key={t.id} onClick={() => void handleToggleTask(t)}>
-                    <span className="project-task-check">{t.status === 'Concluído' && <Check size={13} />}</span>
-                    <span className="project-task-copy"><strong>{t.title}</strong><small>{t.team}</small></span>
-                    <b>{t.status}</b>
-                  </button>
-                ))
+                projectTasks.map((task, index) => {
+                  const expanded = expandedTaskId === task.id
+                  const editing = editingTaskId === task.id && taskBriefingDraft
+                  return <article className="project-task-stack-item" key={task.id}>
+                    <div className="project-task-stack-index"><span>{index + 1}</span>{index < projectTasks.length - 1 && <i />}</div>
+                    <div className="project-task-stack-card">
+                      <header>
+                        <div className="project-task-stack-title"><span><Layers3 size={14} /> Tarefa #{task.publicId}</span><h3>{task.title}</h3><p>{task.team} · prazo estimado de {task.deadlineDays || 2} dias úteis</p></div>
+                        <span className={`project-task-status project-task-status--${task.status.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '')}`}>{task.status}</span>
+                      </header>
+                      <p className="project-task-summary">{task.briefing?.objective || task.briefing?.overview || 'Briefing herdado do projeto.'}</p>
+                      <footer>
+                        <button type="button" onClick={() => setExpandedTaskId(expanded ? null : task.id)}>{expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}{expanded ? 'Ocultar briefing' : 'Ver briefing'}</button>
+                        <button type="button" onClick={() => startEditingTaskBriefing(task)}><Pencil size={13} /> Personalizar briefing</button>
+                        {task.briefing?.inheritedFromProject && <span>Herdado do projeto</span>}
+                      </footer>
+                      {expanded && <section className="project-task-briefing">
+                        {editing ? <div className="project-task-briefing-editor">
+                          <label><span>Objetivo desta tarefa</span><textarea value={taskBriefingDraft.objective || ''} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, objective: event.target.value })} /></label>
+                          <label><span>Contexto</span><textarea value={taskBriefingDraft.overview || ''} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, overview: event.target.value })} /></label>
+                          <div><label><span>Público</span><input value={taskBriefingDraft.audience || ''} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, audience: event.target.value })} /></label><label><span>Tom</span><input value={taskBriefingDraft.tone || ''} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, tone: event.target.value })} /></label></div>
+                          <label><span>Entregáveis, separados por vírgula</span><input value={taskBriefingDraft.deliverables.join(', ')} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, deliverables: event.target.value.split(',').map((item) => item.trim()).filter(Boolean) })} /></label>
+                          <label><span>Formatos, separados por vírgula</span><input value={taskBriefingDraft.formats.join(', ')} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, formats: event.target.value.split(',').map((item) => item.trim()).filter(Boolean) })} /></label>
+                          <div className="project-task-briefing-editor__actions"><button type="button" onClick={() => { setEditingTaskId(null); setTaskBriefingDraft(null) }}>Cancelar</button><button type="button" disabled={savingTaskBriefing} onClick={() => void saveTaskBriefing(task)}>{savingTaskBriefing ? 'Salvando...' : 'Salvar briefing'}</button></div>
+                        </div> : <div className="project-task-briefing-content">
+                          <div><span>Objetivo</span><p>{task.briefing?.objective || 'Mesmo objetivo geral do projeto.'}</p></div>
+                          {task.briefing?.overview && <div><span>Contexto</span><p>{task.briefing.overview}</p></div>}
+                          <div className="project-task-briefing-grid"><div><span>Público</span><p>{task.briefing?.audience || 'Herdado do projeto'}</p></div><div><span>Tom</span><p>{task.briefing?.tone || 'Herdado do projeto'}</p></div></div>
+                          {task.briefing?.deliverables?.length > 0 && <div><span>Entregáveis</span><div className="project-task-briefing-tags">{task.briefing.deliverables.map((item) => <b key={item}>{item}</b>)}</div></div>}
+                          {task.briefing?.formats?.length > 0 && <div><span>Formatos</span><div className="project-task-briefing-tags">{task.briefing.formats.map((item) => <b key={item}>{item}</b>)}</div></div>}
+                        </div>}
+                      </section>}
+                    </div>
+                  </article>
+                })
               )}
             </div>
           </article>

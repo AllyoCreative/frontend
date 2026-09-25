@@ -1,7 +1,21 @@
 export type ProjectStatus = 'Em andamento' | 'Em revisão' | 'Concluído' | 'Rascunho'
 
+export interface TaskBriefing {
+  inheritedFromProject: boolean
+  catalogCode?: string | null
+  overview?: string | null
+  objective?: string | null
+  audience?: string | null
+  tone?: string | null
+  deliverables: string[]
+  formats: string[]
+  creativeDirection: string[]
+  projectDeliverables?: string[]
+}
+
 export interface ProjectTask {
   id: string
+  publicId: string
   projectId: string
   title: string
   team: string
@@ -9,6 +23,7 @@ export interface ProjectTask {
   delivery?: 'Aprovado' | 'Aguardando aprovação'
   deadlineDays?: number
   orderIndex?: number
+  briefing: TaskBriefing
   createdAt?: string
   updatedAt?: string
 }

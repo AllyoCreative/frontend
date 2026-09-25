@@ -1,4 +1,4 @@
-import type { Project, ProjectTask } from '../types'
+import type { Project, ProjectTask, TaskBriefing } from '../types'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
 
@@ -588,7 +588,7 @@ export const api = {
     })
   },
 
-  async updateTask(projectId: string, taskId: string, data: { status?: string; delivery?: string; title?: string }) {
+  async updateTask(projectId: string, taskId: string, data: { status?: string; delivery?: string; title?: string; briefing?: TaskBriefing }) {
     return request<ProjectTask>(`/projects/${projectId}/tasks/${taskId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
