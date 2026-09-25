@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { Project } from './types'
+import type { Project, ProjectTask } from './types'
 import { api, type AccountOverview, type ManagedBrandSummary, type ProfileUpdate, type ProjectBriefingInput, type UserSummary, type WorkspaceSummary, clearAuthToken } from './services/api'
 import { socket, type SocketEventPayload } from './services/socket'
 
@@ -8,15 +8,7 @@ interface Toast {
   id: number
 }
 
-export interface AppTask {
-  id: string
-  projectId: string
-  title: string
-  team: string
-  status: 'Concluído' | 'Em andamento'
-  delivery?: 'Aprovado' | 'Aguardando aprovação'
-  deadlineDays?: number
-}
+export type AppTask = ProjectTask
 
 export type ProjectWithTasks = Project & { tasksList?: AppTask[] }
 
@@ -39,8 +31,8 @@ interface AppContextValue {
   updateProfile: (data: ProfileUpdate) => Promise<void>
   addMember: (data: { name: string; email: string; jobTitle?: string }) => Promise<void>
   addBrand: (data: Pick<ManagedBrand, 'name' | 'description' | 'color'>) => Promise<void>
-  createTask: (projectId: string, title: string, team?: string) => Promise<void>
-  toggleTaskStatus: (projectId: string, taskId: string, currentStatus: string) => Promise<void>
+  createTask: (projectId: string, title: string, team?: string) => Promise<ProjectTask>
+  toggleTaskStatus: (projectId: string, taskId: string, currentStatus: string) => Promise<ProjectTask>
   logout: () => void
 }
 
@@ -256,30 +248,38 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
         })
       )
       notify('Tarefa criada com sucesso!')
-    } catch {
+      return task
+    } catch (error) {
       notify('Erro ao criar tarefa')
+      throw error
     }
   }, [notify])
 
   const toggleTaskStatus = useCallback(async (projectId: string, taskId: string, currentStatus: string) => {
-    const nextStatus = currentStatus === 'Concluído' ? 'Em andamento' : 'Concluído'
+    const nextStatus: ProjectTask['status'] = currentStatus === 'A iniciar'
+      ? 'Em andamento'
+      : currentStatus === 'Concluído' ? 'Em andamento' : 'Concluído'
     try {
-      await api.updateTask(projectId, taskId, { status: nextStatus })
+      const updatedTask = await api.updateTask(projectId, taskId, { status: nextStatus })
       setProjects((current) =>
         current.map((p) => {
           if (p.id !== projectId) return p
           const existingTasks = (p as ProjectWithTasks).tasksList || []
+          const nextTasks = existingTasks.map((t) => t.id === taskId ? { ...t, status: nextStatus } : t)
+          const completedTasks = nextTasks.filter((task) => task.status === 'Concluído').length
           return {
             ...p,
-            tasksList: existingTasks.map((t) =>
-              t.id === taskId ? { ...t, status: nextStatus } : t
-            ),
+            status: nextTasks.length > 0 && completedTasks === nextTasks.length ? 'Concluído' : nextTasks.some((task) => task.status === 'Em revisão') ? 'Em revisão' : 'Em andamento',
+            progress: nextTasks.length > 0 ? Math.max(8, Math.round((completedTasks / nextTasks.length) * 100)) : 8,
+            tasksList: nextTasks,
           }
         })
       )
       notify(`Tarefa marcada como ${nextStatus}`)
-    } catch {
+      return updatedTask
+    } catch (error) {
       notify('Erro ao atualizar status da tarefa')
+      throw error
     }
   }, [notify])
 

@@ -1,21 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useParams } from 'react-router-dom'
-import { Download, ExternalLink, FileText, Upload } from 'lucide-react'
+import { Check, Circle, Clock3, Download, ExternalLink, FileText, Plus, Upload } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
 import { DesignReviewModal, type ReviewOrigin } from '../components/DesignReviewModal'
 import { api, type DesignSummary, type ProjectBriefingSummary, type ProjectFileSummary } from '../services/api'
 import { socket, type SocketEventPayload } from '../services/socket'
-import type { Project } from '../types'
-
-const timelineEvents = [
-  { left: '1%', time: '9:00h', lines: ['Briefing enviado'] },
-  { left: '17%', time: '14:00h', lines: ['Iniciou o projeto'] },
-  { left: '33.5%', time: '17:00h', lines: ['Primeira versão', 'do banner'] },
-  { left: '50%', time: '17:00h', lines: ['Primeira versão', 'da imagem', 'gerada por IA'], clock: true },
-  { left: '66%', time: '2:00h', lines: ['Primeira versão da', 'grade de conteúdo'], clock: true },
-  { left: '82%', time: '7:00h', lines: ['Primeira versão', 'do rodapé'] },
-]
+import type { Project, ProjectTask } from '../types'
 
 const messageTools = [
   { asset: 'messages.imgOcticonBold16' as const, label: 'Negrito' },
@@ -27,49 +18,70 @@ const messageTools = [
   { asset: 'messages.imgGroup3' as const, label: 'Mencionar pessoa' },
 ]
 
-function OverviewTimeline() {
+interface ProjectTimelineEvent {
+  id: string
+  date: Date
+  title: string
+  detail: string
+  completed?: boolean
+}
+
+const validDate = (value?: string) => {
+  if (!value) return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function projectTimeline(project: Project, tasks: ProjectTask[], designs: DesignSummary[]): ProjectTimelineEvent[] {
+  const events: ProjectTimelineEvent[] = []
+  const createdAt = validDate(project.createdAt)
+  const updatedAt = validDate(project.updatedAt)
+
+  if (createdAt) events.push({ id: 'project-created', date: createdAt, title: 'Briefing enviado', detail: 'Projeto criado pelo cliente' })
+
+  tasks.forEach((task) => {
+    const taskCreatedAt = validDate(task.createdAt)
+    const taskUpdatedAt = validDate(task.updatedAt)
+    if (taskCreatedAt) events.push({ id: `task-created-${task.id}`, date: taskCreatedAt, title: task.title, detail: 'Tarefa adicionada ao projeto' })
+    if (taskUpdatedAt && taskCreatedAt && taskUpdatedAt.getTime() - taskCreatedAt.getTime() > 1_000 && task.status !== 'A iniciar') {
+      events.push({
+        id: `task-updated-${task.id}`,
+        date: taskUpdatedAt,
+        title: task.title,
+        detail: task.status === 'Concluído' ? 'Tarefa concluída' : `Status alterado para ${task.status.toLowerCase()}`,
+        completed: task.status === 'Concluído',
+      })
+    }
+  })
+
+  designs.forEach((design) => {
+    const designCreatedAt = validDate(design.createdAt)
+    if (designCreatedAt) events.push({ id: `design-${design.id}`, date: designCreatedAt, title: design.name, detail: `${design.version} enviada para revisão`, completed: design.approved })
+  })
+
+  if (updatedAt && createdAt && updatedAt.getTime() - createdAt.getTime() > 1_000) {
+    events.push({ id: 'project-updated', date: updatedAt, title: `Projeto ${project.status.toLowerCase()}`, detail: `${project.progress}% do projeto concluído`, completed: project.status === 'Concluído' })
+  }
+
+  return events.sort((left, right) => left.date.getTime() - right.date.getTime()).slice(-12)
+}
+
+function OverviewTimeline({ project, tasks, designs }: { project: Project; tasks: ProjectTask[]; designs: DesignSummary[] }) {
+  const events = projectTimeline(project, tasks, designs)
   return (
     <article className="overview-timeline-card">
-      <h2>Timeline</h2>
-      <span className="overview-timeline-month">OUTUBRO</span>
-      <div className="overview-timeline-viewport">
-        <div className="overview-timeline-plot">
-          <div className="overview-timeline-labels" aria-hidden="true">
-            <span><b>25</b> Seg<small>9h</small></span>
-            <span><b>13h</b></span>
-            <span><b>17h</b></span>
-            <span><b>19h</b></span>
-            <span><b>26</b> Ter<small>9h</small></span>
-            <span><b>5h</b></span>
-            <span><b>26</b><small>9h</small></span>
-          </div>
-
-          <div className="overview-timeline-track" aria-hidden="true">
-            <span className="overview-timeline-endpoint overview-timeline-endpoint--start"><img src={figmaAsset('overview.imgLucideFlag')} alt="" /></span>
-            <img className="timeline-line timeline-line--1" src={figmaAsset('overview.imgLine21')} alt="" />
-            <img className="timeline-line timeline-line--2" src={figmaAsset('overview.imgLine22')} alt="" />
-            <img className="timeline-line timeline-line--3" src={figmaAsset('overview.imgLine23')} alt="" />
-            <img className="timeline-line timeline-line--4" src={figmaAsset('overview.imgLine25')} alt="" />
-            <img className="timeline-line timeline-line--5" src={figmaAsset('overview.imgLine26')} alt="" />
-            <img className="timeline-line timeline-line--6" src={figmaAsset('overview.imgLine27')} alt="" />
-            <img className="timeline-line timeline-line--7" src={figmaAsset('overview.imgLine28')} alt="" />
-            {['16.67%', '33.33%', '50%'].map((left) => <img key={left} className="timeline-node" style={{ left }} src={figmaAsset('overview.imgEllipse18')} alt="" />)}
-            {['66.67%', '83.33%'].map((left) => <img key={left} className="timeline-node" style={{ left }} src={figmaAsset('overview.imgEllipse21')} alt="" />)}
-            <img className="timeline-arrow" src={figmaAsset('overview.imgVector11')} alt="" />
-            <span className="overview-timeline-endpoint overview-timeline-endpoint--finish"><img src={figmaAsset('overview.imgMaterialSymbolsRocketLaunchOutline')} alt="" /></span>
-          </div>
-
-          <div className="overview-timeline-events">
-            {timelineEvents.map((event) => (
-              <div className={`overview-timeline-event${event.clock ? ' has-clock' : ''}`} style={{ left: event.left }} key={`${event.time}-${event.left}`}>
-                <strong>{event.time}</strong>
-                <span>{event.lines.map((line) => <span key={line}>{line}</span>)}</span>
-                {event.clock && <img src={figmaAsset('overview.imgGroup2')} alt="Prazo cronometrado" />}
-              </div>
-            ))}
-          </div>
+      <header className="overview-timeline-heading"><div><h2>Timeline</h2><p>Histórico real do projeto e das entregas.</p></div><span>{events.length} {events.length === 1 ? 'evento' : 'eventos'}</span></header>
+      {events.length === 0 ? <div className="overview-timeline-empty"><Clock3 size={18} /><span>Os eventos aparecerão aqui conforme o projeto avançar.</span></div> : (
+        <div className="overview-real-timeline">
+          {events.map((event, index) => (
+            <article className={`overview-real-event${event.completed ? ' is-complete' : ''}`} key={event.id}>
+              <div className="overview-real-event__date"><strong>{event.date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')}</strong><span>{event.date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span></div>
+              <span className="overview-real-event__node">{event.completed ? <Check size={12} /> : index === events.length - 1 ? <Circle size={9} /> : null}</span>
+              <div className="overview-real-event__card"><strong>{event.title}</strong><span>{event.detail}</span></div>
+            </article>
+          ))}
         </div>
-      </div>
+      )}
     </article>
   )
 }
@@ -126,6 +138,7 @@ export function ProjectDetailPage() {
   const [designList, setDesignList] = useState<DesignSummary[]>([])
   const [projectFiles, setProjectFiles] = useState<ProjectFileSummary[]>([])
   const [briefing, setBriefing] = useState<ProjectBriefingSummary | null>(null)
+  const [projectTasks, setProjectTasks] = useState<ProjectTask[]>([])
   const [loadedAssetsFor, setLoadedAssetsFor] = useState<string | null>(null)
   const [uploadingFile, setUploadingFile] = useState(false)
   const [draft, setDraft] = useState('')
@@ -142,6 +155,7 @@ export function ProjectDetailPage() {
   useEffect(() => {
     if (!project) return
     let isMounted = true
+    setProjectTasks(project.tasksList || [])
 
     Promise.allSettled([
       api.getProject(project.id),
@@ -150,7 +164,10 @@ export function ProjectDetailPage() {
       api.getProjectFiles(project.id),
     ]).then(([projectResult, messagesResult, designsResult, filesResult]) => {
       if (!isMounted) return
-      if (projectResult.status === 'fulfilled') setBriefing(projectResult.value.briefing)
+      if (projectResult.status === 'fulfilled') {
+        setBriefing(projectResult.value.briefing)
+        setProjectTasks(projectResult.value.tasksList || [])
+      }
       if (messagesResult.status === 'fulfilled') setMessageList(messagesResult.value)
       if (designsResult.status === 'fulfilled') {
         setDesignList(designsResult.value)
@@ -191,10 +208,23 @@ export function ProjectDetailPage() {
     if (!project || !newTaskTitle.trim()) return
     setIsSubmittingTask(true)
     try {
-      await createTask(project.id, newTaskTitle.trim(), newTaskTeam)
+      const task = await createTask(project.id, newTaskTitle.trim(), newTaskTeam)
+      setProjectTasks((current) => current.some((item) => item.id === task.id) ? current : [...current, task])
       setNewTaskTitle('')
+    } catch {
+      // O contexto global já apresenta a mensagem de erro.
     } finally {
       setIsSubmittingTask(false)
+    }
+  }
+
+  const handleToggleTask = async (task: ProjectTask) => {
+    if (!project) return
+    try {
+      const updatedTask = await toggleTaskStatus(project.id, task.id, task.status)
+      setProjectTasks((current) => current.map((item) => item.id === updatedTask.id ? updatedTask : item))
+    } catch {
+      // O contexto global já apresenta a mensagem de erro.
     }
   }
 
@@ -277,7 +307,6 @@ export function ProjectDetailPage() {
     )
   }
 
-  const projectTasks = (project as { tasksList?: Array<{ id: string; title: string; team: string; status: 'Concluído' | 'Em andamento' }> }).tasksList || []
   const loadingAssets = loadedAssetsFor !== project.id
 
   return (
@@ -307,7 +336,7 @@ export function ProjectDetailPage() {
       {tab === 'visao-geral' && (
         <section className="project-overview">
           {/* Tarefas e Demandas do Projeto */}
-          <article className="project-briefing-card" style={{ marginBottom: 24 }}>
+          <article className="project-briefing-card project-task-card">
             <header>
               <div>
                 <h2>Tarefas do projeto ({projectTasks.length})</h2>
@@ -315,109 +344,33 @@ export function ProjectDetailPage() {
               </div>
             </header>
 
-            <form onSubmit={handleCreateTask} style={{ display: 'flex', gap: 10, marginTop: 16, marginBottom: 16 }}>
-              <input
-                value={newTaskTitle}
-                onChange={(e) => setNewTaskTitle(e.target.value)}
-                placeholder="Nome da nova tarefa (ex: Criação do Key Visual)..."
-                style={{
-                  flex: 1,
-                  background: 'var(--color-bg-secondary, #1c1c1e)',
-                  border: '1px solid var(--color-border, #2c2c2e)',
-                  borderRadius: 8,
-                  padding: '10px 14px',
-                  color: '#fff',
-                  fontSize: 14,
-                }}
-              />
-              <select
-                value={newTaskTeam}
-                onChange={(e) => setNewTaskTeam(e.target.value)}
-                style={{
-                  background: 'var(--color-bg-secondary, #1c1c1e)',
-                  border: '1px solid var(--color-border, #2c2c2e)',
-                  borderRadius: 8,
-                  padding: '10px 14px',
-                  color: '#fff',
-                  fontSize: 14,
-                }}
-              >
+            <form className="project-task-form" onSubmit={handleCreateTask}>
+              <label className="project-task-field"><span>Nova tarefa</span><input value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="Ex.: Ajuste final do carrossel" /></label>
+              <label className="project-task-field project-task-field--team"><span>Especialidade</span><select value={newTaskTeam} onChange={(e) => setNewTaskTeam(e.target.value)}>
                 <option value="Design team">Design team</option>
                 <option value="Copy team">Copy team</option>
                 <option value="Video team">Video team</option>
                 <option value="Dev team">Dev team</option>
-              </select>
-              <button
-                type="submit"
-                disabled={!newTaskTitle.trim() || isSubmittingTask}
-                style={{
-                  background: 'var(--color-primary, #d7ff70)',
-                  color: '#111',
-                  border: 'none',
-                  borderRadius: 8,
-                  padding: '10px 18px',
-                  fontWeight: 600,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                  opacity: !newTaskTitle.trim() || isSubmittingTask ? 0.5 : 1,
-                }}
-              >
-                + Adicionar Tarefa
-              </button>
+              </select></label>
+              <button className="project-task-submit" type="submit" disabled={!newTaskTitle.trim() || isSubmittingTask}><Plus size={15} />{isSubmittingTask ? 'Adicionando...' : 'Adicionar tarefa'}</button>
             </form>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="project-task-list">
               {projectTasks.length === 0 ? (
-                <p style={{ color: '#8e8e93', fontSize: 14, margin: '8px 0' }}>
-                  Nenhuma tarefa cadastrada ainda. Use o formulário acima para criar sua primeira tarefa!
-                </p>
+                <div className="project-task-empty"><Circle size={16} /><span>Nenhuma tarefa cadastrada neste projeto.</span></div>
               ) : (
                 projectTasks.map((t) => (
-                  <div
-                    key={t.id}
-                    onClick={() => toggleTaskStatus(project.id, t.id, t.status)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '12px 16px',
-                      background: 'var(--color-bg-surface, #141416)',
-                      borderRadius: 8,
-                      border: '1px solid var(--color-border, #2c2c2e)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span
-                        style={{
-                          width: 20,
-                          height: 20,
-                          borderRadius: 4,
-                          border: `2px solid ${t.status === 'Concluído' ? '#d7ff70' : '#636366'}`,
-                          background: t.status === 'Concluído' ? '#d7ff70' : 'transparent',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#111',
-                          fontSize: 12,
-                          fontWeight: 700,
-                        }}
-                      >
-                        {t.status === 'Concluído' ? '✓' : ''}
-                      </span>
-                      <strong style={{ color: '#fff', textDecoration: t.status === 'Concluído' ? 'line-through' : 'none' }}>
-                        {t.title}
-                      </strong>
-                      <small style={{ color: '#8e8e93' }}>({t.team})</small>
-                    </div>
-                    <b className={t.status === 'Concluído' ? 'is-done' : 'is-progress'}>{t.status}</b>
-                  </div>
+                  <button className={`project-task-row${t.status === 'Concluído' ? ' is-complete' : ''}`} type="button" key={t.id} onClick={() => void handleToggleTask(t)}>
+                    <span className="project-task-check">{t.status === 'Concluído' && <Check size={13} />}</span>
+                    <span className="project-task-copy"><strong>{t.title}</strong><small>{t.team}</small></span>
+                    <b>{t.status}</b>
+                  </button>
                 ))
               )}
             </div>
           </article>
 
-          <OverviewTimeline />
+          <OverviewTimeline project={project} tasks={projectTasks} designs={designList} />
           <ProjectBriefing project={project} briefing={briefing} files={projectFiles} onDuplicate={() => notify('Briefing pronto para ser reutilizado em um novo projeto')} />
         </section>
       )}

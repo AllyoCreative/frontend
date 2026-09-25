@@ -1,4 +1,4 @@
-import type { Project } from '../types'
+import type { Project, ProjectTask } from '../types'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api'
 
@@ -108,6 +108,8 @@ export interface DesignSummary {
   approved: boolean
   fileUrl?: string
   thumbnailUrl?: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface ReviewCommentItem {
@@ -362,7 +364,7 @@ export const api = {
   },
 
   async getProject(id: string) {
-    return request<Project & { briefing: ProjectBriefingSummary | null; designs: DesignSummary[] }>(`/projects/${id}`)
+    return request<Project & { briefing: ProjectBriefingSummary | null; designs: DesignSummary[]; tasksList: ProjectTask[] }>(`/projects/${id}`)
   },
 
   async createProject(data: Partial<Project> & ProjectBriefingInput): Promise<Project> {
@@ -580,29 +582,14 @@ export const api = {
 
   // Tasks
   async createTask(projectId: string, data: { title: string; team?: string; deadlineDays?: number }) {
-    return request<{
-      id: string
-      projectId: string
-      title: string
-      team: string
-      status: 'Concluído' | 'Em andamento'
-      delivery?: 'Aprovado' | 'Aguardando aprovação'
-      deadlineDays: number
-    }>(`/projects/${projectId}/tasks`, {
+    return request<ProjectTask>(`/projects/${projectId}/tasks`, {
       method: 'POST',
       body: JSON.stringify(data),
     })
   },
 
   async updateTask(projectId: string, taskId: string, data: { status?: string; delivery?: string; title?: string }) {
-    return request<{
-      id: string
-      projectId: string
-      title: string
-      team: string
-      status: 'Concluído' | 'Em andamento'
-      delivery?: 'Aprovado' | 'Aguardando aprovação'
-    }>(`/projects/${projectId}/tasks/${taskId}`, {
+    return request<ProjectTask>(`/projects/${projectId}/tasks/${taskId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     })

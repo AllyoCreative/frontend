@@ -213,8 +213,8 @@ export function NewProjectPage() {
     setSubmitting(true)
     try {
       const created = await addProject({
-        id: `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${Date.now()}`,
-        name: name.trim(), service: selected.name, status: 'Rascunho', deadline: 'A definir', progress: 8, tasks: 1, unread: 0,
+        name: name.trim(), service: selected.name, status: 'Em andamento', deadline: 'A definir', progress: 8,
+        tasks: scope.taskRepeats + Object.values(scope.addons).filter((quantity) => quantity > 0).length, unread: 0,
         accent: categoryAccent[selected.category] || '#d7ff70', team: [], description: overview.trim(), objective, overview: overview.trim(), projectGoal,
         audience: !notApplicable.audience ? audience.trim() : undefined,
         tone: !notApplicable.tone ? tone.trim() : undefined,

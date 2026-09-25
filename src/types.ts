@@ -1,5 +1,18 @@
 export type ProjectStatus = 'Em andamento' | 'Em revisão' | 'Concluído' | 'Rascunho'
 
+export interface ProjectTask {
+  id: string
+  projectId: string
+  title: string
+  team: string
+  status: 'A iniciar' | 'Concluído' | 'Em andamento' | 'Em revisão'
+  delivery?: 'Aprovado' | 'Aguardando aprovação'
+  deadlineDays?: number
+  orderIndex?: number
+  createdAt?: string
+  updatedAt?: string
+}
+
 export interface Project {
   id: string
   name: string
@@ -13,6 +26,9 @@ export interface Project {
   team: string[]
   description: string
   favorite?: boolean
+  tasksList?: ProjectTask[]
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface Service {
