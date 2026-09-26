@@ -300,12 +300,14 @@ export function NewProjectPage() {
     }
   }
 
-  if (step === 'success') return <div className="new-project-page success-page">
-    <button className="close-flow" onClick={() => navigate('/')}><X size={22} /></button>
-    <div className="success-mark"><Check size={34} /></div><span className="eyebrow">Briefing enviado</span><h1>Seu projeto decolou.</h1>
+  if (step === 'success') return <div className="new-project-page new-project-success">
+    <button type="button" className="new-project-success__close" onClick={() => navigate('/')} aria-label="Fechar"><X size={22} /></button>
+    <div className="new-project-success__mark"><Check size={28} /></div>
+    <span className="new-project-success__eyebrow">Briefing enviado</span>
+    <h1>Seu projeto decolou.</h1>
     <p>O time Allyo recebeu o contexto, o escopo e as referências. Agora vamos validar a solicitação e confirmar a entrega.</p>
-    <div className="success-summary"><span style={{ background: categoryAccent[selected?.category || ''] }} /><div><small>{selected?.category} · código {selected?.code}</small><strong>{name}</strong><p>{selected?.name} · {quote ? `${formatCredits(quote.totalCredits)} créditos estimados` : ''}</p></div></div>
-    <div className="success-actions"><button className="secondary-button" onClick={() => navigate('/projetos')}>Ver projetos</button><button className="primary-button" onClick={() => navigate('/')}>Voltar ao início <ArrowRight size={16} /></button></div>
+    <div className="new-project-success__summary"><span style={{ background: categoryAccent[selected?.category || ''] }} /><div><small>{selected?.category} · código {selected?.code}</small><strong>{name}</strong><p>{selected?.name} · {quote ? `${formatCredits(quote.totalCredits)} créditos estimados` : ''}</p></div></div>
+    <div className="new-project-success__actions"><button type="button" className="secondary-button" onClick={() => navigate('/projetos')}>Ver projetos</button><button type="button" className="primary-button" onClick={() => navigate('/')}>Voltar ao início <ArrowRight size={16} /></button></div>
   </div>
 
   return <div className="new-project-page new-project-modal">
