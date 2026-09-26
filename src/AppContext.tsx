@@ -173,13 +173,22 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
       }
     }
 
+    const handleProjectDeleted = (event: SocketEventPayload) => {
+      if (event.projectId) {
+        setProjects((current) => current.filter((project) => project.id !== event.projectId))
+        notify('Projeto excluído pelo time operacional')
+      }
+    }
+
     socket.on('STATUS_UPDATED', handleStatusUpdate)
     socket.on('TEAM_ASSIGNED', handleTeamAssigned)
+    socket.on('PROJECT_DELETED', handleProjectDeleted)
 
     return () => {
       isMounted = false
       socket.off('STATUS_UPDATED', handleStatusUpdate)
       socket.off('TEAM_ASSIGNED', handleTeamAssigned)
+      socket.off('PROJECT_DELETED', handleProjectDeleted)
     }
   }, [notify, logout])
 
