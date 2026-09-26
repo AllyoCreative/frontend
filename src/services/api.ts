@@ -183,6 +183,7 @@ export interface CatalogProduct {
   code: string
   name: string
   description: string
+  imageUrl?: string | null
   category: string
   subcategory: string | null
   specialistRole: string

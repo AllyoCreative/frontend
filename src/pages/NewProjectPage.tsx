@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, FileText, Link2, Minus, Paperclip, Plus, Upload, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, FileText, Link2, Minus, Paperclip, Plus, Search, Upload, X } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
 import { api, type CatalogProduct, type CatalogQuote, type CatalogScope } from '../services/api'
@@ -70,6 +70,7 @@ export function NewProjectPage() {
   const [loaded, setLoaded] = useState(false)
   const [catalogError, setCatalogError] = useState('')
   const [filter, setFilter] = useState<CatalogFilter>('design')
+  const [catalogSearch, setCatalogSearch] = useState('')
   const [selected, setSelected] = useState<CatalogProduct | null>(null)
   const [step, setStep] = useState<FlowStep>('catalog')
   const [scope, setScope] = useState<CatalogScope>({ quantity: 1, taskRepeats: 1, resizeCount: 0, variationCount: 0, characterCount: 1, addons: {} })
@@ -132,13 +133,20 @@ export function NewProjectPage() {
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [navigate, step])
 
-  const visible = useMemo(() => products.filter((product) => {
-    if (filter === 'production') return product.category === 'Vídeo & Áudio'
-    if (filter === 'ai') return product.category === 'Feitos com IA'
-    if (filter === 'fast') return product.slaHours <= 8
-    if (filter === 'design') return product.category !== 'Vídeo & Áudio' && product.category !== 'Feitos com IA'
-    return true
-  }), [filter, products])
+  const visible = useMemo(() => {
+    const query = catalogSearch.trim().toLocaleLowerCase('pt-BR')
+    return products.filter((product) => {
+      const matchesFilter = filter === 'production' ? product.category === 'Vídeo & Áudio'
+        : filter === 'ai' ? product.category === 'Feitos com IA'
+          : filter === 'fast' ? product.slaHours <= 8
+            : filter === 'design' ? product.category !== 'Vídeo & Áudio' && product.category !== 'Feitos com IA'
+              : true
+      if (!matchesFilter || !query) return matchesFilter
+      return [product.name, product.description, product.category, product.subcategory, product.code]
+        .filter(Boolean)
+        .some((value) => String(value).toLocaleLowerCase('pt-BR').includes(query))
+    })
+  }, [catalogSearch, filter, products])
 
   const activeFilter = catalogFilters.find((item) => item.id === filter) || catalogFilters[0]
   const briefReady = Boolean(name.trim() && objective && overview.trim().length >= 10 && projectGoal)
@@ -251,11 +259,11 @@ export function NewProjectPage() {
       </header>
 
       {step === 'catalog' ? <main className="new-project-catalog">
-        <header className="new-project-catalog__heading"><h1>{activeFilter.title}</h1><p>{activeFilter.description}</p></header>
+        <header className="new-project-catalog__heading"><div><h1>{activeFilter.title}</h1><p>{activeFilter.description}</p></div><label className="new-project-catalog__search"><Search size={17} aria-hidden="true" /><input type="search" value={catalogSearch} onChange={(event) => setCatalogSearch(event.target.value)} placeholder="Pesquisar tarefa ou produto" aria-label="Pesquisar tarefa ou produto no catálogo" />{catalogSearch && <button type="button" onClick={() => setCatalogSearch('')} aria-label="Limpar pesquisa"><X size={15} /></button>}</label></header>
         {!loaded && <div className="new-project-catalog-state">Carregando catálogo...</div>}
         {loaded && catalogError && <div className="new-project-catalog-state is-error"><strong>Catálogo indisponível</strong><span>{catalogError}</span><button className="secondary-button" onClick={() => window.location.reload()}>Tentar novamente</button></div>}
-        {loaded && !catalogError && visible.length === 0 && <div className="new-project-catalog-state">Nenhum produto encontrado.</div>}
-        <div className="new-project-services">{visible.map((product) => <button type="button" key={product.code} className="new-project-service" onClick={() => selectProduct(product)} aria-label={`${product.name}: ${product.description}`}><span className="new-project-service__preview" /><span className="new-project-service__body"><h2>{product.name}</h2><small>{formatCredits(product.credits.original)} cr. · {formatCredits(product.slaHours)}h úteis</small></span></button>)}</div>
+        {loaded && !catalogError && visible.length === 0 && <div className="new-project-catalog-state"><strong>Nenhum produto encontrado</strong><span>{catalogSearch ? `Não encontramos resultados para “${catalogSearch}”.` : 'Tente selecionar outra categoria.'}</span></div>}
+        <div className="new-project-services">{visible.map((product) => <button type="button" key={product.code} className="new-project-service" onClick={() => selectProduct(product)} aria-label={`${product.name}: ${product.description}`}><span className={`new-project-service__preview${product.imageUrl ? ' has-image' : ''}`} style={{ backgroundColor: categoryAccent[product.category] || '#d9d9d9' }}>{product.imageUrl && <img src={product.imageUrl} alt="" loading="lazy" onError={(event) => { event.currentTarget.style.display = 'none' }} />}</span><span className="new-project-service__body"><h2>{product.name}</h2><small>{formatCredits(product.credits.original)} cr. · {formatCredits(product.slaHours)}h úteis</small></span></button>)}</div>
       </main> : selected && <main className="new-project-flow">
         <section className="new-project-flow__main">
           {step === 'brief' && <BriefStep selected={selected} name={name} objective={objective} overview={overview} projectGoal={projectGoal} audience={audience} tone={tone} notApplicable={notApplicable} creativePath={creativePath} referenceFiles={referenceFiles} referenceLinks={referenceLinks} linkDraft={linkDraft} setName={setName} setObjective={setObjective} setOverview={setOverview} setProjectGoal={setProjectGoal} setAudience={setAudience} setTone={setTone} setNotApplicable={setNotApplicable} setCreativePath={setCreativePath} setLinkDraft={setLinkDraft} addReferenceLink={addReferenceLink} addReferenceFiles={addReferenceFiles} removeFile={(index) => setReferenceFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} removeLink={(link) => setReferenceLinks((current) => current.filter((item) => item !== link))} onCancel={() => setStep('catalog')} onNext={() => setStep('configure')} ready={briefReady} />}
@@ -359,7 +367,7 @@ function FlowFooter({ children }: { children: React.ReactNode }) {
 }
 
 function ProductSummary({ product, quote, quoteError, onChange }: { product: CatalogProduct; quote: CatalogQuote | null; quoteError: string; onChange: () => void }) {
-  return <aside className="new-project-order-summary"><span className="new-project-order-summary__eyebrow">Sua escolha</span><div className="new-project-order-summary__mark" style={{ background: categoryAccent[product.category] || '#d7ff70' }}>{product.code}</div><small>{product.category}{product.subcategory ? ` · ${product.subcategory}` : ''}</small><h2>{product.name}</h2><p>{product.description}</p><button type="button" onClick={onChange}>Trocar serviço</button><div className="new-project-order-summary__quote"><span><Paperclip size={15} /> Estimativa</span><strong>{quote ? `${formatCredits(quote.totalCredits)} créditos` : 'Calculando...'}</strong><small><Clock3 size={14} /> {quote ? `${formatCredits(quote.slaHours)} horas úteis` : `${formatCredits(product.slaHours)} horas base`}</small>{quoteError && <em>{quoteError}</em>}</div></aside>
+  return <aside className="new-project-order-summary"><span className="new-project-order-summary__eyebrow">Sua escolha</span><div className={`new-project-order-summary__mark${product.imageUrl ? ' has-image' : ''}`} style={{ background: categoryAccent[product.category] || '#d7ff70' }}>{product.imageUrl ? <img src={product.imageUrl} alt="" onError={(event) => { event.currentTarget.style.display = 'none' }} /> : product.code}</div><small>{product.category}{product.subcategory ? ` · ${product.subcategory}` : ''}</small><h2>{product.name}</h2><p>{product.description}</p><button type="button" onClick={onChange}>Trocar serviço</button><div className="new-project-order-summary__quote"><span><Paperclip size={15} /> Estimativa</span><strong>{quote ? `${formatCredits(quote.totalCredits)} créditos` : 'Calculando...'}</strong><small><Clock3 size={14} /> {quote ? `${formatCredits(quote.slaHours)} horas úteis` : `${formatCredits(product.slaHours)} horas base`}</small>{quoteError && <em>{quoteError}</em>}</div></aside>
 }
 
 function ScopeCounter({ label, value, minimum = 0, onDecrease, onIncrease, disableIncrease = false }: { label: string; value: number; minimum?: number; onDecrease: () => void; onIncrease: () => void; disableIncrease?: boolean }) {
