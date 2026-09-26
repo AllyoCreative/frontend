@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, FileText, Link2, Minus, Paperclip, Plus, Search, Upload, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, FileOutput, FileText, Layers3, Link2, Maximize2, Minus, Paperclip, PenTool, Plus, Search, Upload, X } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
 import { api, type CatalogProduct, type CatalogQuote, type CatalogScope } from '../services/api'
@@ -59,8 +59,29 @@ function workOptionsFor(product: CatalogProduct) {
   return [`Criar ${productName}`, 'Reformular ou evoluir um material existente', 'Quero discutir possibilidades com o time Allyo']
 }
 
-function availableFormatsFor(product: CatalogProduct) {
-  return Array.from(new Set([...product.formats.final, ...product.formats.available].filter(Boolean))).slice(0, 12)
+function uniqueOptions(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)))
+}
+
+function defaultFinalFormat(product: CatalogProduct) {
+  const formats = uniqueOptions(product.formats.final)
+  return formats.find((format) => format.replace(/^\./, '').toUpperCase() === 'PNG') || formats[0] || ''
+}
+
+function defaultSize(product: CatalogProduct) {
+  const sizes = uniqueOptions(product.formats.sizesAndRatios)
+  const preferred = ['1080x1080', '1200x1200', '1080x1350', '1080x1920', 'Quadrado', 'Paisagem', 'Retrato', 'A4']
+  return preferred.map((item) => sizes.find((size) => size.toLocaleLowerCase('pt-BR') === item.toLocaleLowerCase('pt-BR'))).find(Boolean) || sizes[0] || ''
+}
+
+function defaultApplication(product: CatalogProduct) {
+  const applications = uniqueOptions(product.formats.available)
+  const preferred = ['Post', 'Stories', 'Reels', 'Banner', 'Thumbnail']
+  return preferred.map((item) => applications.find((application) => application.toLocaleLowerCase('pt-BR') === item.toLocaleLowerCase('pt-BR'))).find(Boolean) || (applications.length === 1 ? applications[0] : '')
+}
+
+function displayFileFormat(format: string) {
+  return format.replace(/^\./, '').trim()
 }
 
 export function NewProjectPage() {
@@ -84,7 +105,10 @@ export function NewProjectPage() {
   const [tone, setTone] = useState('')
   const [notApplicable, setNotApplicable] = useState({ audience: false, tone: false })
   const [creativePath, setCreativePath] = useState<'new-direction' | 'follow-references'>('follow-references')
-  const [selectedFormats, setSelectedFormats] = useState<string[]>([])
+  const [selectedApplications, setSelectedApplications] = useState<string[]>([])
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([])
+  const [selectedFinalFormat, setSelectedFinalFormat] = useState('')
+  const [selectedEditableFormat, setSelectedEditableFormat] = useState('')
   const [referenceFiles, setReferenceFiles] = useState<File[]>([])
   const [referenceLinks, setReferenceLinks] = useState<string[]>([])
   const [linkDraft, setLinkDraft] = useState('')
@@ -133,6 +157,12 @@ export function NewProjectPage() {
     return () => window.removeEventListener('keydown', closeOnEscape)
   }, [navigate, step])
 
+  useEffect(() => {
+    const dialog = document.querySelector<HTMLElement>('.new-project-dialog')
+    if (dialog) dialog.scrollTop = 0
+    window.scrollTo({ top: 0, behavior: 'auto' })
+  }, [step])
+
   const visible = useMemo(() => {
     const query = catalogSearch.trim().toLocaleLowerCase('pt-BR')
     return products.filter((product) => {
@@ -150,15 +180,25 @@ export function NewProjectPage() {
 
   const activeFilter = catalogFilters.find((item) => item.id === filter) || catalogFilters[0]
   const briefReady = Boolean(name.trim() && objective && overview.trim().length >= 10 && projectGoal)
+  const selectedFormats = useMemo(() => [
+    ...selectedApplications.map((application) => `Aplicação: ${application}`),
+    ...selectedSizes.map((size) => `Dimensão: ${size}`),
+    selectedFinalFormat ? `Arquivo final: ${displayFileFormat(selectedFinalFormat).toUpperCase()}` : '',
+    selectedEditableFormat ? `Arquivo aberto: ${selectedEditableFormat}` : 'Arquivo aberto: não solicitado',
+  ].filter(Boolean), [selectedApplications, selectedEditableFormat, selectedFinalFormat, selectedSizes])
 
   const selectProduct = (product: CatalogProduct) => {
-    const formats = availableFormatsFor(product)
+    const initialSize = defaultSize(product)
+    const initialApplication = defaultApplication(product)
     setSelected(product)
     setScope(initialScope(product))
     setQuote(null)
     setQuoteError('')
     setObjective(workOptionsFor(product)[0])
-    setSelectedFormats(formats.slice(0, 1))
+    setSelectedApplications(initialApplication ? [initialApplication] : [])
+    setSelectedSizes(initialSize ? [initialSize] : [])
+    setSelectedFinalFormat(defaultFinalFormat(product))
+    setSelectedEditableFormat('')
     setName('')
     setOverview('')
     setProjectGoal(goals[0])
@@ -190,7 +230,25 @@ export function NewProjectPage() {
     setScope((current) => ({ ...current, addons: { ...current.addons, [addonCode]: current.addons[addonCode] > 0 ? 0 : addonInitialQuantity(selected, addonCode) } }))
   }
 
-  const toggleFormat = (format: string) => setSelectedFormats((current) => current.includes(format) ? current.filter((item) => item !== format) : [...current, format])
+  const toggleApplication = (application: string) => setSelectedApplications((current) => current.includes(application) ? current.filter((item) => item !== application) : [...current, application])
+
+  const toggleSize = (size: string) => {
+    setQuote(null)
+    setQuoteError('')
+    setSelectedSizes((current) => {
+      const next = current.includes(size) ? current.filter((item) => item !== size) : [...current, size]
+      if (selected?.credits.resizeAllowed) {
+        setScope((scopeValue) => ({ ...scopeValue, resizeCount: Math.max(0, next.length - 1) }))
+      }
+      return next
+    })
+  }
+
+  const addCustomSize = (size: string) => {
+    const normalized = size.trim()
+    if (!normalized || selectedSizes.includes(normalized)) return
+    toggleSize(normalized)
+  }
 
   const addReferenceLink = () => {
     const next = linkDraft.trim()
@@ -267,8 +325,8 @@ export function NewProjectPage() {
       </main> : selected && <main className="new-project-flow">
         <section className="new-project-flow__main">
           {step === 'brief' && <BriefStep selected={selected} name={name} objective={objective} overview={overview} projectGoal={projectGoal} audience={audience} tone={tone} notApplicable={notApplicable} creativePath={creativePath} referenceFiles={referenceFiles} referenceLinks={referenceLinks} linkDraft={linkDraft} setName={setName} setObjective={setObjective} setOverview={setOverview} setProjectGoal={setProjectGoal} setAudience={setAudience} setTone={setTone} setNotApplicable={setNotApplicable} setCreativePath={setCreativePath} setLinkDraft={setLinkDraft} addReferenceLink={addReferenceLink} addReferenceFiles={addReferenceFiles} removeFile={(index) => setReferenceFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} removeLink={(link) => setReferenceLinks((current) => current.filter((item) => item !== link))} onCancel={() => setStep('catalog')} onNext={() => setStep('configure')} ready={briefReady} />}
-          {step === 'configure' && <ConfigureStep selected={selected} scope={scope} selectedFormats={selectedFormats} quoteError={quoteError} updateCounter={updateCounter} toggleAddon={toggleAddon} toggleFormat={toggleFormat} onBack={() => setStep('brief')} onNext={() => setStep('review')} quoteReady={Boolean(quote)} />}
-          {step === 'review' && <ReviewStep selected={selected} name={name} overview={overview} objective={objective} projectGoal={projectGoal} audience={notApplicable.audience ? '' : audience} tone={notApplicable.tone ? '' : tone} creativePath={creativePath} selectedFormats={selectedFormats} referenceFiles={referenceFiles} referenceLinks={referenceLinks} scope={scope} quote={quote} submitting={submitting} onBack={() => setStep('configure')} onEditBrief={() => setStep('brief')} onSubmit={() => void submit()} />}
+          {step === 'configure' && <ConfigureStep selected={selected} scope={scope} selectedApplications={selectedApplications} selectedSizes={selectedSizes} selectedFinalFormat={selectedFinalFormat} selectedEditableFormat={selectedEditableFormat} quoteError={quoteError} updateCounter={updateCounter} toggleAddon={toggleAddon} toggleApplication={toggleApplication} toggleSize={toggleSize} addCustomSize={addCustomSize} setSelectedFinalFormat={setSelectedFinalFormat} setSelectedEditableFormat={setSelectedEditableFormat} onBack={() => setStep('brief')} onNext={() => setStep('review')} quoteReady={Boolean(quote)} />}
+          {step === 'review' && <ReviewStep selected={selected} name={name} overview={overview} objective={objective} projectGoal={projectGoal} audience={notApplicable.audience ? '' : audience} tone={notApplicable.tone ? '' : tone} creativePath={creativePath} selectedApplications={selectedApplications} selectedSizes={selectedSizes} selectedFinalFormat={selectedFinalFormat} selectedEditableFormat={selectedEditableFormat} referenceFiles={referenceFiles} referenceLinks={referenceLinks} scope={scope} quote={quote} submitting={submitting} onBack={() => setStep('configure')} onEditBrief={() => setStep('brief')} onSubmit={() => void submit()} />}
         </section>
         <ProductSummary product={selected} quote={quote} quoteError={quoteError} onChange={() => setStep('catalog')} />
       </main>}
@@ -321,25 +379,91 @@ function BriefStep(props: BriefStepProps) {
 }
 
 interface ConfigureStepProps {
-  selected: CatalogProduct; scope: CatalogScope; selectedFormats: string[]; quoteError: string
+  selected: CatalogProduct; scope: CatalogScope; selectedApplications: string[]; selectedSizes: string[]; selectedFinalFormat: string; selectedEditableFormat: string; quoteError: string
   updateCounter: (key: keyof Pick<CatalogScope, 'quantity' | 'taskRepeats' | 'resizeCount' | 'variationCount' | 'characterCount'>, delta: number) => void
-  toggleAddon: (code: string) => void; toggleFormat: (format: string) => void; onBack: () => void; onNext: () => void; quoteReady: boolean
+  toggleAddon: (code: string) => void; toggleApplication: (application: string) => void; toggleSize: (size: string) => void; addCustomSize: (size: string) => void
+  setSelectedFinalFormat: (format: string) => void; setSelectedEditableFormat: (format: string) => void
+  onBack: () => void; onNext: () => void; quoteReady: boolean
 }
 
 function ConfigureStep(props: ConfigureStepProps) {
-  const formats = availableFormatsFor(props.selected)
+  const applications = uniqueOptions(props.selected.formats.available)
+  const sizes = uniqueOptions(props.selected.formats.sizesAndRatios)
+  const finalFormats = uniqueOptions(props.selected.formats.final)
+  const editableFormats = uniqueOptions(props.selected.formats.editable)
+  const deliveryReady = sizes.length === 0 || props.selectedSizes.length > 0
   return <>
     <FlowHeading eyebrow="Etapa 2 de 3" title="Configure a entrega" description="A estimativa é atualizada automaticamente conforme o escopo." />
-    <div className="new-project-form-section"><SectionTitle title="Escopo" description={`${props.selected.billing.label || ''}${props.selected.billing.unitNote ? ` · ${props.selected.billing.unitNote}` : ''}`} />{props.quoteError && <small className="new-project-error">{props.quoteError}</small>}<div className="new-project-scope__controls"><ScopeCounter label={`Quantidade (${props.selected.billing.unit})`} value={props.scope.quantity} minimum={1} onDecrease={() => props.updateCounter('quantity', -1)} onIncrease={() => props.updateCounter('quantity', 1)} disableIncrease={Boolean(props.selected.billing.maxQuantity && props.scope.quantity >= props.selected.billing.maxQuantity)} /><ScopeCounter label="Tarefas" value={props.scope.taskRepeats} minimum={1} onDecrease={() => props.updateCounter('taskRepeats', -1)} onIncrease={() => props.updateCounter('taskRepeats', 1)} />{props.selected.credits.resizeAllowed && <ScopeCounter label="Redimensionamentos" value={props.scope.resizeCount} onDecrease={() => props.updateCounter('resizeCount', -1)} onIncrease={() => props.updateCounter('resizeCount', 1)} />}{props.selected.credits.variationAllowed && <ScopeCounter label="Variações" value={props.scope.variationCount} onDecrease={() => props.updateCounter('variationCount', -1)} onIncrease={() => props.updateCounter('variationCount', 1)} />}{props.selected.billing.characterCredits && <ScopeCounter label="Avatares/personagens" value={props.scope.characterCount} minimum={1} onDecrease={() => props.updateCounter('characterCount', -1)} onIncrease={() => props.updateCounter('characterCount', 1)} />}</div></div>
-    {formats.length > 0 && <div className="new-project-form-section"><SectionTitle title="Formatos de entrega" description="Selecione os arquivos que você precisa receber." /><div className="new-project-format-grid">{formats.map((format) => <label key={format} className={props.selectedFormats.includes(format) ? 'selected' : ''}><input type="checkbox" checked={props.selectedFormats.includes(format)} onChange={() => props.toggleFormat(format)} /><FileText size={17} /><span>{format}</span></label>)}</div></div>}
+    <div className="new-project-form-section"><SectionTitle title="Escopo" description={`${props.selected.billing.label || ''}${props.selected.billing.unitNote ? ` · ${props.selected.billing.unitNote}` : ''}`} />{props.quoteError && <small className="new-project-error">{props.quoteError}</small>}<div className="new-project-scope__controls"><ScopeCounter label={`Quantidade (${props.selected.billing.unit})`} value={props.scope.quantity} minimum={1} onDecrease={() => props.updateCounter('quantity', -1)} onIncrease={() => props.updateCounter('quantity', 1)} disableIncrease={Boolean(props.selected.billing.maxQuantity && props.scope.quantity >= props.selected.billing.maxQuantity)} /><ScopeCounter label="Tarefas" value={props.scope.taskRepeats} minimum={1} onDecrease={() => props.updateCounter('taskRepeats', -1)} onIncrease={() => props.updateCounter('taskRepeats', 1)} />{props.selected.credits.resizeAllowed && sizes.length === 0 && <ScopeCounter label="Redimensionamentos" value={props.scope.resizeCount} onDecrease={() => props.updateCounter('resizeCount', -1)} onIncrease={() => props.updateCounter('resizeCount', 1)} />}{props.selected.credits.variationAllowed && <ScopeCounter label="Variações" value={props.scope.variationCount} onDecrease={() => props.updateCounter('variationCount', -1)} onIncrease={() => props.updateCounter('variationCount', 1)} />}{props.selected.billing.characterCredits && <ScopeCounter label="Avatares/personagens" value={props.scope.characterCount} minimum={1} onDecrease={() => props.updateCounter('characterCount', -1)} onIncrease={() => props.updateCounter('characterCount', 1)} />}</div></div>
+    {applications.length > 0 && <div className="new-project-form-section"><SectionTitle title="Aplicação da peça" description="Escolha onde ou como o material será usado. Você pode selecionar mais de uma opção." /><DeliveryOptionPicker options={applications} selected={props.selectedApplications} onToggle={props.toggleApplication} kind="application" searchPlaceholder="Buscar aplicação, canal ou tipo de peça" /></div>}
+    {sizes.length > 0 && <div className="new-project-form-section"><SectionTitle title="Dimensões e proporções" description="Escolha o tamanho da peça. Cada tamanho adicional é considerado um redimensionamento." /><DeliveryOptionPicker options={sizes} selected={props.selectedSizes} onToggle={props.toggleSize} onAddCustom={props.addCustomSize} kind="size" searchPlaceholder="Buscar tamanho ou proporção" />{props.selected.credits.resizeAllowed && props.selectedSizes.length > 1 && <p className="new-project-selection-note"><Maximize2 size={16} /> {props.selectedSizes.length} tamanhos selecionados · {props.selectedSizes.length - 1} redimensionamento{props.selectedSizes.length > 2 ? 's' : ''}</p>}</div>}
+    {(finalFormats.length > 0 || editableFormats.length > 0) && <div className="new-project-form-section new-project-delivery-files"><SectionTitle title="Arquivos de entrega" description="O arquivo final vem pronto para uso. O arquivo aberto é opcional e permite futuras edições." />
+      {finalFormats.length > 0 && <DeliveryFileChoice title="Arquivo final" description="Fechado e pronto para publicar ou enviar." icon="final" options={finalFormats} selected={props.selectedFinalFormat} onSelect={props.setSelectedFinalFormat} defaultLabel={displayFileFormat(defaultFinalFormat(props.selected)).toUpperCase()} />}
+      {editableFormats.length > 0 && <DeliveryFileChoice title="Arquivo aberto" description="Opcional. Escolha o software em que deseja editar." icon="editable" options={editableFormats} selected={props.selectedEditableFormat} onSelect={props.setSelectedEditableFormat} allowNone allowCustom />}
+    </div>}
     {props.selected.addons.length > 0 && <div className="new-project-form-section"><SectionTitle title="Adicionais" description="Inclua apenas o que fizer sentido para esta entrega." /><div className="new-project-addons"><div>{props.selected.addons.map((addon) => { const checked = props.scope.addons[addon.code] > 0; const addonCredits = addon.rule?.credits ?? addon.credits; return <label key={addon.code} className={checked ? 'selected' : ''}><input type="checkbox" checked={checked} onChange={() => props.toggleAddon(addon.code)} /><span><strong>{addon.name}</strong><small>{addon.rule?.unit ? `${addon.rule.step || 1} ${addon.rule.unit}` : 'Adicional da entrega'}</small></span><b>{addonCredits > 0 ? `+${formatCredits(addonCredits)} cr.` : 'Incluso'}</b></label> })}</div></div></div>}
-    <FlowFooter><button type="button" className="secondary-button" onClick={props.onBack}><ArrowLeft size={15} /> Voltar</button><button type="button" className="primary-button" disabled={!props.quoteReady} onClick={props.onNext}>Revisar solicitação <ArrowRight size={15} /></button></FlowFooter>
+    <FlowFooter><button type="button" className="secondary-button" onClick={props.onBack}><ArrowLeft size={15} /> Voltar</button><button type="button" className="primary-button" disabled={!props.quoteReady || !deliveryReady} onClick={props.onNext}>Revisar solicitação <ArrowRight size={15} /></button></FlowFooter>
   </>
+}
+
+function DeliveryOptionPicker({ options, selected, onToggle, onAddCustom, kind, searchPlaceholder }: {
+  options: string[]; selected: string[]; onToggle: (option: string) => void; onAddCustom?: (option: string) => void
+  kind: 'application' | 'size'; searchPlaceholder: string
+}) {
+  const [query, setQuery] = useState('')
+  const [expanded, setExpanded] = useState(false)
+  const [customValue, setCustomValue] = useState('')
+  const normalizedQuery = query.trim().toLocaleLowerCase('pt-BR')
+  const filtered = options.filter((option) => !normalizedQuery || option.toLocaleLowerCase('pt-BR').includes(normalizedQuery))
+  const visible = expanded || normalizedQuery ? filtered : filtered.slice(0, 8)
+  const customSelections = selected.filter((option) => !options.includes(option) && (!normalizedQuery || option.toLocaleLowerCase('pt-BR').includes(normalizedQuery)))
+  const visibleOptions = [...customSelections, ...visible]
+  const Icon = kind === 'size' ? Maximize2 : Layers3
+  const addCustom = () => {
+    const next = customValue.trim()
+    if (!next || !onAddCustom) return
+    onAddCustom(next)
+    setCustomValue('')
+  }
+  return <div className="new-project-option-picker">
+    {options.length > 8 && <label className="new-project-option-search"><Search size={17} /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={searchPlaceholder} />{query && <button type="button" onClick={() => setQuery('')} aria-label="Limpar busca"><X size={15} /></button>}</label>}
+    <div className="new-project-option-grid">{visibleOptions.map((option) => { const active = selected.includes(option); return <button type="button" key={option} className={active ? 'selected' : ''} aria-pressed={active} onClick={() => onToggle(option)}><Icon size={18} /><span>{option}</span><span className="new-project-option-check">{active && <Check size={14} />}</span></button> })}</div>
+    {visibleOptions.length === 0 && <p className="new-project-option-empty">Nenhuma opção encontrada para “{query}”.</p>}
+    {!normalizedQuery && options.length > 8 && <button type="button" className="new-project-show-options" onClick={() => setExpanded((current) => !current)}>{expanded ? 'Mostrar menos opções' : `Ver todas as ${options.length} opções`}</button>}
+    {onAddCustom && <div className="new-project-custom-option"><div><strong>Outro tamanho</strong><span>Use largura × altura e informe a unidade. Ex.: 1080 × 1350 px.</span></div><div><input value={customValue} onChange={(event) => setCustomValue(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addCustom() } }} placeholder="Ex.: 1920 × 480 px" /><button type="button" disabled={!customValue.trim()} onClick={addCustom}>Adicionar</button></div></div>}
+  </div>
+}
+
+function DeliveryFileChoice({ title, description, icon, options, selected, onSelect, allowNone = false, allowCustom = false, defaultLabel }: {
+  title: string; description: string; icon: 'final' | 'editable'; options: string[]; selected: string; onSelect: (option: string) => void
+  allowNone?: boolean; allowCustom?: boolean; defaultLabel?: string
+}) {
+  const [customOpen, setCustomOpen] = useState(false)
+  const [customValue, setCustomValue] = useState('')
+  const Icon = icon === 'final' ? FileOutput : PenTool
+  const addCustom = () => {
+    const next = customValue.trim()
+    if (!next) return
+    onSelect(next)
+    setCustomValue('')
+    setCustomOpen(false)
+  }
+  const selectedIsCustom = Boolean(selected && !options.includes(selected))
+  return <div className="new-project-file-choice">
+    <header><span><Icon size={19} /></span><div><strong>{title}</strong><p>{description}</p></div></header>
+    <div className="new-project-file-choice__options">
+      {allowNone && <button type="button" className={!selected ? 'selected' : ''} onClick={() => { onSelect(''); setCustomOpen(false) }}><span>Não preciso</span>{!selected && <Check size={15} />}</button>}
+      {options.map((option) => { const active = selected === option; const label = icon === 'final' ? displayFileFormat(option).toUpperCase() : option; return <button type="button" key={option} className={active ? 'selected' : ''} onClick={() => { onSelect(option); setCustomOpen(false) }}><span>{label}{defaultLabel === label && <small>Padrão</small>}</span>{active && <Check size={15} />}</button> })}
+      {selectedIsCustom && <button type="button" className="selected" onClick={() => setCustomOpen(true)}><span>{selected}<small>Outro</small></span><Check size={15} /></button>}
+      {allowCustom && !selectedIsCustom && <button type="button" className={customOpen ? 'selected' : ''} onClick={() => setCustomOpen((current) => !current)}><span>Outro software</span><Plus size={15} /></button>}
+    </div>
+    {customOpen && <div className="new-project-file-choice__custom"><input value={customValue} onChange={(event) => setCustomValue(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addCustom() } }} placeholder="Nome do software ou formato" autoFocus /><button type="button" disabled={!customValue.trim()} onClick={addCustom}>Usar este formato</button></div>}
+  </div>
 }
 
 interface ReviewStepProps {
   selected: CatalogProduct; name: string; overview: string; objective: string; projectGoal: string; audience: string; tone: string
-  creativePath: 'new-direction' | 'follow-references'; selectedFormats: string[]; referenceFiles: File[]; referenceLinks: string[]; scope: CatalogScope
+  creativePath: 'new-direction' | 'follow-references'; selectedApplications: string[]; selectedSizes: string[]; selectedFinalFormat: string; selectedEditableFormat: string; referenceFiles: File[]; referenceLinks: string[]; scope: CatalogScope
   quote: CatalogQuote | null; submitting: boolean; onBack: () => void; onEditBrief: () => void; onSubmit: () => void
 }
 
@@ -348,7 +472,7 @@ function ReviewStep(props: ReviewStepProps) {
   return <>
     <FlowHeading eyebrow="Etapa 3 de 3" title="Revise antes de enviar" description="Você poderá complementar o briefing na conversa do projeto depois do envio." />
     <div className="new-project-review-block"><header><div><span>Briefing</span><h2>{props.name}</h2></div><button type="button" onClick={props.onEditBrief}>Editar</button></header><p>{props.overview}</p><dl><div><dt>Pedido</dt><dd>{props.objective}</dd></div><div><dt>Objetivo</dt><dd>{props.projectGoal}</dd></div><div><dt>Direção</dt><dd>{props.creativePath === 'new-direction' ? 'Explorar nova direção' : 'Partir das referências'}</dd></div>{props.audience && <div><dt>Público</dt><dd>{props.audience}</dd></div>}{props.tone && <div><dt>Tom</dt><dd>{props.tone}</dd></div>}</dl></div>
-    <div className="new-project-review-block"><header><div><span>Entrega</span><h2>{props.selected.name}</h2></div><button type="button" onClick={props.onBack}>Editar</button></header><dl><div><dt>Quantidade</dt><dd>{props.scope.quantity} {props.selected.billing.unit}</dd></div><div><dt>Tarefas</dt><dd>{props.scope.taskRepeats}</dd></div><div><dt>Formatos</dt><dd>{props.selectedFormats.length ? props.selectedFormats.join(', ') : 'Padrão do catálogo'}</dd></div>{activeAddons.length > 0 && <div><dt>Adicionais</dt><dd>{activeAddons.map((item) => item.name).join(', ')}</dd></div>}<div><dt>Referências</dt><dd>{props.referenceFiles.length + props.referenceLinks.length || 'Nenhuma'}</dd></div></dl></div>
+    <div className="new-project-review-block"><header><div><span>Entrega</span><h2>{props.selected.name}</h2></div><button type="button" onClick={props.onBack}>Editar</button></header><dl><div><dt>Quantidade</dt><dd>{props.scope.quantity} {props.selected.billing.unit}</dd></div><div><dt>Tarefas</dt><dd>{props.scope.taskRepeats}</dd></div>{props.selectedApplications.length > 0 && <div><dt>Aplicação</dt><dd>{props.selectedApplications.join(', ')}</dd></div>}{props.selectedSizes.length > 0 && <div><dt>Dimensões</dt><dd>{props.selectedSizes.join(', ')}</dd></div>}<div><dt>Arquivo final</dt><dd>{props.selectedFinalFormat ? displayFileFormat(props.selectedFinalFormat).toUpperCase() : 'Padrão do catálogo'}</dd></div><div><dt>Arquivo aberto</dt><dd>{props.selectedEditableFormat || 'Não solicitado'}</dd></div>{activeAddons.length > 0 && <div><dt>Adicionais</dt><dd>{activeAddons.map((item) => item.name).join(', ')}</dd></div>}<div><dt>Referências</dt><dd>{props.referenceFiles.length + props.referenceLinks.length || 'Nenhuma'}</dd></div></dl></div>
     <div className="new-project-review-total"><div><span>Estimativa da solicitação</span><strong>{props.quote ? `${formatCredits(props.quote.totalCredits)} créditos` : 'Calculando...'}</strong><small>{props.quote ? `Prazo estimado de ${formatCredits(props.quote.slaHours)} horas úteis` : 'Aguarde a atualização do escopo'}</small></div><p>A estimativa pode ser ajustada pelo time caso o briefing exija uma validação adicional. Você será avisado antes de qualquer alteração.</p></div>
     <FlowFooter><button type="button" className="secondary-button" onClick={props.onBack}><ArrowLeft size={15} /> Voltar</button><button type="button" className="primary-button" disabled={!props.quote || props.submitting} onClick={props.onSubmit}>{props.submitting ? 'Enviando...' : 'Enviar projeto'} <ArrowRight size={15} /></button></FlowFooter>
   </>
