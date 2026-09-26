@@ -10,6 +10,7 @@ import {
   MousePointer2,
   Redo2,
   Square,
+  Star,
   Type,
   Undo2,
   X,
@@ -74,7 +75,7 @@ type DesignReviewModalProps = {
   initialVersion: number
   isApproved: boolean
   origin: ReviewOrigin | null
-  onApprovalChange: (approved: boolean) => void
+  onApprovalChange: (approved: boolean, feedback?: { rating: number; comment?: string }) => Promise<void>
   onClose: () => void
   notify: (message: string) => void
 }
@@ -144,6 +145,12 @@ export function DesignReviewModal({ designTitle, initialVersion, isApproved, ori
   const [railVisible, setRailVisible] = useState(true)
   const [isPanning, setIsPanning] = useState(false)
   const [closing, setClosing] = useState(false)
+  const [approvalFeedbackOpen, setApprovalFeedbackOpen] = useState(false)
+  const [approvalRating, setApprovalRating] = useState(0)
+  const [hoveredRating, setHoveredRating] = useState(0)
+  const [approvalComment, setApprovalComment] = useState('')
+  const [approvalSubmitting, setApprovalSubmitting] = useState(false)
+  const [approvalError, setApprovalError] = useState('')
   const [artReady, setArtReady] = useState(!origin || reducedMotion)
   const [clonePhase, setClonePhase] = useState<'opening' | 'closing' | null>(origin && !reducedMotion ? 'opening' : null)
   const [cloneRect, setCloneRect] = useState<ReviewOrigin | null>(origin)
@@ -227,6 +234,11 @@ export function DesignReviewModal({ designTitle, initialVersion, isApproved, ori
         return
       }
       if (event.key !== 'Escape') return
+      if (approvalFeedbackOpen) {
+        setApprovalFeedbackOpen(false)
+        setApprovalError('')
+        return
+      }
       if (textEditor || pendingPoint || draftAnnotation) {
         setTextEditor(null)
         setPendingPoint(null)
@@ -245,7 +257,36 @@ export function DesignReviewModal({ designTitle, initialVersion, isApproved, ori
       document.body.style.overflow = previousOverflow
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [brushOpen, closeModal, draftAnnotation, pendingPoint, textEditor])
+  }, [approvalFeedbackOpen, brushOpen, closeModal, draftAnnotation, pendingPoint, textEditor])
+
+  const submitApprovalFeedback = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!approvalRating || approvalSubmitting) return
+    setApprovalSubmitting(true)
+    setApprovalError('')
+    try {
+      await onApprovalChange(true, { rating: approvalRating, comment: approvalComment.trim() || undefined })
+      setApprovalFeedbackOpen(false)
+      notify('Tarefa aprovada e avaliação enviada. Obrigado pelo feedback!')
+    } catch (error: unknown) {
+      setApprovalError(error instanceof Error ? error.message : 'Não foi possível enviar a avaliação')
+    } finally {
+      setApprovalSubmitting(false)
+    }
+  }
+
+  const revokeApproval = async () => {
+    if (approvalSubmitting) return
+    setApprovalSubmitting(true)
+    try {
+      await onApprovalChange(false)
+      notify('Aprovação removida')
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : 'Não foi possível remover a aprovação')
+    } finally {
+      setApprovalSubmitting(false)
+    }
+  }
 
   const clearPendingContext = () => {
     setPendingPoint(null)
@@ -430,7 +471,7 @@ export function DesignReviewModal({ designTitle, initialVersion, isApproved, ori
               <strong>Nome-doArquivo.pdf</strong>
               <span className="file-review-status">{isApproved ? 'Aprovado' : 'Aguardando aprovação'}</span><i />
               <button type="button" className="file-review-change" onClick={() => notify('Solicitação de alterações aberta')}><img src={figmaAsset('design_review.imgGardenReloadFill16')} alt="" />Solicitar alterações</button>
-              <button type="button" className="file-review-approve" onClick={() => { onApprovalChange(!isApproved); notify(isApproved ? 'Aprovação removida' : 'Design aprovado com sucesso') }}><img src={figmaAsset('design_review.imgGroup')} alt="" />{isApproved ? 'Aprovado' : 'Marcar como aprovado'}</button>
+              <button type="button" className="file-review-approve" disabled={approvalSubmitting} onClick={() => { if (isApproved) void revokeApproval(); else setApprovalFeedbackOpen(true) }}><img src={figmaAsset('design_review.imgGroup')} alt="" />{isApproved ? 'Aprovado' : 'Marcar como aprovado'}</button>
             </div>
             <div className="file-review-share-actions"><button type="button" onClick={() => notify('Link de compartilhamento copiado')}><img src={figmaAsset('design_review.imgTablerShare')} alt="" />Compartilhar</button><button type="button" aria-label="Mais opções"><img src={figmaAsset('design_review.imgTablerDots')} alt="" /></button></div>
           </div>
@@ -544,6 +585,15 @@ export function DesignReviewModal({ designTitle, initialVersion, isApproved, ori
           </form>
         </aside>
       </div>
+      {approvalFeedbackOpen && <div className="file-review-feedback-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !approvalSubmitting) setApprovalFeedbackOpen(false) }}>
+        <form className="file-review-feedback" role="dialog" aria-modal="true" aria-labelledby="approval-feedback-title" onSubmit={submitApprovalFeedback}>
+          <header><div><span>Aprovar tarefa</span><h2 id="approval-feedback-title">Como você avalia esta entrega?</h2><p>Sua nota ajuda o time a entender o que funcionou e a melhorar as próximas entregas.</p></div><button type="button" disabled={approvalSubmitting} onClick={() => setApprovalFeedbackOpen(false)} aria-label="Fechar avaliação"><X size={20} /></button></header>
+          <fieldset><legend>Nota da entrega <b>Obrigatório</b></legend><div className="file-review-feedback__stars" onMouseLeave={() => setHoveredRating(0)}>{[1, 2, 3, 4, 5].map((rating) => <button type="button" key={rating} className={rating <= (hoveredRating || approvalRating) ? 'active' : ''} onMouseEnter={() => setHoveredRating(rating)} onFocus={() => setHoveredRating(rating)} onBlur={() => setHoveredRating(0)} onClick={() => { setApprovalRating(rating); setApprovalError('') }} aria-label={`${rating} ${rating === 1 ? 'estrela' : 'estrelas'}`} aria-pressed={approvalRating === rating}><Star size={30} fill="currentColor" /></button>)}</div><p>{approvalRating ? ['', 'Muito abaixo do esperado', 'Abaixo do esperado', 'Atendeu ao esperado', 'Muito boa', 'Excelente entrega'][approvalRating] : 'Selecione de 1 a 5 estrelas'}</p></fieldset>
+          <label><span>Comentário <small>Opcional</small></span><textarea value={approvalComment} maxLength={2000} onChange={(event) => setApprovalComment(event.target.value)} placeholder="Conte o que mais gostou ou o que podemos melhorar nas próximas entregas..." /><small>{approvalComment.length}/2000</small></label>
+          {approvalError && <p className="file-review-feedback__error">{approvalError}</p>}
+          <footer><button type="button" className="secondary-button" disabled={approvalSubmitting} onClick={() => setApprovalFeedbackOpen(false)}>Voltar</button><button type="submit" className="primary-button" disabled={!approvalRating || approvalSubmitting}>{approvalSubmitting ? 'Enviando...' : 'Aprovar e enviar avaliação'}</button></footer>
+        </form>
+      </div>}
     </div>
     {clonePhase && cloneRect && <div className="file-review-shared-clone" ref={cloneRef} style={{ left: cloneRect.left, top: cloneRect.top, width: cloneRect.width, height: cloneRect.height }} aria-hidden="true"><img src={figmaAsset('design_review.imgImage8')} alt="" /></div>}
     </>,

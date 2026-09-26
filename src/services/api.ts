@@ -250,6 +250,19 @@ export interface CatalogQuote {
   }
 }
 
+export interface ClientDashboardSummary {
+  tasks: Array<ProjectTask & {
+    projectName: string
+    reviewDesignId: number | null
+  }>
+  metrics: {
+    queueCount: number
+    pendingReviewCount: number
+    averageRating: number | null
+    ratingCount: number
+  }
+}
+
 export interface ProjectBriefingInput {
   objective?: string
   audience?: string
@@ -380,6 +393,10 @@ export const api = {
     return request<{ schemaVersion: string; products: CatalogProduct[] }>('/catalog')
   },
 
+  async getClientDashboard() {
+    return request<ClientDashboardSummary>('/dashboard/client')
+  },
+
   async quoteCatalogProduct(catalogCode: string, scope: CatalogScope) {
     return request<CatalogQuote>('/catalog/quote', {
       method: 'POST',
@@ -444,10 +461,10 @@ export const api = {
     })
   },
 
-  async setDesignApproval(designId: number, approved: boolean) {
-    return request<{ success: boolean; id: number; approved: boolean }>(`/designs/${designId}/approval`, {
+  async setDesignApproval(designId: number, approved: boolean, feedback?: { rating: number; comment?: string }) {
+    return request<{ success: boolean; id: number; approved: boolean; taskId?: string | null; feedback?: { rating: number; comment: string | null } | null }>(`/designs/${designId}/approval`, {
       method: 'POST',
-      body: JSON.stringify({ approved }),
+      body: JSON.stringify({ approved, ...feedback }),
     })
   },
 

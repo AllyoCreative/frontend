@@ -19,7 +19,7 @@ export interface ProjectTask {
   projectId: string
   title: string
   team: string
-  status: 'A iniciar' | 'Concluído' | 'Em andamento' | 'Em revisão'
+  status: 'A iniciar' | 'Bloqueada' | 'Concluído' | 'Em andamento' | 'Em revisão' | 'Inativa'
   delivery?: 'Aprovado' | 'Aguardando aprovação'
   deadlineDays?: number
   orderIndex?: number

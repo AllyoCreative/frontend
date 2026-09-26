@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Star } from 'lucide-react'
 import { useApp, type ProjectWithTasks } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
+import { api, type ClientDashboardSummary } from '../services/api'
 
 type AssetName = Parameters<typeof figmaAsset>[0]
 
@@ -15,28 +17,35 @@ function FigmaIcon({ asset, className = '' }: { asset: AssetName; className?: st
   return <img className={className} src={figmaAsset(asset)} alt="" />
 }
 
-function DesignDelivery({ state }: { state: string }) {
-  return (
-    <div className="home-delivery">
-      <img src={figmaAsset('home.imgRectangle161124126')} alt="Prévia do design entregue" />
-      <span><strong>DESIGN ENTREGUE</strong><small>{state}</small></span>
-      <time>1h</time>
-    </div>
-  )
-}
-
 export function HomePage() {
   const { projects, currentUser, account, members, notify } = useApp()
   const navigate = useNavigate()
   const [prompt, setPrompt] = useState('')
+  const [dashboard, setDashboard] = useState<ClientDashboardSummary | null>(null)
 
-  const tasks = useMemo(() => {
+  const projectTasks = useMemo(() => {
     return projects.flatMap((p) => {
       const pWithTasks = p as ProjectWithTasks
       const list = pWithTasks.tasksList || []
-      return list.map((t) => ({ ...t, projectName: p.name, projectId: p.id }))
+      return list
+        .filter((task) => task.status !== 'Concluído' || task.delivery === 'Aguardando aprovação')
+        .map((task) => ({ ...task, projectName: p.name, projectId: p.id, reviewDesignId: null as number | null }))
     })
   }, [projects])
+
+  useEffect(() => {
+    let active = true
+    api.getClientDashboard().then((summary) => {
+      if (active) setDashboard(summary)
+    }).catch(() => {
+      // A lista de projetos continua sendo usada como fallback offline.
+    })
+    return () => { active = false }
+  }, [])
+
+  const tasks = dashboard?.tasks ?? projectTasks
+  const averageRating = dashboard?.metrics.averageRating ?? null
+  const ratingCount = dashboard?.metrics.ratingCount ?? 0
 
   const firstName = currentUser?.name ? currentUser.name.split(' ')[0] : 'você'
 
@@ -102,14 +111,17 @@ export function HomePage() {
           <section className="home-card home-tasks-card">
             <header className="home-card__header">
               <h2>Suas tarefas</h2>
-              <span className="home-task-count">{tasks.length}</span>
+              <div className="home-task-header-metrics">
+                <span className="home-rating-summary"><Star size={16} fill="currentColor" /><span><strong>{averageRating === null ? '—' : averageRating.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</strong><small>{ratingCount ? `${ratingCount} ${ratingCount === 1 ? 'avaliação' : 'avaliações'}` : 'Sem avaliações'}</small></span></span>
+                <span className="home-task-count">{tasks.length}</span>
+              </div>
             </header>
 
             <div className="home-task-list">
               {tasks.length === 0 ? (
-                <div style={{ padding: '24px 16px', textAlign: 'center', color: '#8e8e93' }}>
-                  <p style={{ margin: 0, fontSize: '14px', fontWeight: 500, color: '#f2f2f7' }}>Nenhuma tarefa pendente</p>
-                  <small style={{ display: 'block', marginTop: '6px', color: '#8e8e93' }}>
+                <div className="home-task-empty">
+                  <p>Nenhuma tarefa pendente</p>
+                  <small>
                     Tarefas criadas nos seus projetos aparecerão aqui.
                   </small>
                 </div>
@@ -118,15 +130,14 @@ export function HomePage() {
                   <button
                     key={task.id}
                     className="home-notification"
-                    onClick={() => navigate(`/projetos/${task.projectId}`)}
+                    onClick={() => navigate(`/projetos/${task.projectId}${task.reviewDesignId ? '/designs' : ''}`)}
                   >
                     <FigmaIcon asset="home.imgGroup4" className="home-notification__icon" />
                     <span>
                       <strong>{task.title}</strong>
                       <small>Projeto: {task.projectName} · {task.team}</small>
                     </span>
-                    <b className={task.status === 'Concluído' ? 'is-done' : 'is-progress'}>{task.status}</b>
-                    {task.delivery && <DesignDelivery state={task.delivery} />}
+                    <span className="home-task-state"><b className={task.status === 'Concluído' ? 'is-done' : 'is-progress'}>{task.status}</b>{task.delivery && <small>{task.delivery === 'Aguardando aprovação' ? 'Avaliar entrega' : task.delivery}</small>}</span>
                   </button>
                 ))
               )}

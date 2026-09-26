@@ -155,7 +155,7 @@ export function ProjectDetailPage() {
   const [designList, setDesignList] = useState<DesignSummary[]>([])
   const [projectFiles, setProjectFiles] = useState<ProjectFileSummary[]>([])
   const [briefing, setBriefing] = useState<ProjectBriefingSummary | null>(null)
-  const [projectTasks, setProjectTasks] = useState<ProjectTask[]>([])
+  const [projectTasks, setProjectTasks] = useState<ProjectTask[]>(() => project?.tasksList || [])
   const [loadedAssetsFor, setLoadedAssetsFor] = useState<string | null>(null)
   const [uploadingFile, setUploadingFile] = useState(false)
   const [draft, setDraft] = useState('')
@@ -177,7 +177,6 @@ export function ProjectDetailPage() {
   useEffect(() => {
     if (!project) return
     let isMounted = true
-    setProjectTasks(project.tasksList || [])
 
     Promise.allSettled([
       api.getProject(project.id),
@@ -297,11 +296,16 @@ export function ProjectDetailPage() {
     }
   }
 
-  const handleApprovalChange = (designId: number, nextApproved: boolean) => {
+  const handleApprovalChange = async (designId: number, nextApproved: boolean, feedback?: { rating: number; comment?: string }) => {
+    const result = await api.setDesignApproval(designId, nextApproved, feedback)
     setApproved((current) => nextApproved ? (current.includes(designId) ? current : [...current, designId]) : current.filter((item) => item !== designId))
-    api.setDesignApproval(designId, nextApproved).catch((err) => {
-      console.warn('Failed to sync approval with backend:', err)
-    })
+    if (result.taskId) {
+      setProjectTasks((current) => current.map((task) => task.id === result.taskId ? {
+        ...task,
+        status: nextApproved ? 'Concluído' : 'Em revisão',
+        delivery: nextApproved ? 'Aprovado' : 'Aguardando aprovação',
+      } : task))
+    }
   }
 
   const openReview = (designId: number, target: HTMLButtonElement) => {
@@ -558,7 +562,7 @@ export function ProjectDetailPage() {
         isApproved={approved.includes(reviewing)}
         origin={reviewOrigin}
         notify={notify}
-        onApprovalChange={(nextApproved) => handleApprovalChange(reviewing, nextApproved)}
+        onApprovalChange={(nextApproved, feedback) => handleApprovalChange(reviewing, nextApproved, feedback)}
         onClose={closeReview}
       />}
     </div>

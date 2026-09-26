@@ -461,14 +461,22 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .home-card, .home-allocation-card { overflow: hidden; border: 0; border-radius: 10px; background: #fff; }
 .home-card__header { min-height: 58px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; border-bottom: 1px solid #d8dcd5; }
 .home-card__header h2 { margin: 0; font-size: 19px; font-weight: 700; line-height: 26px; }
+.home-task-header-metrics { display: flex; align-items: center; gap: 14px; }
+.home-rating-summary { display: flex; align-items: center; gap: 8px; color: #004c46; }
+.home-rating-summary > span { display: grid; gap: 1px; }
+.home-rating-summary strong { color: #131f15; font-size: 14px; line-height: 17px; }
+.home-rating-summary small { color: #778078; font-size: 10px; line-height: 13px; }
 .home-task-count { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: #ff0037; color: #fff; font-size: 14px; font-weight: 800; }
 .home-tasks-card { width: 739px; min-height: 370px; }
 .home-task-list { display: grid; gap: 6px; padding: 12px 10px; }
+.home-task-empty { padding: 34px 16px; color: #778078; text-align: center; }
+.home-task-empty p { margin: 0; color: #273129; font-size: 14px; font-weight: 650; }
+.home-task-empty small { display: block; margin-top: 6px; font-size: 12px; line-height: 18px; }
 .home-notification {
   width: 100%;
   min-height: 68px;
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) 110px;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   padding: 8px 8px 8px 12px;
@@ -486,6 +494,11 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .home-notification strong { overflow: hidden; font-size: 14px; font-weight: 400; line-height: 20px; white-space: nowrap; text-overflow: ellipsis; }
 .home-notification strong b { color: #004c46; font-weight: 400; }
 .home-notification small { color: #68726c; font-size: 12px; line-height: 16px; }
+.home-task-state { min-width: 122px; display: grid; justify-items: end; gap: 5px; }
+.home-task-state b { padding: 5px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; line-height: 14px; }
+.home-task-state b.is-done { background: #d9f1e8; color: #00675e; }
+.home-task-state b.is-progress { background: #e4eef5; color: #365d7b; }
+.home-task-state small { color: #004c46; font-size: 11px; font-weight: 700; }
 .home-notification__thumb { width: 110px; height: 52px; border-radius: 4px; object-fit: cover; }
 .home-request-actions { display: flex; gap: 7px; }
 .home-request-actions button { min-height: 36px; padding: 0 13px; border: 0; border-radius: 100px; background: #d8dcd5; color: #0d1e1d; font-size: 12px; font-weight: 650; transition: background-color .16s ease, transform .16s ease; }
@@ -953,6 +966,42 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .file-review-change img { width: 16px; height: 16px; }
 .file-review-approve { min-height: 40px; display: flex; align-items: center; gap: 7px; padding: 8px 16px 8px 8px; border: 0; border-radius: 100px; background: #1ca473; color: #fff; font-size: 13px; font-weight: 650; line-height: 18px; white-space: nowrap; }
 .file-review-approve img { width: 20px; height: 20px; }
+.file-review-approve:disabled { opacity: .6; cursor: wait; }
+.file-review-feedback-backdrop { position: absolute; z-index: 80; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(13,30,29,.54); backdrop-filter: blur(5px); animation: file-review-backdrop-in .18s ease-out both; }
+.file-review-feedback { width: min(520px,100%); display: grid; gap: 22px; padding: 26px; border: 1px solid #dfe5df; border-radius: 16px; background: #fff; color: #131f15; box-shadow: 0 28px 80px rgba(13,30,29,.2); }
+.file-review-feedback > header { display: grid; grid-template-columns: minmax(0,1fr) 36px; align-items: start; gap: 18px; }
+.file-review-feedback > header > div { display: grid; gap: 5px; }
+.file-review-feedback > header span { color: #004c46; font-size: 11px; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; }
+.file-review-feedback h2 { margin: 0; color: #131f15; font-size: 22px; line-height: 29px; letter-spacing: -.025em; }
+.file-review-feedback > header p { margin: 0; color: #68726c; font-size: 13px; line-height: 20px; }
+.file-review-feedback > header button { width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 8px; background: #f1f3f1; color: #53605a; }
+.file-review-feedback fieldset { display: grid; gap: 10px; margin: 0; padding: 17px; border: 1px solid #e1e6e0; border-radius: 12px; background: #fafbf9; }
+.file-review-feedback legend { padding: 0 5px; color: #273129; font-size: 13px; font-weight: 700; }
+.file-review-feedback legend b { margin-left: 6px; color: #778078; font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }
+.file-review-feedback__stars { display: flex; align-items: center; justify-content: center; gap: 7px; }
+.file-review-feedback__stars button { width: 46px; height: 46px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 9px; background: transparent; color: #d3d9d3; transition: color .14s ease, background-color .14s ease, transform .14s ease; }
+.file-review-feedback__stars button:hover, .file-review-feedback__stars button:focus-visible { background: #f0f4ec; transform: translateY(-2px); }
+.file-review-feedback__stars button.active { color: #e8ad21; }
+.file-review-feedback fieldset > p { min-height: 18px; margin: 0; color: #53605a; font-size: 12px; font-weight: 600; text-align: center; }
+.file-review-feedback > label { position: relative; display: grid; gap: 7px; color: #273129; font-size: 13px; font-weight: 700; }
+.file-review-feedback > label > span { display: flex; align-items: center; gap: 7px; }
+.file-review-feedback > label > span small { color: #778078; font-size: 11px; font-weight: 500; }
+.file-review-feedback textarea { min-height: 112px; padding: 12px 13px 28px; resize: vertical; outline: 0; border: 1px solid #dce2dc; border-radius: 10px; background: #f8f9f7; color: #131f15; font: 500 13px/20px 'Plus Jakarta Sans',sans-serif; }
+.file-review-feedback textarea:focus { border-color: #6f968c; background: #fff; box-shadow: 0 0 0 3px rgba(0,76,70,.07); }
+.file-review-feedback > label > small { position: absolute; right: 10px; bottom: 8px; color: #8a938c; font-size: 10px; font-weight: 500; }
+.file-review-feedback__error { margin: -8px 0 0; padding: 9px 11px; border-radius: 8px; background: #fff0ee; color: #a43d39; font-size: 12px; line-height: 18px; }
+.file-review-feedback > footer { display: flex; align-items: center; justify-content: flex-end; gap: 9px; padding-top: 2px; }
+.file-review-feedback > footer button { min-height: 42px; font-size: 13px; }
+@media (max-width: 560px) {
+  .file-review-feedback-backdrop { align-items: end; padding: 0; }
+  .file-review-feedback { width: 100%; max-height: 92svh; gap: 18px; overflow-y: auto; padding: 22px 18px max(22px,env(safe-area-inset-bottom)); border: 0; border-radius: 18px 18px 0 0; }
+  .file-review-feedback h2 { font-size: 20px; line-height: 27px; }
+  .file-review-feedback__stars { gap: 2px; }
+  .file-review-feedback__stars button { width: 43px; height: 43px; }
+  .file-review-feedback > footer { display: grid; grid-template-columns: 1fr; }
+  .file-review-feedback > footer .primary-button { grid-row: 1; }
+  .file-review-feedback > footer button { width: 100%; justify-content: center; }
+}
 .file-review-share-actions { flex: none; gap: 12px; }
 .file-review-share-actions button { border: 0; background: transparent; }
 .file-review-share-actions button:first-child { min-height: 40px; display: flex; align-items: center; gap: 7px; padding: 8px 15px 8px 10px; border: 1px solid #e0e4df; border-radius: 100px; font-size: 13px; font-weight: 650; line-height: 18px; }
@@ -1531,6 +1580,7 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
   .home-card__header { padding-inline: 18px; }
   .home-task-list { padding-inline: 8px; }
   .home-notification { height: auto; min-height: 72px; grid-template-columns: 16px minmax(0, 1fr); padding-block: 10px; }
+  .home-task-state { grid-column: 2; justify-items: start; }
   .home-notification--request { min-height: 96px; }
   .home-notification__thumb { display: none; }
   .home-notification > span { gap: 9px; }
