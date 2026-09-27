@@ -82,4 +82,9 @@ test('cliente avalia a entrega ao aprovar uma tarefa', async ({ page }) => {
 
   await expect.poll(() => approvalBody).toEqual({ approved: true, rating: 5, comment: 'Entrega excelente.' })
   await expect(page.getByText('Aprovado', { exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Alterações encerradas' })).toBeDisabled()
+  await expect(page.locator('.file-review-review-closed')).toContainText('Projeto concluído · revisão encerrada')
+  await expect(page.locator('.project-compact-status')).toHaveText('Concluído')
+  await expect(page.getByLabel('Novo comentário')).toHaveCount(0)
+  await page.screenshot({ path: '/private/tmp/allyo-completed-project-review.png' })
 })

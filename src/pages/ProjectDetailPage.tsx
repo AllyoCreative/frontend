@@ -388,6 +388,15 @@ export function ProjectDetailPage() {
   }
 
   const loadingAssets = loadedAssetsFor !== project.id
+  const projectCompleted = projectTasks.length > 0 && projectTasks.every((task) => task.status === 'Concluído')
+  const projectStatus: Project['status'] = projectCompleted
+    ? 'Concluído'
+    : projectTasks.length > 0 && project.status === 'Concluído'
+      ? projectTasks.some((task) => task.status === 'Em revisão') ? 'Em revisão' : 'Em andamento'
+      : project.status
+  const displayedProject = projectStatus === project.status && !projectCompleted
+    ? project
+    : { ...project, status: projectStatus, progress: projectCompleted ? 100 : project.progress }
 
   return (
     <div className={`page project-detail-page project-detail-page--${tab}`}>
@@ -403,7 +412,7 @@ export function ProjectDetailPage() {
       <header className="project-compact-header">
         <h1>{project.name}</h1>
         <span className="project-compact-deadline">com prazo de <strong>{project.deadline || 'A definir'}</strong></span>
-        <span className="project-compact-status">{project.status}</span>
+        <span className="project-compact-status">{projectStatus}</span>
       </header>
 
       <nav className="project-detail-tabs">
@@ -479,7 +488,7 @@ export function ProjectDetailPage() {
             </div>
           </article>
 
-          <OverviewTimeline project={project} tasks={projectTasks} designs={designList} />
+          <OverviewTimeline project={displayedProject} tasks={projectTasks} designs={designList} />
           <ProjectBriefing project={project} briefing={briefing} files={projectFiles} onDuplicate={() => notify('Briefing pronto para ser reutilizado em um novo projeto')} />
         </section>
       )}
@@ -498,7 +507,7 @@ export function ProjectDetailPage() {
                 <div><span>Horas estimadas</span><strong>12.00</strong><small>24.00</small></div>
                 <div><span>Créditos</span><strong>1</strong><small><img src={figmaAsset('messages.imgMaterialSymbolsBoltBoostRounded')} alt="" />Normal</small></div>
                 <div><span>Duração</span><strong>{project.deadline || '48 horas'}</strong></div>
-                <div><span>Status</span><strong>{project.status}</strong></div>
+                <div><span>Status</span><strong>{projectStatus}</strong></div>
               </div>
             </article>
 
@@ -594,6 +603,7 @@ export function ProjectDetailPage() {
       {reviewing !== null && <DesignReviewModal
         delivery={designList.find((item) => item.id === reviewing)!}
         isApproved={approved.includes(reviewing)}
+        projectCompleted={projectCompleted}
         origin={reviewOrigin}
         notify={notify}
         onApprovalChange={(nextApproved, feedback) => handleApprovalChange(reviewing, nextApproved, feedback)}

@@ -485,7 +485,7 @@ export const api = {
   },
 
   async setDesignApproval(designId: number, approved: boolean, feedback?: { rating: number; comment?: string }) {
-    return request<{ success: boolean; id: number; approved: boolean; taskId?: string | null; feedback?: { rating: number; comment: string | null } | null }>(`/designs/${designId}/approval`, {
+    return request<{ success: boolean; id: number; approved: boolean; taskId?: string | null; project?: { status: string; progress: number; tasks: number }; feedback?: { rating: number; comment: string | null } | null }>(`/designs/${designId}/approval`, {
       method: 'POST',
       body: JSON.stringify({ approved, ...feedback }),
     })
