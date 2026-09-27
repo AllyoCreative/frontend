@@ -19,7 +19,11 @@ test('cliente avalia a entrega ao aprovar uma tarefa', async ({ page }) => {
     if (path.endsWith('/account/overview')) return route.fulfill({ json: { workspace: { id: 'workspace-1', name: 'Allyo', plan: 'Demo', creditsAvailable: 10, creditAllowance: 10, creditBank: 0, creditsUsed: 0, boosters: 0, cycleStart: null, cycleEnd: null, contractStart: null, contractEnd: null }, members: [], brands: [], teams: [], contracts: [], creditTransactions: [], creditPackages: [] } })
     if (path.endsWith('/projects/project-1/messages') || path.endsWith('/projects/project-1/files')) return route.fulfill({ json: [] })
     if (path.endsWith('/projects/project-1/designs')) return route.fulfill({ json: [design, copy, pdf] })
-    if (path.endsWith('/designs/1/review')) return route.fulfill({ json: { ...design, comments: [], annotations: [] } })
+    if (path.endsWith('/designs/1/review')) return route.fulfill({ json: { ...design, comments: [
+      { id: 11, author: 'Levy', text: 'Aumentar o contraste.', time: 'Agora', resolved: false, version: 3, point: { x: 24, y: 34 } },
+      { id: 12, author: 'Levy', text: 'Comentário geral.', time: 'Agora', resolved: false, version: 3 },
+      { id: 13, author: 'Levy', text: 'Rever alinhamento.', time: 'Agora', resolved: false, version: 3, point: { x: 72, y: 60 } },
+    ], annotations: [] } })
     if (path.endsWith('/designs/2/review')) return route.fulfill({ json: { ...copy, comments: [], annotations: [] } })
     if (path.endsWith('/designs/3/review')) return route.fulfill({ json: { ...pdf, comments: [], annotations: [] } })
     if (path.endsWith('/designs/2/comments') && request.method() === 'POST') {
@@ -65,6 +69,12 @@ test('cliente avalia a entrega ao aprovar uma tarefa', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Abrir Key visual principal.png' }).click()
   await expect(page.getByRole('toolbar', { name: 'Ferramentas de anotação' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Comentário 1: Aumentar o contraste/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Comentário 2: Rever alinhamento/ })).toBeVisible()
+  await page.getByRole('button', { name: /Comentário 2: Rever alinhamento/ }).click()
+  await expect(page.locator('#review-comment-13')).toHaveClass(/is-selected/)
+  await page.waitForTimeout(250)
+  await page.screenshot({ path: '/private/tmp/allyo-numbered-markers.png' })
   await page.getByRole('button', { name: 'Marcar como aprovado' }).click()
   await page.getByRole('button', { name: '5 estrelas' }).click()
   await page.getByPlaceholder(/Conte o que mais gostou/).fill('Entrega excelente.')

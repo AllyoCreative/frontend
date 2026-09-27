@@ -122,8 +122,10 @@ export function DesignReviewModal({ delivery, isApproved, origin, onApprovalChan
   const [zoom, setZoom] = useState(supportsCanvas ? 50 : 100)
   const [filter, setFilter] = useState<'all' | 'open' | 'resolved'>('all')
   const [comments, setComments] = useState<ReviewComment[]>([])
+  const [selectedCommentId, setSelectedCommentId] = useState<number | null>(null)
   const [reviewLoading, setReviewLoading] = useState(true)
   const [commentSubmitting, setCommentSubmitting] = useState(false)
+  const [fileLoadError, setFileLoadError] = useState(false)
   const [commentDraft, setCommentDraft] = useState('')
   const [pendingPoint, setPendingPoint] = useState<ReviewPoint | null>(null)
   const [pendingAnnotationId, setPendingAnnotationId] = useState<number | null>(null)
@@ -152,6 +154,7 @@ export function DesignReviewModal({ delivery, isApproved, origin, onApprovalChan
   const cloneRef = useRef<HTMLDivElement>(null)
   const commentInputRef = useRef<HTMLTextAreaElement>(null)
   const inlineCommentInputRef = useRef<HTMLTextAreaElement>(null)
+  const commentsPanelRef = useRef<HTMLElement>(null)
   const textInputRef = useRef<HTMLInputElement>(null)
   const panStartRef = useRef<{ clientX: number; clientY: number; scrollLeft: number; scrollTop: number } | null>(null)
 
@@ -163,6 +166,21 @@ export function DesignReviewModal({ delivery, isApproved, origin, onApprovalChan
     if (filter === 'resolved') return comment.resolved
     return true
   }), [activeVersion, comments, filter])
+  const pointedComments = useMemo(() => comments
+    .filter((comment) => comment.version === activeVersion && comment.point)
+    .sort((left, right) => left.id - right.id), [activeVersion, comments])
+  const markerNumber = (commentId: number) => pointedComments.findIndex((comment) => comment.id === commentId) + 1
+
+  const selectComment = (comment: ReviewComment) => {
+    setSelectedCommentId(comment.id)
+    setFilter(comment.resolved ? 'resolved' : 'open')
+    requestAnimationFrame(() => {
+      const panel = commentsPanelRef.current
+      const target = document.getElementById(`review-comment-${comment.id}`)
+      if (!panel || !target) return
+      panel.scrollTo({ top: Math.max(0, target.offsetTop - 54), behavior: 'smooth' })
+    })
+  }
 
   useEffect(() => {
     let active = true
@@ -439,6 +457,7 @@ export function DesignReviewModal({ delivery, isApproved, origin, onApprovalChan
         annotationId: pendingAnnotationId ?? undefined,
       })
       setComments((current) => [...current, created as ReviewComment])
+      setSelectedCommentId(created.id)
       setCommentDraft('')
       setPendingPoint(null)
       setPendingAnnotationId(null)
@@ -485,12 +504,21 @@ export function DesignReviewModal({ delivery, isApproved, origin, onApprovalChan
   const loadImageDimensions = (event: React.SyntheticEvent<HTMLImageElement>) => {
     const image = event.currentTarget
     if (!image.naturalWidth || !image.naturalHeight) return
-    const scale = Math.min(1, 1800 / Math.max(image.naturalWidth, image.naturalHeight))
-    setCanvasSize({ width: Math.round(image.naturalWidth * scale), height: Math.round(image.naturalHeight * scale) })
+    setFileLoadError(false)
+    const scale = Math.min(1, 2000 / Math.max(image.naturalWidth, image.naturalHeight))
+    const size = { width: Math.round(image.naturalWidth * scale), height: Math.round(image.naturalHeight * scale) }
+    setCanvasSize(size)
+    const stage = artStageRef.current
+    if (stage) {
+      const fittedZoom = Math.min(100, ((stage.clientWidth - 36) / size.width) * 100, ((stage.clientHeight - 36) / size.height) * 100)
+      setZoom(Math.max(15, Math.floor(fittedZoom)))
+    }
   }
 
-  const deliveryContent = kind === 'image' && fileUrl ? (
-    <img src={fileUrl} onLoad={loadImageDimensions} alt={delivery.name} />
+  const deliveryContent = kind === 'image' && fileUrl && !fileLoadError ? (
+    <img src={fileUrl} onLoad={loadImageDimensions} onError={() => setFileLoadError(true)} alt={delivery.name} />
+  ) : kind === 'image' ? (
+    <div className="file-review-file-fallback"><FileText size={54} /><h2>Não foi possível carregar a imagem</h2><p>O link pode ter expirado. Feche e abra novamente; se continuar, peça um novo envio ao time.</p>{fileUrl && <a href={fileUrl} target="_blank" rel="noreferrer"><Download size={17} /> Abrir arquivo original</a>}</div>
   ) : kind === 'pdf' && fileUrl ? (
     <div className="file-review-document-wrap"><iframe className="file-review-document" src={`${fileUrl}#toolbar=1&navpanes=0`} title={`PDF ${delivery.name}`} /><a href={fileUrl} target="_blank" rel="noreferrer"><Download size={16} /> Abrir PDF em nova aba</a></div>
   ) : kind === 'video' && fileUrl ? (
@@ -521,7 +549,7 @@ export function DesignReviewModal({ delivery, isApproved, origin, onApprovalChan
             <div className="file-review-view-controls">
               {supportsCanvas && <><button type="button" className={railVisible ? 'active' : ''} onClick={() => setRailVisible((value) => !value)} aria-label="Alternar miniatura" title="Miniatura"><img src={figmaAsset('design_review.imgPhSidebarBold')} alt="" /></button>
               <button type="button" className={activeTool === 'pan' ? 'active' : ''} onClick={() => chooseTool('pan')} aria-pressed={activeTool === 'pan'} aria-label="Mover arquivo" title="Mover arquivo"><Hand size={20} /></button>
-              <label className="file-review-select file-review-zoom"><select value={zoom} onChange={(event) => setZoom(Number(event.target.value))} aria-label="Zoom"><option value="50">50%</option><option value="75">75%</option><option value="100">100%</option><option value="125">125%</option></select></label><i /></>}
+              <label className="file-review-select file-review-zoom"><select value={zoom} onChange={(event) => setZoom(Number(event.target.value))} aria-label="Zoom">{![25, 50, 75, 100, 125].includes(zoom) && <option value={zoom}>Ajustar ({zoom}%)</option>}<option value="25">25%</option><option value="50">50%</option><option value="75">75%</option><option value="100">100%</option><option value="125">125%</option></select></label><i /></>}
               <span className="file-review-current-version">Versão {activeVersion}</span>
             </div>
 
@@ -591,8 +619,8 @@ export function DesignReviewModal({ delivery, isApproved, origin, onApprovalChan
               {draftAnnotation && renderAnnotation(draftAnnotation)}
             </svg>}
             {supportsCanvas && visibleAnnotations.filter((annotation): annotation is TextAnnotation => annotation.type === 'text').map(renderAnnotation)}
-            {supportsCanvas && comments.filter((comment) => comment.version === activeVersion && comment.point).map((comment) => <button type="button" className={`file-review-pin${comment.resolved ? ' is-resolved' : ''}`} style={{ left: `${comment.point?.x}%`, top: `${comment.point?.y}%` }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); setFilter(comment.resolved ? 'resolved' : 'open') }} aria-label={`Comentário: ${comment.text}`} key={comment.id}><img src={figmaAsset('design_review.imgGroup1410119711')} alt="" /></button>)}
-            {supportsCanvas && pendingPoint && <span className="file-review-pin is-pending" style={{ left: `${pendingPoint.x}%`, top: `${pendingPoint.y}%` }}><img src={figmaAsset('design_review.imgGroup1410119711')} alt="" /></span>}
+            {supportsCanvas && pointedComments.map((comment) => <button type="button" className={`file-review-pin${comment.resolved ? ' is-resolved' : ''}${selectedCommentId === comment.id ? ' is-selected' : ''}`} style={{ left: `${comment.point?.x}%`, top: `${comment.point?.y}%` }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); selectComment(comment) }} aria-label={`Comentário ${markerNumber(comment.id)}: ${comment.text}`} key={comment.id}><span>{markerNumber(comment.id)}</span></button>)}
+            {supportsCanvas && pendingPoint && <span className="file-review-pin is-pending" style={{ left: `${pendingPoint.x}%`, top: `${pendingPoint.y}%` }}><span>{pointedComments.length + 1}</span></span>}
 
             {pendingPoint && <form className={`file-review-inline-comment${pendingPoint.x > 62 ? ' is-left' : ''}`} style={{ left: `${pendingPoint.x}%`, top: `${Math.min(78, Math.max(12, pendingPoint.y))}%` }} onPointerDown={(event) => event.stopPropagation()} onSubmit={addComment}>
               <header><strong>Comentário neste ponto</strong><button type="button" onClick={() => setPendingPoint(null)} aria-label="Cancelar comentário pontual"><X size={18} /></button></header>
@@ -608,13 +636,14 @@ export function DesignReviewModal({ delivery, isApproved, origin, onApprovalChan
           </div>
         </main>
 
-        <aside className="file-review-comments">
+        <aside className="file-review-comments" ref={commentsPanelRef}>
           <div className="file-review-filters"><button type="button" className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>Todos</button><button type="button" className={filter === 'open' ? 'active' : ''} onClick={() => setFilter('open')}>Aberto</button><button type="button" className={filter === 'resolved' ? 'active' : ''} onClick={() => setFilter('resolved')}>Resolvido</button></div>
           <div className="file-review-comment-list">
             {reviewLoading && <p className="file-review-comments-empty">Carregando comentários...</p>}
             {!reviewLoading && visibleComments.map((comment) => {
               const annotation = comment.annotationId ? annotations.find((item) => item.id === comment.annotationId) : undefined
-              return <article className={comment.resolved ? 'is-resolved' : ''} key={comment.id}><header><span><img src={figmaAsset('design_review.imgEllipse24')} alt="" /><strong>{comment.author}</strong></span><span><button type="button" aria-label="Mais opções do comentário"><img src={figmaAsset('design_review.imgTablerDots1')} alt="" /></button><button type="button" onClick={() => toggleResolved(comment.id)} aria-label={comment.resolved ? 'Reabrir comentário' : 'Resolver comentário'}><img src={figmaAsset('design_review.imgGroup2')} alt="" /></button></span></header><time>{comment.time}</time>{(comment.point || annotation) && <span className="file-review-comment-kind">{comment.point ? 'Comentário pontual' : annotationLabel(annotation)}</span>}<p>{comment.text}</p><button type="button" className="file-review-reply"><img src={figmaAsset('design_review.imgMaterialSymbolsReplyRounded')} alt="" />Responder</button></article>
+              const number = comment.point ? markerNumber(comment.id) : 0
+              return <article id={`review-comment-${comment.id}`} className={`${comment.resolved ? 'is-resolved ' : ''}${selectedCommentId === comment.id ? 'is-selected' : ''}`} key={comment.id} onClick={() => setSelectedCommentId(comment.id)}><header><span>{number > 0 && <b className="file-review-comment-number">{number}</b>}<img src={figmaAsset('design_review.imgEllipse24')} alt="" /><strong>{comment.author}</strong></span><span><button type="button" aria-label="Mais opções do comentário"><img src={figmaAsset('design_review.imgTablerDots1')} alt="" /></button><button type="button" onClick={() => void toggleResolved(comment.id)} aria-label={comment.resolved ? 'Reabrir comentário' : 'Resolver comentário'}><img src={figmaAsset('design_review.imgGroup2')} alt="" /></button></span></header><time>{comment.time}</time>{(comment.point || annotation) && <span className="file-review-comment-kind">{comment.point ? `Marcação ${number}` : annotationLabel(annotation)}</span>}<p>{comment.text}</p><button type="button" className="file-review-reply"><img src={figmaAsset('design_review.imgMaterialSymbolsReplyRounded')} alt="" />Responder</button></article>
             })}
             {!reviewLoading && visibleComments.length === 0 && <p className="file-review-comments-empty">Nenhum comentário nesta versão.</p>}
           </div>

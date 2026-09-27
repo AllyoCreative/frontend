@@ -167,7 +167,9 @@ function deliveryTypeLabel(kind: DeliveryKind) {
 function DeliveryPreview({ delivery }: { delivery: DesignSummary }) {
   const kind = deliveryKind(delivery)
   const previewUrl = delivery.thumbnailUrl || delivery.fileUrl
-  if (kind === 'image' && previewUrl) return <img src={previewUrl} alt={delivery.name} />
+  const [previewFailed, setPreviewFailed] = useState(false)
+  if (kind === 'image' && previewUrl && !previewFailed) return <img src={previewUrl} alt={delivery.name} onError={() => setPreviewFailed(true)} />
+  if (kind === 'image') return <span className="project-delivery-file"><ImageIcon size={38} /><strong>Imagem</strong><small>Não foi possível carregar a prévia. Abra a entrega para tentar novamente.</small></span>
   if (kind === 'copy') return <span className="project-delivery-copy"><MessageSquareText size={25} /><small>Conteúdo para leitura</small><p>{delivery.textContent || 'Abra para revisar o texto desta entrega.'}</p></span>
   if (kind === 'pdf') return <span className="project-delivery-file project-delivery-file--pdf"><FileText size={38} /><strong>PDF</strong><small>Abra para visualizar o documento</small></span>
   if (kind === 'video') return <span className="project-delivery-file project-delivery-file--video"><Play size={38} /><strong>Vídeo</strong><small>Abra para reproduzir</small></span>

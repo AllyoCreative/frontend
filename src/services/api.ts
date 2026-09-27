@@ -107,9 +107,11 @@ export interface DesignSummary {
   version: string
   color: string
   approved: boolean
+  fileKey?: string | null
   fileUrl?: string | null
   thumbnailUrl?: string | null
   contentType?: string
+  sizeBytes?: number | null
   textContent?: string | null
   createdAt?: string
   updatedAt?: string
