@@ -102,12 +102,15 @@ export interface AccountOverview {
 
 export interface DesignSummary {
   id: number
+  taskId?: string | null
   name: string
   version: string
   color: string
   approved: boolean
-  fileUrl?: string
-  thumbnailUrl?: string
+  fileUrl?: string | null
+  thumbnailUrl?: string | null
+  contentType?: string
+  textContent?: string | null
   createdAt?: string
   updatedAt?: string
 }
@@ -449,13 +452,31 @@ export const api = {
       name: string
       version: string
       approved: boolean
+      fileUrl: string | null
+      thumbnailUrl: string | null
+      contentType: string
+      textContent: string | null
       comments: ReviewCommentItem[]
       annotations: Record<string, unknown>[]
     }>(`/designs/${designId}/review`)
   },
 
-  async addComment(designId: number, data: { text: string; version: number; point?: { x: number; y: number } }) {
+  async addComment(designId: number, data: { text: string; version: number; point?: { x: number; y: number }; annotationId?: number }) {
     return request<ReviewCommentItem>(`/designs/${designId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  async setCommentResolved(designId: number, commentId: number, resolved: boolean) {
+    return request<{ id: number; resolved: boolean }>(`/designs/${designId}/comments/${commentId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ resolved }),
+    })
+  },
+
+  async addAnnotation(designId: number, data: { type: 'draw' | 'arrow' | 'rectangle' | 'text'; version: number; color: string; width: number; payload: Record<string, unknown> }) {
+    return request<Record<string, unknown> & { id: number }>(`/designs/${designId}/annotations`, {
       method: 'POST',
       body: JSON.stringify(data),
     })

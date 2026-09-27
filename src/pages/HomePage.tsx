@@ -130,7 +130,7 @@ export function HomePage() {
                   <button
                     key={task.id}
                     className="home-notification"
-                    onClick={() => navigate(`/projetos/${task.projectId}${task.reviewDesignId ? '/designs' : ''}`)}
+                    onClick={() => navigate(`/projetos/${task.projectId}${task.reviewDesignId ? '/entregas' : ''}`)}
                   >
                     <FigmaIcon asset="home.imgGroup4" className="home-notification__icon" />
                     <span>

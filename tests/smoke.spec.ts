@@ -76,13 +76,12 @@ test('Brand Brain não fica disponível no início da relação com o cliente', 
   await expect(page.getByRole('heading', { name: /Vamos arrasar/ })).toBeVisible()
 })
 
-test('design abre a experiência de revisão do Figma', async ({ page }) => {
+test('entrega abre a experiência de revisão', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('allyo-demo-auth', 'true'))
-  await page.goto('/projetos/campanha-q1/designs')
-  await expect(page.getByRole('heading', { name: 'Designs para revisão' })).toBeVisible()
+  await page.goto('/projetos/campanha-q1/entregas')
+  await expect(page.getByRole('heading', { name: 'Entregas para revisão' })).toBeVisible()
   await page.getByRole('button', { name: /Abrir/ }).first().click()
-  await expect(page.getByRole('dialog', { name: 'Revisão de design' })).toBeVisible()
-  await expect(page.getByAltText('Design em revisão')).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Revisão de entrega' })).toBeVisible()
   await page.getByRole('button', { name: 'Fechar revisão' }).click()
-  await expect(page.getByRole('dialog', { name: 'Revisão de design' })).toBeHidden()
+  await expect(page.getByRole('dialog', { name: 'Revisão de entrega' })).toBeHidden()
 })

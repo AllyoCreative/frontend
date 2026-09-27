@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useParams } from 'react-router-dom'
-import { ChevronDown, ChevronUp, Circle, Download, ExternalLink, FileText, Layers3, Pencil, Plus, Upload } from 'lucide-react'
+import { ChevronDown, ChevronUp, Circle, Download, ExternalLink, FileText, Image as ImageIcon, Layers3, MessageSquareText, Pencil, Play, Plus, Upload } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
 import { DesignReviewModal, type ReviewOrigin } from '../components/DesignReviewModal'
@@ -145,6 +145,33 @@ interface ChatMessage {
   text: string
   time: string
   mine?: boolean
+  deliveryId?: number | null
+}
+
+type DeliveryKind = 'image' | 'pdf' | 'copy' | 'video' | 'file'
+
+function deliveryKind(delivery: DesignSummary): DeliveryKind {
+  const type = delivery.contentType?.toLowerCase() || ''
+  const name = `${delivery.name} ${delivery.fileUrl || ''}`.toLowerCase()
+  if (delivery.textContent || type.startsWith('text/')) return 'copy'
+  if (type === 'application/pdf' || name.endsWith('.pdf')) return 'pdf'
+  if (type.startsWith('video/')) return 'video'
+  if (type.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(name)) return 'image'
+  return 'file'
+}
+
+function deliveryTypeLabel(kind: DeliveryKind) {
+  return { image: 'Imagem', pdf: 'PDF', copy: 'Copy', video: 'Vídeo', file: 'Arquivo' }[kind]
+}
+
+function DeliveryPreview({ delivery }: { delivery: DesignSummary }) {
+  const kind = deliveryKind(delivery)
+  const previewUrl = delivery.thumbnailUrl || delivery.fileUrl
+  if (kind === 'image' && previewUrl) return <img src={previewUrl} alt={delivery.name} />
+  if (kind === 'copy') return <span className="project-delivery-copy"><MessageSquareText size={25} /><small>Conteúdo para leitura</small><p>{delivery.textContent || 'Abra para revisar o texto desta entrega.'}</p></span>
+  if (kind === 'pdf') return <span className="project-delivery-file project-delivery-file--pdf"><FileText size={38} /><strong>PDF</strong><small>Abra para visualizar o documento</small></span>
+  if (kind === 'video') return <span className="project-delivery-file project-delivery-file--video"><Play size={38} /><strong>Vídeo</strong><small>Abra para reproduzir</small></span>
+  return <span className="project-delivery-file"><FileText size={38} /><strong>Arquivo</strong><small>Prévia indisponível</small></span>
 }
 
 export function ProjectDetailPage() {
@@ -212,6 +239,7 @@ export function ProjectDetailPage() {
             text: msg.text,
             time: msg.time,
             mine: msg.mine ?? false,
+            deliveryId: typeof msg.deliveryId === 'number' ? msg.deliveryId : null,
           }]
         })
       }
@@ -379,7 +407,7 @@ export function ProjectDetailPage() {
       <nav className="project-detail-tabs">
         <NavLink to={`/projetos/${project.id}/visao-geral`} className={tab === 'visao-geral' ? 'active' : ''}>Visão geral</NavLink>
         <NavLink to={`/projetos/${project.id}/mensagens`} className={tab === 'mensagens' ? 'active' : ''}>Mensagens</NavLink>
-        <NavLink to={`/projetos/${project.id}/designs`} className={tab === 'designs' ? 'active' : ''}>Designs</NavLink>
+        <NavLink to={`/projetos/${project.id}/entregas`} className={tab === 'entregas' || tab === 'designs' ? 'active' : ''}>Entregas</NavLink>
         <NavLink to={`/projetos/${project.id}/arquivos`} className={tab === 'arquivos' ? 'active' : ''}>Arquivos</NavLink>
       </nav>
 
@@ -489,6 +517,11 @@ export function ProjectDetailPage() {
                       </header>
                     )}
                     <p>{msg.text}</p>
+                    {msg.deliveryId && <button className="project-message-delivery-link" type="button" onClick={() => {
+                      if (!designList.some((delivery) => delivery.id === msg.deliveryId)) return notify('Esta entrega ainda está sendo carregada')
+                      setReviewOrigin(null)
+                      setReviewing(msg.deliveryId || null)
+                    }}><ExternalLink size={14} /> Revisar entrega</button>}
                     {msg.mine && <time>{msg.time}</time>}
                   </article>
                 ))
@@ -513,12 +546,12 @@ export function ProjectDetailPage() {
         </section>
       )}
 
-      {(tab === 'designs' || tab === 'arquivos') && (
+      {(tab === 'entregas' || tab === 'designs' || tab === 'arquivos') && (
         <section className="project-designs-gallery">
           <header className="project-assets-header">
             <div>
-              <h2>{tab === 'arquivos' ? 'Arquivos do projeto' : 'Designs para revisão'}</h2>
-              <p>{tab === 'arquivos' ? 'Documentos e imagens ficam salvos no armazenamento seguro do projeto.' : 'Entregas enviadas pela equipe para avaliação.'}</p>
+              <h2>{tab === 'arquivos' ? 'Arquivos do projeto' : 'Entregas para revisão'}</h2>
+              <p>{tab === 'arquivos' ? 'Documentos e imagens ficam salvos no armazenamento seguro do projeto.' : 'Imagens, PDFs, textos e outros materiais enviados pela equipe para sua avaliação.'}</p>
             </div>
             {tab === 'arquivos' && <button className="secondary-button project-assets-upload" disabled={uploadingFile} onClick={() => projectFileInputRef.current?.click()}>
               <Upload size={16} /> {uploadingFile ? 'Enviando...' : 'Enviar arquivo'}
@@ -527,19 +560,19 @@ export function ProjectDetailPage() {
 
           {loadingAssets && <div className="project-gallery-empty">Carregando arquivos...</div>}
 
-          {!loadingAssets && tab === 'designs' && (designList.length > 0 ? <div className="project-designs-grid">
+          {!loadingAssets && (tab === 'entregas' || tab === 'designs') && (designList.length > 0 ? <div className="project-designs-grid">
             {designList.map((design) => {
               const isApproved = approved.includes(design.id)
-              const previewUrl = design.thumbnailUrl || design.fileUrl
+              const kind = deliveryKind(design)
               return <article key={design.id} className="project-design-tile">
-                <header><span>{design.name}</span><b className={isApproved ? 'is-approved' : ''}>{isApproved ? 'Aprovado' : 'Aguardando aprovação'}</b></header>
+                <header><span><small>{deliveryTypeLabel(kind)}</small>{design.name}</span><b className={isApproved ? 'is-approved' : ''}>{isApproved ? 'Aprovado' : 'Aguardando aprovação'}</b></header>
                 <button onClick={(event) => openReview(design.id, event.currentTarget)} aria-label={`Abrir ${design.name}`}>
-                  {previewUrl ? <img src={previewUrl} alt={design.name} /> : <span className="project-file-placeholder"><FileText size={34} /> Prévia indisponível</span>}
-                  <span className="project-design-open"><ExternalLink size={15} /> Abrir</span>
+                  <DeliveryPreview delivery={design} />
+                  <span className="project-design-open"><ExternalLink size={15} /> Revisar</span>
                 </button>
               </article>
             })}
-          </div> : <div className="project-gallery-empty">Nenhum design foi enviado para revisão ainda.</div>)}
+          </div> : <div className="project-gallery-empty"><ImageIcon size={24} /> Nenhuma entrega foi enviada para revisão ainda.</div>)}
 
           {!loadingAssets && tab === 'arquivos' && (projectFiles.length > 0 ? <div className="project-files-grid">
             {projectFiles.map((file) => <article key={file.id} className="project-file-card">
@@ -557,8 +590,7 @@ export function ProjectDetailPage() {
       )}
 
       {reviewing !== null && <DesignReviewModal
-        designTitle={designList.find((item) => item.id === reviewing)?.name ?? 'Design'}
-        initialVersion={Number((designList.find((item) => item.id === reviewing)?.version ?? 'v1').slice(1))}
+        delivery={designList.find((item) => item.id === reviewing)!}
         isApproved={approved.includes(reviewing)}
         origin={reviewOrigin}
         notify={notify}

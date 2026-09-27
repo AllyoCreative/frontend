@@ -4,6 +4,8 @@ import {
   AlignJustify,
   ArrowUpRight,
   Brush,
+  Download,
+  FileText,
   Hand,
   MessageSquare,
   MessageSquareText,
@@ -16,6 +18,7 @@ import {
   X,
 } from 'lucide-react'
 import { figmaAsset } from '../assets/figma'
+import { api, type DesignSummary } from '../services/api'
 
 export type ReviewOrigin = { left: number; top: number; width: number; height: number }
 
@@ -67,12 +70,12 @@ type DraftAnnotation = StrokeAnnotation | DragAnnotation
 type AnnotationHistory = { snapshots: ReviewAnnotation[][]; index: number }
 type AnnotationAction =
   | { type: 'commit'; annotation: ReviewAnnotation }
+  | { type: 'replace'; annotations: ReviewAnnotation[] }
   | { type: 'undo' }
   | { type: 'redo' }
 
 type DesignReviewModalProps = {
-  designTitle: string
-  initialVersion: number
+  delivery: DesignSummary
   isApproved: boolean
   origin: ReviewOrigin | null
   onApprovalChange: (approved: boolean, feedback?: { rating: number; comment?: string }) => Promise<void>
@@ -80,41 +83,16 @@ type DesignReviewModalProps = {
   notify: (message: string) => void
 }
 
-const ART_WIDTH = 1468
-const ART_HEIGHT = 920
 const annotationColors = ['#5d55c7', '#f2c94c', '#22a977', '#ef6a5b'] as const
 
-const initialComments: ReviewComment[] = [
-  { id: 1, author: 'Levy Câmara', text: 'Ficou ótimo!', time: 'Hoje 16:34', resolved: false, version: 3, point: { x: 88, y: 20 } },
-  { id: 2, author: 'Levy Câmara', text: 'Ficou ótimo!', time: 'Hoje 16:34', resolved: false, version: 3 },
-  { id: 3, author: 'Levy Câmara', text: 'Ficou ótimo!', time: 'Hoje 16:34', resolved: false, version: 3 },
-]
-
-function loadStoredReview(designTitle: string): { comments: ReviewComment[]; annotations: ReviewAnnotation[] } {
-  try {
-    const raw = window.localStorage.getItem(`allyo-review:${designTitle}`)
-    if (!raw) return { comments: initialComments, annotations: [] }
-    const parsed = JSON.parse(raw) as { comments?: ReviewComment[]; annotations?: ReviewAnnotation[] }
-    return {
-      comments: Array.isArray(parsed.comments) ? parsed.comments : initialComments,
-      annotations: Array.isArray(parsed.annotations) ? parsed.annotations : [],
-    }
-  } catch {
-    return { comments: initialComments, annotations: [] }
-  }
-}
-
 function annotationReducer(state: AnnotationHistory, action: AnnotationAction): AnnotationHistory {
+  if (action.type === 'replace') return { snapshots: [action.annotations], index: 0 }
   if (action.type === 'undo') return state.index > 0 ? { ...state, index: state.index - 1 } : state
   if (action.type === 'redo') return state.index < state.snapshots.length - 1 ? { ...state, index: state.index + 1 } : state
 
   const current = state.snapshots[state.index]
   const snapshots = [...state.snapshots.slice(0, state.index + 1), [...current, action.annotation]]
   return { snapshots, index: snapshots.length - 1 }
-}
-
-function toSvgPoint(point: ReviewPoint) {
-  return { x: point.x * ART_WIDTH / 100, y: point.y * ART_HEIGHT / 100 }
 }
 
 function annotationLabel(annotation?: ReviewAnnotation) {
@@ -125,24 +103,39 @@ function annotationLabel(annotation?: ReviewAnnotation) {
   return 'Texto na arte'
 }
 
-export function DesignReviewModal({ designTitle, initialVersion, isApproved, origin, onApprovalChange, onClose, notify }: DesignReviewModalProps) {
+function contentKind(delivery: DesignSummary) {
+  const type = delivery.contentType?.toLowerCase() || ''
+  const name = `${delivery.name} ${delivery.fileUrl || ''}`.toLowerCase()
+  if (delivery.textContent || type.startsWith('text/')) return 'copy' as const
+  if (type === 'application/pdf' || name.endsWith('.pdf')) return 'pdf' as const
+  if (type.startsWith('video/')) return 'video' as const
+  if (type.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(name)) return 'image' as const
+  return 'file' as const
+}
+
+export function DesignReviewModal({ delivery, isApproved, origin, onApprovalChange, onClose, notify }: DesignReviewModalProps) {
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  const [storedReview] = useState(() => loadStoredReview(designTitle))
-  const [activeVersion, setActiveVersion] = useState(initialVersion)
-  const [zoom, setZoom] = useState(50)
+  const initialVersion = Number(delivery.version.replace(/\D/g, '')) || 1
+  const kind = contentKind(delivery)
+  const supportsCanvas = kind === 'image'
+  const activeVersion = initialVersion
+  const [zoom, setZoom] = useState(supportsCanvas ? 50 : 100)
   const [filter, setFilter] = useState<'all' | 'open' | 'resolved'>('all')
-  const [comments, setComments] = useState(storedReview.comments)
+  const [comments, setComments] = useState<ReviewComment[]>([])
+  const [reviewLoading, setReviewLoading] = useState(true)
+  const [commentSubmitting, setCommentSubmitting] = useState(false)
   const [commentDraft, setCommentDraft] = useState('')
   const [pendingPoint, setPendingPoint] = useState<ReviewPoint | null>(null)
   const [pendingAnnotationId, setPendingAnnotationId] = useState<number | null>(null)
-  const [activeTool, setActiveTool] = useState<ReviewTool>('point')
+  const [activeTool, setActiveTool] = useState<ReviewTool>(supportsCanvas ? 'point' : 'general')
   const [brushOpen, setBrushOpen] = useState(false)
   const [inkColor, setInkColor] = useState('#5d55c7')
   const [strokeWidth, setStrokeWidth] = useState(5)
   const [draftAnnotation, setDraftAnnotation] = useState<DraftAnnotation | null>(null)
   const [textEditor, setTextEditor] = useState<{ point: ReviewPoint; value: string } | null>(null)
-  const [annotationHistory, dispatchAnnotation] = useReducer(annotationReducer, { snapshots: [storedReview.annotations], index: 0 })
-  const [railVisible, setRailVisible] = useState(true)
+  const [annotationHistory, dispatchAnnotation] = useReducer(annotationReducer, { snapshots: [[]], index: 0 })
+  const [railVisible, setRailVisible] = useState(supportsCanvas)
+  const [canvasSize, setCanvasSize] = useState(() => kind === 'copy' ? { width: 900, height: 1080 } : kind === 'video' ? { width: 1280, height: 720 } : { width: 1468, height: 920 })
   const [isPanning, setIsPanning] = useState(false)
   const [closing, setClosing] = useState(false)
   const [approvalFeedbackOpen, setApprovalFeedbackOpen] = useState(false)
@@ -151,8 +144,8 @@ export function DesignReviewModal({ designTitle, initialVersion, isApproved, ori
   const [approvalComment, setApprovalComment] = useState('')
   const [approvalSubmitting, setApprovalSubmitting] = useState(false)
   const [approvalError, setApprovalError] = useState('')
-  const [artReady, setArtReady] = useState(!origin || reducedMotion)
-  const [clonePhase, setClonePhase] = useState<'opening' | 'closing' | null>(origin && !reducedMotion ? 'opening' : null)
+  const [artReady, setArtReady] = useState(!origin || reducedMotion || !supportsCanvas)
+  const [clonePhase, setClonePhase] = useState<'opening' | 'closing' | null>(origin && supportsCanvas && !reducedMotion ? 'opening' : null)
   const [cloneRect, setCloneRect] = useState<ReviewOrigin | null>(origin)
   const artStageRef = useRef<HTMLElement>(null)
   const artRef = useRef<HTMLDivElement>(null)
@@ -172,12 +165,18 @@ export function DesignReviewModal({ designTitle, initialVersion, isApproved, ori
   }), [activeVersion, comments, filter])
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(`allyo-review:${designTitle}`, JSON.stringify({ comments, annotations }))
-    } catch {
-      // A revisão continua funcional quando o navegador bloqueia o armazenamento local.
-    }
-  }, [annotations, comments, designTitle])
+    let active = true
+    api.getDesignReview(delivery.id).then((review) => {
+      if (!active) return
+      setComments(review.comments as ReviewComment[])
+      dispatchAnnotation({ type: 'replace', annotations: review.annotations as ReviewAnnotation[] })
+    }).catch((error: unknown) => {
+      if (active) notify(error instanceof Error ? error.message : 'Não foi possível carregar os comentários')
+    }).finally(() => {
+      if (active) setReviewLoading(false)
+    })
+    return () => { active = false }
+  }, [delivery.id, notify])
 
   useLayoutEffect(() => {
     if (!clonePhase || !origin || !artRef.current || !cloneRef.current) return
@@ -211,7 +210,7 @@ export function DesignReviewModal({ designTitle, initialVersion, isApproved, ori
     if (closing) return
     const art = artRef.current
     const shouldReduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (!art || !origin || shouldReduceMotion) {
+    if (!art || !origin || shouldReduceMotion || !supportsCanvas) {
       onClose()
       return
     }
@@ -220,7 +219,7 @@ export function DesignReviewModal({ designTitle, initialVersion, isApproved, ori
     setArtReady(false)
     setCloneRect({ left: target.left, top: target.top, width: target.width, height: target.height })
     setClonePhase('closing')
-  }, [closing, onClose, origin])
+  }, [closing, onClose, origin, supportsCanvas])
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow
@@ -288,19 +287,8 @@ export function DesignReviewModal({ designTitle, initialVersion, isApproved, ori
     }
   }
 
-  const clearPendingContext = () => {
-    setPendingPoint(null)
-    setPendingAnnotationId(null)
-    setTextEditor(null)
-  }
-
-  const selectVersion = (version: number) => {
-    setActiveVersion(version)
-    clearPendingContext()
-    notify(`Versão ${version} carregada`)
-  }
-
   const chooseTool = (tool: ReviewTool) => {
+    if (!supportsCanvas && tool !== 'general') return
     setActiveTool(tool)
     setDraftAnnotation(null)
     setTextEditor(null)
@@ -329,6 +317,7 @@ export function DesignReviewModal({ designTitle, initialVersion, isApproved, ori
   }
 
   const beginArtInteraction = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!supportsCanvas) return
     if (event.button !== 0) return
     const point = getPoint(event.clientX, event.clientY)
 
@@ -391,13 +380,35 @@ export function DesignReviewModal({ designTitle, initialVersion, isApproved, ori
       ? draftAnnotation.points.length > 1
       : Math.hypot(draftAnnotation.end.x - draftAnnotation.start.x, draftAnnotation.end.y - draftAnnotation.start.y) > .5
     if (isUsable) {
-      dispatchAnnotation({ type: 'commit', annotation: draftAnnotation })
-      setPendingAnnotationId(draftAnnotation.id)
+      void persistAnnotation(draftAnnotation)
       setPendingPoint(null)
-      requestAnimationFrame(() => commentInputRef.current?.focus())
       notify(`${annotationLabel(draftAnnotation)} adicionado. Você pode incluir um comentário.`)
     }
     setDraftAnnotation(null)
+  }
+
+  const annotationPayload = (annotation: ReviewAnnotation | DraftAnnotation): Record<string, unknown> => {
+    if (annotation.type === 'draw') return { points: annotation.points }
+    if (annotation.type === 'text') return { point: annotation.point, text: annotation.text }
+    return { start: annotation.start, end: annotation.end }
+  }
+
+  const persistAnnotation = async (annotation: ReviewAnnotation | DraftAnnotation) => {
+    try {
+      const saved = await api.addAnnotation(delivery.id, {
+        type: annotation.type,
+        version: annotation.version,
+        color: annotation.color,
+        width: 'width' in annotation ? annotation.width : 3,
+        payload: annotationPayload(annotation),
+      })
+      const persisted = saved as unknown as ReviewAnnotation
+      dispatchAnnotation({ type: 'commit', annotation: persisted })
+      setPendingAnnotationId(persisted.id)
+      requestAnimationFrame(() => commentInputRef.current?.focus())
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : 'Não foi possível salvar a marcação')
+    }
   }
 
   const submitTextAnnotation = (event: React.FormEvent) => {
@@ -411,34 +422,43 @@ export function DesignReviewModal({ designTitle, initialVersion, isApproved, ori
       point: textEditor.point,
       text: textEditor.value.trim(),
     }
-    dispatchAnnotation({ type: 'commit', annotation })
-    setPendingAnnotationId(annotation.id)
+    void persistAnnotation(annotation)
     setTextEditor(null)
-    requestAnimationFrame(() => commentInputRef.current?.focus())
     notify('Texto adicionado à arte')
   }
 
-  const addComment = (event: React.FormEvent) => {
+  const addComment = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (!commentDraft.trim()) return
-    setComments((current) => [...current, {
-      id: Date.now(),
-      author: 'Levy Câmara',
-      text: commentDraft.trim(),
-      time: 'Agora',
-      resolved: false,
-      version: activeVersion,
-      point: pendingPoint ?? undefined,
-      annotationId: pendingAnnotationId ?? undefined,
-    }])
-    setCommentDraft('')
-    setPendingPoint(null)
-    setPendingAnnotationId(null)
-    notify('Comentário adicionado ao arquivo')
+    if (!commentDraft.trim() || commentSubmitting) return
+    setCommentSubmitting(true)
+    try {
+      const created = await api.addComment(delivery.id, {
+        text: commentDraft.trim(),
+        version: activeVersion,
+        point: pendingPoint ?? undefined,
+        annotationId: pendingAnnotationId ?? undefined,
+      })
+      setComments((current) => [...current, created as ReviewComment])
+      setCommentDraft('')
+      setPendingPoint(null)
+      setPendingAnnotationId(null)
+      notify('Comentário adicionado à entrega')
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : 'Não foi possível adicionar o comentário')
+    } finally {
+      setCommentSubmitting(false)
+    }
   }
 
-  const toggleResolved = (id: number) => {
-    setComments((current) => current.map((comment) => comment.id === id ? { ...comment, resolved: !comment.resolved } : comment))
+  const toggleResolved = async (id: number) => {
+    const comment = comments.find((item) => item.id === id)
+    if (!comment) return
+    try {
+      const updated = await api.setCommentResolved(delivery.id, id, !comment.resolved)
+      setComments((current) => current.map((item) => item.id === id ? { ...item, resolved: updated.resolved } : item))
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : 'Não foi possível atualizar o comentário')
+    }
   }
 
   const cycleStrokeWidth = () => setStrokeWidth((current) => current === 3 ? 5 : current === 5 ? 8 : 3)
@@ -450,41 +470,62 @@ export function DesignReviewModal({ designTitle, initialVersion, isApproved, ori
       <span className="file-review-art-text" style={{ left: `${annotation.point.x}%`, top: `${annotation.point.y}%`, color: annotation.color }} key={annotation.id}>{annotation.text}</span>
     )
     if (annotation.type === 'draw') {
-      return <polyline key={annotation.id} points={annotation.points.map((point) => { const svg = toSvgPoint(point); return `${svg.x},${svg.y}` }).join(' ')} fill="none" stroke={annotation.color} strokeWidth={annotation.width} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+      return <polyline key={annotation.id} points={annotation.points.map((point) => `${point.x},${point.y}`).join(' ')} fill="none" stroke={annotation.color} strokeWidth={annotation.width} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
     }
-    const start = toSvgPoint(annotation.start)
-    const end = toSvgPoint(annotation.end)
+    const start = annotation.start
+    const end = annotation.end
     if (annotation.type === 'arrow') {
       return <line key={annotation.id} x1={start.x} y1={start.y} x2={end.x} y2={end.y} stroke={annotation.color} strokeWidth={annotation.width} strokeLinecap="round" markerEnd="url(#file-review-arrow-head)" vectorEffect="non-scaling-stroke" />
     }
     return <rect key={annotation.id} x={Math.min(start.x, end.x)} y={Math.min(start.y, end.y)} width={Math.abs(end.x - start.x)} height={Math.abs(end.y - start.y)} rx="5" fill={`${annotation.color}18`} stroke={annotation.color} strokeWidth={annotation.width} vectorEffect="non-scaling-stroke" />
   }
 
+  const fileUrl = delivery.fileUrl || delivery.thumbnailUrl || null
+  const typeLabel = kind === 'copy' ? 'Copy' : kind === 'pdf' ? 'PDF' : kind === 'video' ? 'Vídeo' : kind === 'image' ? 'Imagem' : 'Arquivo'
+  const loadImageDimensions = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    const image = event.currentTarget
+    if (!image.naturalWidth || !image.naturalHeight) return
+    const scale = Math.min(1, 1800 / Math.max(image.naturalWidth, image.naturalHeight))
+    setCanvasSize({ width: Math.round(image.naturalWidth * scale), height: Math.round(image.naturalHeight * scale) })
+  }
+
+  const deliveryContent = kind === 'image' && fileUrl ? (
+    <img src={fileUrl} onLoad={loadImageDimensions} alt={delivery.name} />
+  ) : kind === 'pdf' && fileUrl ? (
+    <div className="file-review-document-wrap"><iframe className="file-review-document" src={`${fileUrl}#toolbar=1&navpanes=0`} title={`PDF ${delivery.name}`} /><a href={fileUrl} target="_blank" rel="noreferrer"><Download size={16} /> Abrir PDF em nova aba</a></div>
+  ) : kind === 'video' && fileUrl ? (
+    <video className="file-review-video" src={fileUrl} controls playsInline aria-label={delivery.name} />
+  ) : kind === 'copy' ? (
+    <article className="file-review-copy"><span>Texto para aprovação</span><h1>{delivery.name}</h1><div>{delivery.textContent || 'O conteúdo desta entrega ainda não foi informado.'}</div></article>
+  ) : (
+    <div className="file-review-file-fallback"><FileText size={54} /><h2>{delivery.name}</h2><p>Este formato não possui visualização no navegador.</p>{fileUrl && <a href={fileUrl} target="_blank" rel="noreferrer"><Download size={17} /> Baixar arquivo para revisar</a>}</div>
+  )
+
   return createPortal(
     <>
-    <div className={`file-review-modal${closing ? ' file-review-modal--closing' : ''}`} role="dialog" aria-modal="true" aria-label="Revisão de design">
+    <div className={`file-review-modal file-review-modal--${kind}${closing ? ' file-review-modal--closing' : ''}`} role="dialog" aria-modal="true" aria-label="Revisão de entrega">
       <div className="file-review-shell">
         <header className="file-review-topbar">
           <div className="file-review-topline">
             <div className="file-review-breadcrumbs">
-              <button type="button">Chat</button><button type="button">Designs</button><i />
-              <strong>Nome-doArquivo.pdf</strong>
+              <button type="button">Chat</button><button type="button">Entregas</button><i />
+              <strong title={delivery.name}>{delivery.name}</strong>
+              <span className="file-review-kind">{typeLabel}</span>
               <span className="file-review-status">{isApproved ? 'Aprovado' : 'Aguardando aprovação'}</span><i />
-              <button type="button" className="file-review-change" onClick={() => notify('Solicitação de alterações aberta')}><img src={figmaAsset('design_review.imgGardenReloadFill16')} alt="" />Solicitar alterações</button>
+              <button type="button" className="file-review-change" onClick={() => { chooseTool('general'); notify('Descreva os ajustes no comentário para enviar ao time') }}><img src={figmaAsset('design_review.imgGardenReloadFill16')} alt="" />Solicitar alterações</button>
               <button type="button" className="file-review-approve" disabled={approvalSubmitting} onClick={() => { if (isApproved) void revokeApproval(); else setApprovalFeedbackOpen(true) }}><img src={figmaAsset('design_review.imgGroup')} alt="" />{isApproved ? 'Aprovado' : 'Marcar como aprovado'}</button>
             </div>
             <div className="file-review-share-actions"><button type="button" onClick={() => notify('Link de compartilhamento copiado')}><img src={figmaAsset('design_review.imgTablerShare')} alt="" />Compartilhar</button><button type="button" aria-label="Mais opções"><img src={figmaAsset('design_review.imgTablerDots')} alt="" /></button></div>
           </div>
           <div className="file-review-controls">
             <div className="file-review-view-controls">
-              <button type="button" className={railVisible ? 'active' : ''} onClick={() => setRailVisible((value) => !value)} aria-label="Alternar miniaturas" title="Miniaturas"><img src={figmaAsset('design_review.imgPhSidebarBold')} alt="" /></button>
+              {supportsCanvas && <><button type="button" className={railVisible ? 'active' : ''} onClick={() => setRailVisible((value) => !value)} aria-label="Alternar miniatura" title="Miniatura"><img src={figmaAsset('design_review.imgPhSidebarBold')} alt="" /></button>
               <button type="button" className={activeTool === 'pan' ? 'active' : ''} onClick={() => chooseTool('pan')} aria-pressed={activeTool === 'pan'} aria-label="Mover arquivo" title="Mover arquivo"><Hand size={20} /></button>
-              <label className="file-review-select file-review-zoom"><select value={zoom} onChange={(event) => setZoom(Number(event.target.value))} aria-label="Zoom"><option value="50">50%</option><option value="75">75%</option><option value="100">100%</option><option value="125">125%</option></select></label><i />
-              <label className="file-review-select file-review-version"><select value={activeVersion} onChange={(event) => selectVersion(Number(event.target.value))} aria-label="Versão do arquivo"><option value="3">Versão 3</option><option value="2">Versão 2</option><option value="1">Versão 1</option></select></label><i />
-              <div className="file-review-stepper"><button type="button" aria-label="Versão anterior" onClick={() => selectVersion(Math.max(1, activeVersion - 1))}><img src={figmaAsset('design_review.imgGroup1410119707')} alt="" /></button><button type="button" aria-label="Recarregar versão" onClick={() => notify(`Versão ${activeVersion} atualizada`)}><img src={figmaAsset('design_review.imgGroup1410119709')} alt="" /></button><button type="button" aria-label="Próxima versão" onClick={() => selectVersion(Math.min(3, activeVersion + 1))}><img src={figmaAsset('design_review.imgGroup1410119710')} alt="" /></button></div>
+              <label className="file-review-select file-review-zoom"><select value={zoom} onChange={(event) => setZoom(Number(event.target.value))} aria-label="Zoom"><option value="50">50%</option><option value="75">75%</option><option value="100">100%</option><option value="125">125%</option></select></label><i /></>}
+              <span className="file-review-current-version">Versão {activeVersion}</span>
             </div>
 
-            <div className={`file-review-annotation-toolbar${brushOpen ? ' is-expanded' : ''}`} role="toolbar" aria-label="Ferramentas de anotação">
+            {supportsCanvas ? <div className={`file-review-annotation-toolbar${brushOpen ? ' is-expanded' : ''}`} role="toolbar" aria-label="Ferramentas de anotação">
               <div className="file-review-primary-tools">
                 <button type="button" className={activeTool === 'point' ? 'active' : ''} onClick={() => chooseTool('point')} aria-pressed={activeTool === 'point'} aria-label="Comentário pontual" title="Comentário pontual: clique na arte">
                   <span className="file-review-point-tool"><MessageSquare size={21} /><MousePointer2 size={13} /></span>
@@ -507,25 +548,25 @@ export function DesignReviewModal({ designTitle, initialVersion, isApproved, ori
                 <button type="button" onClick={() => dispatchAnnotation({ type: 'undo' })} disabled={annotationHistory.index === 0} aria-label="Desfazer anotação" title="Desfazer"><Undo2 size={21} /></button>
                 <button type="button" onClick={() => dispatchAnnotation({ type: 'redo' })} disabled={annotationHistory.index === annotationHistory.snapshots.length - 1} aria-label="Refazer anotação" title="Refazer"><Redo2 size={21} /></button>
               </div>}
-            </div>
+            </div> : <div className="file-review-delivery-actions"><button type="button" className="file-review-general-comment" onClick={() => chooseTool('general')}><MessageSquareText size={18} /> Comentar entrega</button>{fileUrl && <a href={fileUrl} target="_blank" rel="noreferrer"><Download size={17} /> Abrir original</a>}</div>}
 
             <div className="file-review-right-controls"><label className="file-review-select file-review-read"><select aria-label="Estado de leitura" defaultValue="unread"><option value="unread">não lido</option><option value="read">lido</option></select></label><button type="button" aria-label="Visualizar comentários"><img src={figmaAsset('design_review.imgGroup1')} alt="" /></button><button type="button" onClick={closeModal} aria-label="Fechar revisão"><img src={figmaAsset('design_review.imgMaterialSymbolsClose')} alt="" /></button></div>
           </div>
         </header>
 
-        <aside className={`file-review-rail${railVisible ? '' : ' is-hidden'}`} aria-label="Versões do arquivo">
-          {[3, 2, 1].map((version) => <button type="button" className={activeVersion === version ? 'active' : ''} onClick={() => selectVersion(version)} key={version}><img src={figmaAsset('design_review.imgImage8')} alt={`Miniatura da versão ${version}`} /><span><b>{version}</b><small><img src={figmaAsset('design_review.imgGroup1410119708')} alt="" />3</small></span></button>)}
-        </aside>
+        {supportsCanvas && <aside className={`file-review-rail${railVisible ? '' : ' is-hidden'}`} aria-label="Versão atual do arquivo">
+          <button type="button" className="active"><img src={delivery.thumbnailUrl || fileUrl || ''} alt={`Miniatura da versão ${activeVersion}`} /><span><b>{activeVersion}</b><small>Atual</small></span></button>
+        </aside>}
 
         <main ref={artStageRef} className={`file-review-art-stage${railVisible ? '' : ' is-expanded'} is-${activeTool}${isPanning ? ' is-panning' : ''}`}>
           <div
             className={`file-review-art file-review-art--v${activeVersion}${artReady ? ' is-ready' : ' is-transitioning'}`}
             ref={artRef}
-            style={{ width: ART_WIDTH * zoom / 100, height: ART_HEIGHT * zoom / 100 }}
-            onPointerDown={beginArtInteraction}
-            onPointerMove={continueArtInteraction}
-            onPointerUp={finishArtInteraction}
-            onPointerCancel={finishArtInteraction}
+            style={{ width: canvasSize.width * zoom / 100, height: canvasSize.height * zoom / 100 }}
+            onPointerDown={supportsCanvas ? beginArtInteraction : undefined}
+            onPointerMove={supportsCanvas ? continueArtInteraction : undefined}
+            onPointerUp={supportsCanvas ? finishArtInteraction : undefined}
+            onPointerCancel={supportsCanvas ? finishArtInteraction : undefined}
             onKeyDown={(event) => {
               if (event.key !== 'Enter' && event.key !== ' ') return
               if (activeTool === 'point') {
@@ -538,25 +579,25 @@ export function DesignReviewModal({ designTitle, initialVersion, isApproved, ori
                 requestAnimationFrame(() => textInputRef.current?.focus())
               }
             }}
-            role="application"
+            role={supportsCanvas ? 'application' : 'document'}
             tabIndex={0}
-            aria-label="Arquivo em revisão. Use a barra de ferramentas para comentar ou desenhar."
-            title={designTitle}
+            aria-label={supportsCanvas ? 'Imagem em revisão. Use a barra de ferramentas para comentar ou desenhar.' : `${typeLabel} em revisão`}
+            title={delivery.name}
           >
-            <img src={figmaAsset('design_review.imgImage8')} alt="Design em revisão" />
-            <svg className="file-review-annotation-layer" viewBox={`0 0 ${ART_WIDTH} ${ART_HEIGHT}`} preserveAspectRatio="none" aria-hidden="true">
+            {deliveryContent}
+            {supportsCanvas && <svg className="file-review-annotation-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
               <defs><marker id="file-review-arrow-head" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,7 L6,3.5 z" fill="context-stroke" /></marker></defs>
               {visibleAnnotations.filter((annotation) => annotation.type !== 'text').map(renderAnnotation)}
               {draftAnnotation && renderAnnotation(draftAnnotation)}
-            </svg>
-            {visibleAnnotations.filter((annotation): annotation is TextAnnotation => annotation.type === 'text').map(renderAnnotation)}
-            {comments.filter((comment) => comment.version === activeVersion && comment.point).map((comment) => <button type="button" className={`file-review-pin${comment.resolved ? ' is-resolved' : ''}`} style={{ left: `${comment.point?.x}%`, top: `${comment.point?.y}%` }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); setFilter(comment.resolved ? 'resolved' : 'open') }} aria-label={`Comentário: ${comment.text}`} key={comment.id}><img src={figmaAsset('design_review.imgGroup1410119711')} alt="" /></button>)}
-            {pendingPoint && <span className="file-review-pin is-pending" style={{ left: `${pendingPoint.x}%`, top: `${pendingPoint.y}%` }}><img src={figmaAsset('design_review.imgGroup1410119711')} alt="" /></span>}
+            </svg>}
+            {supportsCanvas && visibleAnnotations.filter((annotation): annotation is TextAnnotation => annotation.type === 'text').map(renderAnnotation)}
+            {supportsCanvas && comments.filter((comment) => comment.version === activeVersion && comment.point).map((comment) => <button type="button" className={`file-review-pin${comment.resolved ? ' is-resolved' : ''}`} style={{ left: `${comment.point?.x}%`, top: `${comment.point?.y}%` }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); setFilter(comment.resolved ? 'resolved' : 'open') }} aria-label={`Comentário: ${comment.text}`} key={comment.id}><img src={figmaAsset('design_review.imgGroup1410119711')} alt="" /></button>)}
+            {supportsCanvas && pendingPoint && <span className="file-review-pin is-pending" style={{ left: `${pendingPoint.x}%`, top: `${pendingPoint.y}%` }}><img src={figmaAsset('design_review.imgGroup1410119711')} alt="" /></span>}
 
             {pendingPoint && <form className={`file-review-inline-comment${pendingPoint.x > 62 ? ' is-left' : ''}`} style={{ left: `${pendingPoint.x}%`, top: `${Math.min(78, Math.max(12, pendingPoint.y))}%` }} onPointerDown={(event) => event.stopPropagation()} onSubmit={addComment}>
               <header><strong>Comentário neste ponto</strong><button type="button" onClick={() => setPendingPoint(null)} aria-label="Cancelar comentário pontual"><X size={18} /></button></header>
               <textarea ref={inlineCommentInputRef} value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} placeholder="O que precisa ser ajustado aqui?" aria-label="Comentário neste ponto" />
-              <footer><span>Vinculado à versão {activeVersion}</span><button type="submit" disabled={!commentDraft.trim()}>Comentar</button></footer>
+              <footer><span>Vinculado à versão {activeVersion}</span><button type="submit" disabled={!commentDraft.trim() || commentSubmitting}>{commentSubmitting ? 'Enviando...' : 'Comentar'}</button></footer>
             </form>}
 
             {textEditor && <form className={`file-review-text-editor${textEditor.point.x > 72 ? ' is-left' : ''}`} style={{ left: `${textEditor.point.x}%`, top: `${textEditor.point.y}%`, color: inkColor }} onPointerDown={(event) => event.stopPropagation()} onSubmit={submitTextAnnotation}>
@@ -570,17 +611,18 @@ export function DesignReviewModal({ designTitle, initialVersion, isApproved, ori
         <aside className="file-review-comments">
           <div className="file-review-filters"><button type="button" className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>Todos</button><button type="button" className={filter === 'open' ? 'active' : ''} onClick={() => setFilter('open')}>Aberto</button><button type="button" className={filter === 'resolved' ? 'active' : ''} onClick={() => setFilter('resolved')}>Resolvido</button></div>
           <div className="file-review-comment-list">
-            {visibleComments.map((comment) => {
+            {reviewLoading && <p className="file-review-comments-empty">Carregando comentários...</p>}
+            {!reviewLoading && visibleComments.map((comment) => {
               const annotation = comment.annotationId ? annotations.find((item) => item.id === comment.annotationId) : undefined
               return <article className={comment.resolved ? 'is-resolved' : ''} key={comment.id}><header><span><img src={figmaAsset('design_review.imgEllipse24')} alt="" /><strong>{comment.author}</strong></span><span><button type="button" aria-label="Mais opções do comentário"><img src={figmaAsset('design_review.imgTablerDots1')} alt="" /></button><button type="button" onClick={() => toggleResolved(comment.id)} aria-label={comment.resolved ? 'Reabrir comentário' : 'Resolver comentário'}><img src={figmaAsset('design_review.imgGroup2')} alt="" /></button></span></header><time>{comment.time}</time>{(comment.point || annotation) && <span className="file-review-comment-kind">{comment.point ? 'Comentário pontual' : annotationLabel(annotation)}</span>}<p>{comment.text}</p><button type="button" className="file-review-reply"><img src={figmaAsset('design_review.imgMaterialSymbolsReplyRounded')} alt="" />Responder</button></article>
             })}
-            {visibleComments.length === 0 && <p className="file-review-comments-empty">Nenhum comentário nesta versão.</p>}
+            {!reviewLoading && visibleComments.length === 0 && <p className="file-review-comments-empty">Nenhum comentário nesta versão.</p>}
           </div>
           <form className={`file-review-comment-form${pendingPoint ? ' is-point-pending' : ''}`} onSubmit={addComment}>
             <div><strong>{commentFormTitle}</strong>{(pendingPoint || contextAnnotation) && <button type="button" onClick={() => chooseTool('general')}>Alterar para geral</button>}</div>
             {pendingPoint ? <p>Escreva no campo que abriu ao lado do marcador na arte.</p> : <>
               <textarea ref={commentInputRef} value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} placeholder={contextAnnotation ? 'Descreva o ajuste relacionado à anotação...' : 'Adicionar comentário geral...'} aria-label="Novo comentário" />
-              <button type="submit" disabled={!commentDraft.trim()}>Comentar</button>
+              <button type="submit" disabled={!commentDraft.trim() || commentSubmitting}>{commentSubmitting ? 'Enviando...' : 'Comentar'}</button>
             </>}
           </form>
         </aside>
@@ -595,7 +637,7 @@ export function DesignReviewModal({ designTitle, initialVersion, isApproved, ori
         </form>
       </div>}
     </div>
-    {clonePhase && cloneRect && <div className="file-review-shared-clone" ref={cloneRef} style={{ left: cloneRect.left, top: cloneRect.top, width: cloneRect.width, height: cloneRect.height }} aria-hidden="true"><img src={figmaAsset('design_review.imgImage8')} alt="" /></div>}
+    {clonePhase && cloneRect && <div className="file-review-shared-clone" ref={cloneRef} style={{ left: cloneRect.left, top: cloneRect.top, width: cloneRect.width, height: cloneRect.height }} aria-hidden="true"><img src={delivery.thumbnailUrl || delivery.fileUrl || ''} alt="" /></div>}
     </>,
     document.body,
   )
