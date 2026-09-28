@@ -26,6 +26,29 @@ interface ProjectTimelineEvent {
   completed?: boolean
 }
 
+const cleanDecodedText = (text?: string | null): string => {
+  if (!text) return ''
+  try {
+    return decodeURIComponent(text)
+  } catch {
+    return text
+  }
+}
+
+const formatProjectDeadline = (value?: string | null): string => {
+  if (!value || value === 'A definir') return 'Prazo a definir'
+  if (value.toLowerCase() === 'hoje') return 'Hoje'
+  const date = new Date(value)
+  if (!Number.isNaN(date.getTime()) && (value.includes('-') || value.includes('T'))) {
+    const today = new Date()
+    const isSameDay = date.getDate() === today.getDate() && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear()
+    const dateLabel = isSameDay ? 'Hoje' : new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(date).replace('.', '')
+    const timeLabel = value.includes('T') ? `, ${new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(date)}` : ''
+    return `${dateLabel}${timeLabel}`
+  }
+  return value
+}
+
 const validDate = (value?: string) => {
   if (!value) return null
   const date = new Date(value)
@@ -56,7 +79,7 @@ function projectTimeline(project: Project, tasks: ProjectTask[], designs: Design
 
   designs.forEach((design) => {
     const designCreatedAt = validDate(design.createdAt)
-    if (designCreatedAt) events.push({ id: `design-${design.id}`, date: designCreatedAt, title: design.name, detail: `${design.version} enviada para revisão`, completed: design.approved })
+    if (designCreatedAt) events.push({ id: `design-${design.id}`, date: designCreatedAt, title: cleanDecodedText(design.name), detail: `${design.version} enviada para revisão`, completed: design.approved })
   })
 
   if (updatedAt && createdAt && updatedAt.getTime() - createdAt.getTime() > 1_000) {
@@ -411,7 +434,7 @@ export function ProjectDetailPage() {
       />
       <header className="project-compact-header">
         <h1>{project.name}</h1>
-        <span className="project-compact-deadline">com prazo de <strong>{project.deadline || 'A definir'}</strong></span>
+        <span className="project-compact-deadline">com prazo de <strong>{formatProjectDeadline(project.deadline)}</strong></span>
         <span className="project-compact-status">{projectStatus}</span>
       </header>
 
@@ -501,12 +524,12 @@ export function ProjectDetailPage() {
             <article className="project-started-card">
               <header>
                 <div><span>PROJETO</span><h2>{project.name}</h2></div>
-                <time>{project.deadline || 'Prazo a definir'}</time>
+                <time>{formatProjectDeadline(project.deadline)}</time>
               </header>
               <div className="project-started-metrics">
-                <div><span>Horas estimadas</span><strong>12.00</strong><small>24.00</small></div>
-                <div><span>Créditos</span><strong>1</strong><small><img src={figmaAsset('messages.imgMaterialSymbolsBoltBoostRounded')} alt="" />Normal</small></div>
-                <div><span>Duração</span><strong>{project.deadline || '48 horas'}</strong></div>
+                <div><span>Horas estimadas</span><strong>{briefing?.estimatedHours ? Number(briefing.estimatedHours).toFixed(2) : '12.00'}</strong><small>24.00</small></div>
+                <div><span>Créditos</span><strong>{briefing?.creditsEstimated || 1}</strong><small><img src={figmaAsset('messages.imgMaterialSymbolsBoltBoostRounded')} alt="" />Normal</small></div>
+                <div><span>Duração</span><strong>{briefing?.estimatedHours ? `${briefing.estimatedHours} horas` : '48 horas'}</strong></div>
                 <div><span>Status</span><strong>{projectStatus}</strong></div>
               </div>
             </article>
@@ -527,7 +550,7 @@ export function ProjectDetailPage() {
                         <time>{msg.time}</time>
                       </header>
                     )}
-                    <p>{msg.text}</p>
+                    <p>{cleanDecodedText(msg.text)}</p>
                     {msg.deliveryId && <button className="project-message-delivery-link" type="button" onClick={() => {
                       if (!designList.some((delivery) => delivery.id === msg.deliveryId)) return notify('Esta entrega ainda está sendo carregada')
                       setReviewOrigin(null)
@@ -576,8 +599,8 @@ export function ProjectDetailPage() {
               const isApproved = approved.includes(design.id)
               const kind = deliveryKind(design)
               return <article key={design.id} className="project-design-tile">
-                <header><span><small>{deliveryTypeLabel(kind)}</small>{design.name}</span><b className={isApproved ? 'is-approved' : ''}>{isApproved ? 'Aprovado' : 'Aguardando aprovação'}</b></header>
-                <button onClick={(event) => openReview(design.id, event.currentTarget)} aria-label={`Abrir ${design.name}`}>
+                <header><span><small>{deliveryTypeLabel(kind)}</small>{cleanDecodedText(design.name)}</span><b className={isApproved ? 'is-approved' : ''}>{isApproved ? 'Aprovado' : 'Aguardando aprovação'}</b></header>
+                <button onClick={(event) => openReview(design.id, event.currentTarget)} aria-label={`Abrir ${cleanDecodedText(design.name)}`}>
                   <DeliveryPreview delivery={design} />
                   <span className="project-design-open"><ExternalLink size={15} /> Revisar</span>
                 </button>
@@ -591,10 +614,10 @@ export function ProjectDetailPage() {
                 {file.contentType.startsWith('image/') ? <img src={file.fileUrl} alt="" /> : <FileText size={36} />}
               </div>
               <div className="project-file-info">
-                <span title={file.name}>{file.name}</span>
+                <span title={cleanDecodedText(file.name)}>{cleanDecodedText(file.name)}</span>
                 <small>{Math.max(1, Math.round(file.sizeBytes / 1024))} KB</small>
               </div>
-              <a href={file.fileUrl} target="_blank" rel="noreferrer" aria-label={`Abrir ${file.name}`}><Download size={17} /></a>
+              <a href={file.fileUrl} target="_blank" rel="noreferrer" aria-label={`Abrir ${cleanDecodedText(file.name)}`}><Download size={17} /></a>
             </article>)}
           </div> : <div className="project-gallery-empty">Nenhum arquivo enviado neste projeto.</div>)}
         </section>

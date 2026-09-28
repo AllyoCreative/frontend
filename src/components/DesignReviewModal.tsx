@@ -116,6 +116,13 @@ function contentKind(delivery: DesignSummary) {
 }
 
 export function DesignReviewModal({ delivery, isApproved, projectCompleted, origin, onApprovalChange, onClose, notify }: DesignReviewModalProps) {
+  const cleanName = (() => {
+    try {
+      return decodeURIComponent(delivery.name)
+    } catch {
+      return delivery.name
+    }
+  })()
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   const initialVersion = Number(delivery.version.replace(/\D/g, '')) || 1
   const kind = contentKind(delivery)
@@ -530,17 +537,17 @@ export function DesignReviewModal({ delivery, isApproved, projectCompleted, orig
   }
 
   const deliveryContent = kind === 'image' && fileUrl && !fileLoadError ? (
-    <img src={fileUrl} onLoad={loadImageDimensions} onError={() => setFileLoadError(true)} alt={delivery.name} />
+    <img src={fileUrl} onLoad={loadImageDimensions} onError={() => setFileLoadError(true)} alt={cleanName} />
   ) : kind === 'image' ? (
     <div className="file-review-file-fallback"><FileText size={54} /><h2>Não foi possível carregar a imagem</h2><p>O link pode ter expirado. Feche e abra novamente; se continuar, peça um novo envio ao time.</p>{fileUrl && <a href={fileUrl} target="_blank" rel="noreferrer"><Download size={17} /> Abrir arquivo original</a>}</div>
   ) : kind === 'pdf' && fileUrl ? (
-    <div className="file-review-document-wrap"><iframe className="file-review-document" src={`${fileUrl}#toolbar=1&navpanes=0`} title={`PDF ${delivery.name}`} /><a href={fileUrl} target="_blank" rel="noreferrer"><Download size={16} /> Abrir PDF em nova aba</a></div>
+    <div className="file-review-document-wrap"><iframe className="file-review-document" src={`${fileUrl}#toolbar=1&navpanes=0`} title={`PDF ${cleanName}`} /><a href={fileUrl} target="_blank" rel="noreferrer"><Download size={16} /> Abrir PDF em nova aba</a></div>
   ) : kind === 'video' && fileUrl ? (
-    <video className="file-review-video" src={fileUrl} controls playsInline aria-label={delivery.name} />
+    <video className="file-review-video" src={fileUrl} controls playsInline aria-label={cleanName} />
   ) : kind === 'copy' ? (
-    <article className="file-review-copy"><span>Texto para aprovação</span><h1>{delivery.name}</h1><div>{delivery.textContent || 'O conteúdo desta entrega ainda não foi informado.'}</div></article>
+    <article className="file-review-copy"><span>Texto para aprovação</span><h1>{cleanName}</h1><div>{delivery.textContent || 'O conteúdo desta entrega ainda não foi informado.'}</div></article>
   ) : (
-    <div className="file-review-file-fallback"><FileText size={54} /><h2>{delivery.name}</h2><p>Este formato não possui visualização no navegador.</p>{fileUrl && <a href={fileUrl} target="_blank" rel="noreferrer"><Download size={17} /> Baixar arquivo para revisar</a>}</div>
+    <div className="file-review-file-fallback"><FileText size={54} /><h2>{cleanName}</h2><p>Este formato não possui visualização no navegador.</p>{fileUrl && <a href={fileUrl} target="_blank" rel="noreferrer"><Download size={17} /> Baixar arquivo para revisar</a>}</div>
   )
 
   return createPortal(
@@ -551,7 +558,7 @@ export function DesignReviewModal({ delivery, isApproved, projectCompleted, orig
           <div className="file-review-topline">
             <div className="file-review-breadcrumbs">
               <button type="button">Chat</button><button type="button">Entregas</button><i />
-              <strong title={delivery.name}>{delivery.name}</strong>
+              <strong title={cleanName}>{cleanName}</strong>
               <span className="file-review-kind">{typeLabel}</span>
               <span className="file-review-status">{isApproved ? 'Aprovado' : 'Aguardando aprovação'}</span><i />
               {projectCompleted

@@ -867,25 +867,26 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .project-started-card > header h2 { overflow: hidden; max-width: 340px; margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-size: 26px; font-weight: 400; line-height: 30px; white-space: nowrap; text-overflow: ellipsis; }
 .project-started-card > header time { flex: none; white-space: nowrap; }
 .project-started-metrics { min-height: 78px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; }
-.project-started-metrics > div { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; white-space: nowrap; }
-.project-started-metrics strong { font-size: 22px; font-weight: 650; line-height: 28px; }
+.project-started-metrics > div { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.project-started-metrics strong { font-size: 20px; font-weight: 650; line-height: 26px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-started-metrics small { min-height: 18px; display: flex; align-items: center; gap: 6px; color: #131f15; font-size: 13px; font-weight: 500; line-height: 18px; }
 .project-started-metrics small img { width: 16px; height: 16px; }
-.project-chat-stage { position: relative; width: 100%; height: 290px; flex: none; }
-.figma-message { position: absolute; color: #131f15; }
-.figma-message--allyo { top: 0; left: 0; width: 455px; min-height: 140px; }
-.figma-message--allyo > header { min-width: 240px; min-height: 40px; display: flex; align-items: flex-start; gap: 8px; }
-.figma-message--allyo > header img { width: 40px; height: 40px; flex: none; }
-.figma-message--allyo > header span { min-width: 105px; display: grid; padding-top: 1px; }
-.figma-message--allyo > header strong { font-size: 14px; font-weight: 650; line-height: 20px; white-space: nowrap; }
-.figma-message--allyo > header small { color: #68716c; font-size: 12px; font-weight: 500; line-height: 17px; white-space: nowrap; }
-.figma-message--allyo > header time { margin-left: 10px; color: #68716c; font-size: 11px; font-weight: 500; line-height: 20px; }
-.figma-message p { width: 410px; min-height: 88px; margin: 0; padding: 14px 16px; border-radius: 0 8px 8px 8px; background: #f0f3ee; font-size: 14px; font-weight: 500; line-height: 21px; }
-.project-message-delivery-link { min-height: 34px; display: inline-flex; align-items: center; gap: 6px; margin: 8px 0 0 44px; padding: 0 12px; border: 1px solid #cbd7cf; border-radius: 999px; background: #fff; color: #004c46; font-size: 12px; font-weight: 700; }
-.figma-message--allyo > p { position: absolute; top: 48px; left: 44px; }
-.figma-message--mine { top: 165px; right: 0; width: 410px; min-height: 120px; display: flex; flex-direction: column; align-items: flex-end; }
-.figma-message--mine p { border-radius: 5px 5px 0 5px; background: #d8ead8; }
-.figma-message--mine time { min-height: 20px; color: #68716c; font-size: 11px; font-weight: 500; line-height: 20px; }
+.project-chat-stage { position: relative; width: 100%; min-height: 180px; display: flex; flex-direction: column; gap: 20px; flex: none; margin-bottom: 8px; }
+.figma-message { position: relative; color: #131f15; display: flex; flex-direction: column; max-width: min(600px, 100%); }
+.figma-message--allyo { align-self: flex-start; width: min(520px, 100%); gap: 8px; }
+.figma-message--allyo > header { display: flex; align-items: center; gap: 10px; min-height: 38px; }
+.figma-message--allyo > header img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex: none; }
+.figma-message--allyo > header span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.figma-message--allyo > header strong { font-size: 13px; font-weight: 650; line-height: 18px; white-space: nowrap; }
+.figma-message--allyo > header small { color: #68716c; font-size: 11px; font-weight: 500; line-height: 15px; white-space: nowrap; }
+.figma-message--allyo > header time { margin-left: 8px; color: #68716c; font-size: 11px; font-weight: 500; line-height: 18px; white-space: nowrap; }
+.figma-message p { position: static; width: auto; max-width: 100%; min-height: auto; margin: 0; padding: 12px 16px; border-radius: 0 10px 10px 10px; background: #f0f3ee; font-size: 14px; font-weight: 450; line-height: 22px; word-break: break-word; white-space: pre-wrap; }
+.figma-message--allyo > p { margin-left: 46px; }
+.project-message-delivery-link { min-height: 34px; display: inline-flex; align-items: center; gap: 6px; margin: 8px 0 0 46px; padding: 0 14px; border: 1px solid #cbd7cf; border-radius: 999px; background: #fff; color: #004c46; font-size: 12px; font-weight: 700; cursor: pointer; transition: all .16s ease; width: fit-content; }
+.project-message-delivery-link:hover { background: #004c46; color: #fff; border-color: #004c46; }
+.figma-message--mine { align-self: flex-end; width: min(460px, 90%); display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.figma-message--mine p { border-radius: 10px 10px 0 10px; background: #d8ead8; color: #0d2818; }
+.figma-message--mine time { min-height: 18px; color: #68716c; font-size: 11px; font-weight: 500; line-height: 18px; }
 .project-message-composer { width: 100%; min-height: 130px; display: flex; flex-direction: column; gap: 12px; padding: 14px; border-radius: 10px; background: #fff; }
 .project-message-composer textarea { width: 100%; min-height: 50px; padding: 8px 10px; resize: vertical; overflow: auto; border: 0; outline: 0; background: transparent; color: #131f15; font-size: 14px; font-weight: 500; line-height: 21px; }
 .project-message-composer textarea::placeholder { color: #a9a9a9; opacity: 1; }
