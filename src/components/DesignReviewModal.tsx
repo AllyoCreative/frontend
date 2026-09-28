@@ -4,6 +4,8 @@ import {
   AlignJustify,
   ArrowUpRight,
   Brush,
+  ChevronLeft,
+  ChevronRight,
   Download,
   FileText,
   Hand,
@@ -20,7 +22,7 @@ import {
 } from 'lucide-react'
 import { figmaAsset } from '../assets/figma'
 import { api, type DesignSummary } from '../services/api'
-import { PdfReviewCanvas } from './PdfReviewCanvas'
+import { PdfReviewCanvas, PdfPageThumb, type PDFDocumentProxy } from './PdfReviewCanvas'
 
 export function parseQuotedSnippet(rawText: string): { snippet: string | null; cleanText: string } {
   if (!rawText) return { snippet: null, cleanText: '' }
@@ -180,6 +182,11 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
     } catch {}
   }
   const [zoom, setZoom] = useState(supportsCanvas ? 50 : 100)
+  const [pdfPage, setPdfPage] = useState(1)
+  const [pdfNumPages, setPdfNumPages] = useState(1)
+  const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null)
+  const [railTab, setRailTab] = useState<'pages' | 'versions'>('pages')
+  const hasInitialZoomFittedRef = useRef(false)
   const [filter, setFilter] = useState<'all' | 'open' | 'resolved'>('all')
   const [comments, setComments] = useState<ReviewComment[]>([])
   const [selectedCommentId, setSelectedCommentId] = useState<number | null>(null)
@@ -196,6 +203,14 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
   const [draftAnnotation, setDraftAnnotation] = useState<DraftAnnotation | null>(null)
   const [textEditor, setTextEditor] = useState<{ point: ReviewPoint; value: string } | null>(null)
   const [annotationHistory, dispatchAnnotation] = useReducer(annotationReducer, { snapshots: [[]], index: 0 })
+  useEffect(() => {
+    setPdfPage(1)
+    setPdfNumPages(1)
+    setPdfDoc(null)
+    setRailTab('pages')
+    hasInitialZoomFittedRef.current = false
+  }, [currentDelivery.id])
+
   const [railVisible, setRailVisible] = useState(supportsCanvas)
   const [canvasSize, setCanvasSize] = useState(() => kind === 'copy' ? { width: 900, height: 1080 } : kind === 'video' ? { width: 1280, height: 720 } : { width: 1468, height: 920 })
   const [isPanning, setIsPanning] = useState(false)
@@ -600,14 +615,26 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
     <PdfReviewCanvas
       url={fileUrl}
       altName={cleanName}
+      currentPage={pdfPage}
+      zoom={zoom}
       onDimensions={({ width, height }) => {
         setCanvasSize({ width, height })
-        const stage = artStageRef.current
-        if (stage) {
-          const fittedZoom = Math.min(100, ((stage.clientWidth - 36) / width) * 100, ((stage.clientHeight - 36) / height) * 100)
-          setZoom(Math.max(15, Math.floor(fittedZoom)))
+        if (!hasInitialZoomFittedRef.current) {
+          const stage = artStageRef.current
+          if (stage && stage.clientWidth > 0 && stage.clientHeight > 0) {
+            const availableW = Math.max(120, stage.clientWidth - 56)
+            const availableH = Math.max(120, stage.clientHeight - 86)
+            const fittedZoom = Math.min(100, (availableW / width) * 100, (availableH / height) * 100)
+            setZoom(Math.max(10, Math.floor(fittedZoom)))
+            hasInitialZoomFittedRef.current = true
+          }
         }
       }}
+      onNumPages={(num) => {
+        setPdfNumPages(num)
+        if (num > 1) setRailTab('pages')
+      }}
+      onDocLoaded={setPdfDoc}
       onTextSelect={(sel) => {
         if (sel) {
           setActiveTextSelection({ text: sel.text, point: sel.point })
@@ -695,7 +722,62 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
             <div className="file-review-view-controls">
               {supportsCanvas && <><button type="button" className={railVisible ? 'active' : ''} onClick={() => setRailVisible((value) => !value)} aria-label="Alternar miniatura" title="Miniatura"><img src={figmaAsset('design_review.imgPhSidebarBold')} alt="" /></button>
               <button type="button" className={effectiveTool === 'pan' ? 'active' : ''} onClick={() => chooseTool('pan')} aria-pressed={effectiveTool === 'pan'} aria-label="Mover arquivo" title="Mover arquivo"><Hand size={20} /></button>
-              <label className="file-review-select file-review-zoom"><select value={zoom} onChange={(event) => setZoom(Number(event.target.value))} aria-label="Zoom">{![25, 50, 75, 100, 125].includes(zoom) && <option value={zoom}>Ajustar ({zoom}%)</option>}<option value="25">25%</option><option value="50">50%</option><option value="75">75%</option><option value="100">100%</option><option value="125">125%</option></select></label><i /></>}
+              <label className="file-review-select file-review-zoom">
+                <select
+                  value={zoom}
+                  onChange={(event) => {
+                    const val = event.target.value
+                    if (val === 'fit') {
+                      const stage = artStageRef.current
+                      if (stage && canvasSize.width && canvasSize.height) {
+                        const availableW = Math.max(120, stage.clientWidth - 56)
+                        const availableH = Math.max(120, stage.clientHeight - 86)
+                        const fittedZoom = Math.min(100, (availableW / canvasSize.width) * 100, (availableH / canvasSize.height) * 100)
+                        setZoom(Math.max(10, Math.floor(fittedZoom)))
+                      }
+                    } else {
+                      setZoom(Number(val))
+                    }
+                  }}
+                  aria-label="Zoom"
+                >
+                  <option value="fit">Ajustar à tela</option>
+                  {![25, 50, 75, 100, 125, 150, 200].includes(zoom) && <option value={zoom}>{zoom}%</option>}
+                  <option value="25">25%</option>
+                  <option value="50">50%</option>
+                  <option value="75">75%</option>
+                  <option value="100">100%</option>
+                  <option value="125">125%</option>
+                  <option value="150">150%</option>
+                  <option value="200">200%</option>
+                </select>
+              </label>
+              {kind === 'pdf' && pdfNumPages > 1 && (
+                <div className="file-review-pdf-page-controls">
+                  <button
+                    type="button"
+                    disabled={pdfPage <= 1}
+                    onClick={() => setPdfPage((p) => Math.max(1, p - 1))}
+                    aria-label="Página anterior"
+                    title="Página anterior"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <span className="file-review-pdf-page-label">
+                    Pág. <b>{pdfPage}</b> / {pdfNumPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={pdfPage >= pdfNumPages}
+                    onClick={() => setPdfPage((p) => Math.min(pdfNumPages, p + 1))}
+                    aria-label="Próxima página"
+                    title="Próxima página"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
+              <i /></>}
               {sortedVersions.length > 1 ? (
                 <label className="file-review-select file-review-version">
                   <select
@@ -747,24 +829,93 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
           </div>
         </header>
 
-        {supportsCanvas && <aside className={`file-review-rail${railVisible ? '' : ' is-hidden'}`} aria-label="Versão atual do arquivo">
-          {sortedVersions.map((v) => {
-            const vNum = parseVersionNum(v.version);
-            const isSelected = v.id === currentDelivery.id;
-            return (
-              <button
-                key={v.id}
-                type="button"
-                className={isSelected ? 'active' : ''}
-                onClick={() => setCurrentDelivery(v)}
-                title={`Versão ${vNum}`}
-              >
-                <img src={v.thumbnailUrl || v.fileUrl || fileUrl || ''} alt={`Miniatura da versão ${vNum}`} />
-                <span><b>{vNum}</b><small>{isSelected ? 'Atual' : `v${vNum}`}</small></span>
-              </button>
-            );
-          })}
-        </aside>}
+        {supportsCanvas && (
+          <aside className={`file-review-rail${railVisible ? '' : ' is-hidden'}`} aria-label="Versão atual do arquivo">
+            {kind === 'pdf' && pdfNumPages > 1 ? (
+              <>
+                {sortedVersions.length > 1 && (
+                  <div className="file-review-rail-tabs">
+                    <button
+                      type="button"
+                      className={railTab === 'pages' ? 'active' : ''}
+                      onClick={() => setRailTab('pages')}
+                    >
+                      Páginas ({pdfNumPages})
+                    </button>
+                    <button
+                      type="button"
+                      className={railTab === 'versions' ? 'active' : ''}
+                      onClick={() => setRailTab('versions')}
+                    >
+                      Versões ({sortedVersions.length})
+                    </button>
+                  </div>
+                )}
+
+                {railTab === 'pages' ? (
+                  <div className="file-review-rail-list">
+                    {Array.from({ length: pdfNumPages }, (_, i) => i + 1).map((pageNum) => {
+                      const isSelected = pageNum === pdfPage;
+                      return (
+                        <button
+                          key={pageNum}
+                          type="button"
+                          className={`file-review-rail-page ${isSelected ? 'active' : ''}`}
+                          onClick={() => setPdfPage(pageNum)}
+                          title={`Página ${pageNum}`}
+                        >
+                          <PdfPageThumb pdfDoc={pdfDoc} pageNum={pageNum} isSelected={isSelected} />
+                          <span>
+                            <b>{pageNum}</b>
+                            <small>{isSelected ? 'Atual' : `Pág. ${pageNum}`}</small>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="file-review-rail-list">
+                    {sortedVersions.map((v) => {
+                      const vNum = parseVersionNum(v.version);
+                      const isSelected = v.id === currentDelivery.id;
+                      return (
+                        <button
+                          key={v.id}
+                          type="button"
+                          className={isSelected ? 'active' : ''}
+                          onClick={() => setCurrentDelivery(v)}
+                          title={`Versão ${vNum}`}
+                        >
+                          <img src={v.thumbnailUrl || v.fileUrl || fileUrl || ''} alt={`Miniatura da versão ${vNum}`} />
+                          <span><b>{vNum}</b><small>{isSelected ? 'Atual' : `v${vNum}`}</small></span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="file-review-rail-list">
+                {sortedVersions.map((v) => {
+                  const vNum = parseVersionNum(v.version);
+                  const isSelected = v.id === currentDelivery.id;
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      className={isSelected ? 'active' : ''}
+                      onClick={() => setCurrentDelivery(v)}
+                      title={`Versão ${vNum}`}
+                    >
+                      <img src={v.thumbnailUrl || v.fileUrl || fileUrl || ''} alt={`Miniatura da versão ${vNum}`} />
+                      <span><b>{vNum}</b><small>{isSelected ? 'Atual' : `v${vNum}`}</small></span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </aside>
+        )}
 
         <main ref={artStageRef} className={`file-review-art-stage${railVisible ? '' : ' is-expanded'} is-${effectiveTool}${isPanning ? ' is-panning' : ''}`}>
           <div

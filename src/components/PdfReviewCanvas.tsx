@@ -4,18 +4,81 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
+export type { PDFDocumentProxy };
+
 export interface PdfTextSelection {
   text: string;
   point: { x: number; y: number };
   rect: { x: number; y: number; width: number; height: number };
 }
 
+export const PdfPageThumb: React.FC<{
+  pdfDoc: PDFDocumentProxy | null;
+  pageNum: number;
+  isSelected?: boolean;
+}> = ({ pdfDoc, pageNum }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!pdfDoc || !canvasRef.current) return;
+    let active = true;
+
+    pdfDoc.getPage(pageNum).then((page) => {
+      if (!active || !canvasRef.current) return;
+      const vp = page.getViewport({ scale: 1 });
+      const targetWidth = 125;
+      const scale = targetWidth / vp.width;
+      const thumbViewport = page.getViewport({ scale });
+      const canvas = canvasRef.current;
+      canvas.width = Math.floor(thumbViewport.width);
+      canvas.height = Math.floor(thumbViewport.height);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      page.render({
+        canvas,
+        canvasContext: ctx,
+        viewport: thumbViewport,
+      }).promise.then(() => {
+        if (active) setLoaded(true);
+      }).catch(() => {});
+    }).catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, [pdfDoc, pageNum]);
+
+  return (
+    <div className="file-review-rail-thumb-wrap">
+      <canvas
+        ref={canvasRef}
+        style={{
+          display: loaded ? 'block' : 'none',
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          borderRadius: 5,
+        }}
+      />
+      {!loaded && (
+        <div className="file-review-rail-thumb-placeholder">
+          <span>{pageNum}</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface PdfReviewCanvasProps {
   url: string;
   altName: string;
   currentPage?: number;
+  zoom?: number;
   onDimensions?: (dim: { width: number; height: number }) => void;
   onNumPages?: (numPages: number) => void;
+  onDocLoaded?: (doc: PDFDocumentProxy) => void;
   onTextSelect?: (sel: PdfTextSelection | null) => void;
 }
 
@@ -23,8 +86,10 @@ export const PdfReviewCanvas: React.FC<PdfReviewCanvasProps> = ({
   url,
   altName,
   currentPage = 1,
+  zoom = 100,
   onDimensions,
   onNumPages,
+  onDocLoaded,
   onTextSelect,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -47,6 +112,7 @@ export const PdfReviewCanvas: React.FC<PdfReviewCanvasProps> = ({
         setPdfDoc(doc);
         setLoading(false);
         if (onNumPages) onNumPages(doc.numPages);
+        if (onDocLoaded) onDocLoaded(doc);
       })
       .catch((err) => {
         if (!active) return;
@@ -72,17 +138,16 @@ export const PdfReviewCanvas: React.FC<PdfReviewCanvasProps> = ({
         if (!active || !canvasRef.current) return;
 
         const baseViewport = page.getViewport({ scale: 1 });
-        const scale = Math.min(1, 2000 / Math.max(baseViewport.width, baseViewport.height));
-        const displayWidth = Math.round(baseViewport.width * scale);
-        const displayHeight = Math.round(baseViewport.height * scale);
+        const baseWidth = Math.round(baseViewport.width);
+        const baseHeight = Math.round(baseViewport.height);
 
         if (onDimensions) {
-          onDimensions({ width: displayWidth, height: displayHeight });
+          onDimensions({ width: baseWidth, height: baseHeight });
         }
 
         const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-        const renderViewport = page.getViewport({ scale: scale * pixelRatio });
-        const textViewport = page.getViewport({ scale });
+        const renderViewport = page.getViewport({ scale: Math.max(1, pixelRatio * 1.5) });
+        const textViewport = page.getViewport({ scale: 1 });
 
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
@@ -90,19 +155,18 @@ export const PdfReviewCanvas: React.FC<PdfReviewCanvasProps> = ({
 
         canvas.width = Math.floor(renderViewport.width);
         canvas.height = Math.floor(renderViewport.height);
-        canvas.style.width = `${displayWidth}px`;
-        canvas.style.height = `${displayHeight}px`;
 
         renderTask = page.render({
-          canvas, canvasContext: ctx,
+          canvas,
+          canvasContext: ctx,
           viewport: renderViewport,
         });
         await renderTask.promise;
 
         if (textLayerRef.current && active) {
           textLayerRef.current.innerHTML = '';
-          textLayerRef.current.style.width = `${displayWidth}px`;
-          textLayerRef.current.style.height = `${displayHeight}px`;
+          textLayerRef.current.style.width = `${baseWidth}px`;
+          textLayerRef.current.style.height = `${baseHeight}px`;
           const textContent = await page.getTextContent();
           const layer = new TextLayer({
             textContentSource: textContent,
@@ -157,7 +221,7 @@ export const PdfReviewCanvas: React.FC<PdfReviewCanvasProps> = ({
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 380, color: '#8e8e93' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 380, color: '#8e8e93', width: '100%', height: '100%' }}>
         <p style={{ margin: 0, fontSize: 13 }}>Carregando visualização interativa do PDF...</p>
       </div>
     );
@@ -165,9 +229,9 @@ export const PdfReviewCanvas: React.FC<PdfReviewCanvasProps> = ({
 
   if (error) {
     return (
-      <div style={{ padding: 24, textAlign: 'center', color: '#ff453a' }}>
+      <div style={{ padding: 24, textAlign: 'center', color: '#ff453a', width: '100%' }}>
         <p>{error}</p>
-        {url && <a href={url} target="_blank" rel="noreferrer" style={{ color: '#fff', textDecoration: 'underline', fontSize: 12 }}>Baixar PDF original</a>}
+        {url && <a href={url} target="_blank" rel="noreferrer" style={{ color: '#004c46', textDecoration: 'underline', fontSize: 12, fontWeight: 700 }}>Baixar PDF original</a>}
       </div>
     );
   }
@@ -176,17 +240,41 @@ export const PdfReviewCanvas: React.FC<PdfReviewCanvasProps> = ({
     <div
       ref={containerRef}
       onMouseUp={handleMouseUp}
-      style={{ position: 'relative', display: 'inline-block', userSelect: 'text' }}
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        userSelect: 'text',
+        overflow: 'hidden',
+        borderRadius: 5,
+        background: '#fff',
+        boxShadow: '0 10px 30px rgba(13,30,29,.12)',
+      }}
     >
       <canvas
         ref={canvasRef}
         aria-label={`PDF ${altName}`}
-        style={{ display: 'block', borderRadius: 8, pointerEvents: 'none' }}
+        style={{
+          display: 'block',
+          width: '100%',
+          height: '100%',
+          borderRadius: 5,
+          pointerEvents: 'none',
+          objectFit: 'contain',
+        }}
       />
       <div
         ref={textLayerRef}
         className="textLayer"
-        style={{ position: 'absolute', inset: 0, pointerEvents: 'auto', userSelect: 'text' }}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          transform: `scale(${zoom / 100})`,
+          transformOrigin: 'top left',
+          pointerEvents: 'auto',
+          userSelect: 'text',
+        }}
       />
       <style>{`
         .textLayer {
