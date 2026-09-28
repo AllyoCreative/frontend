@@ -2296,3 +2296,5 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 
 .file-review-annotation-layer :is(polyline, line, rect) { vector-effect: non-scaling-stroke; }
 .file-review-art-stage:is(.is-draw, .is-arrow, .is-rectangle, .is-pan) .textLayer { pointer-events: none !important; user-select: none !important; }
+
+.file-review-comment-page-badge { display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 4px; background: #eef2ee; color: #004c46; font-size: 10px; font-weight: 700; letter-spacing: .02em; }
