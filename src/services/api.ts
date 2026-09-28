@@ -124,6 +124,7 @@ export interface ReviewCommentItem {
   time: string
   resolved: boolean
   version: number
+  page?: number
   point?: { x: number; y: number }
   annotationId?: number
 }
@@ -463,7 +464,7 @@ export const api = {
     }>(`/designs/${designId}/review`)
   },
 
-  async addComment(designId: number, data: { text: string; version: number; point?: { x: number; y: number }; annotationId?: number }) {
+  async addComment(designId: number, data: { text: string; version: number; page?: number; point?: { x: number; y: number }; annotationId?: number }) {
     return request<ReviewCommentItem>(`/designs/${designId}/comments`, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -477,7 +478,7 @@ export const api = {
     })
   },
 
-  async addAnnotation(designId: number, data: { type: 'draw' | 'arrow' | 'rectangle' | 'text'; version: number; color: string; width: number; payload: Record<string, unknown> }) {
+  async addAnnotation(designId: number, data: { type: 'draw' | 'arrow' | 'rectangle' | 'text'; version: number; page?: number; color: string; width: number; payload: Record<string, unknown> }) {
     return request<Record<string, unknown> & { id: number }>(`/designs/${designId}/annotations`, {
       method: 'POST',
       body: JSON.stringify(data),

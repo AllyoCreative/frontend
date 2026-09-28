@@ -188,6 +188,7 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
   const [zoom, setZoom] = useState(supportsCanvas ? 50 : 100)
   const [pdfPage, setPdfPage] = useState(1)
   const [pdfNumPages, setPdfNumPages] = useState(1)
+  const hasRail = supportsCanvas && kind === 'pdf' && pdfNumPages > 1
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null)
   const hasInitialZoomFittedRef = useRef(false)
   const [filter, setFilter] = useState<'all' | 'open' | 'resolved'>('all')
@@ -248,6 +249,10 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
     if (filter === 'resolved') return comment.resolved
     return true
   }), [activeVersion, comments, filter])
+  const allVersionPointedComments = useMemo(() => comments
+    .filter((comment) => comment.version === activeVersion && comment.point)
+    .sort((left, right) => left.id - right.id), [activeVersion, comments])
+
   const pointedComments = useMemo(() => comments
     .filter((comment) => {
       if (comment.version !== activeVersion || !comment.point) return false
@@ -255,7 +260,11 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
       return true
     })
     .sort((left, right) => left.id - right.id), [activeVersion, comments, kind, pdfPage])
-  const markerNumber = (commentId: number) => pointedComments.findIndex((comment) => comment.id === commentId) + 1
+
+  const markerNumber = (commentId: number) => {
+    const idx = allVersionPointedComments.findIndex((comment) => comment.id === commentId)
+    return idx >= 0 ? idx + 1 : 0
+  }
 
   const selectComment = (comment: ReviewComment) => {
     if (kind === 'pdf' && comment.page && comment.page !== pdfPage) {
@@ -508,9 +517,10 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
   }
 
   const annotationPayload = (annotation: ReviewAnnotation | DraftAnnotation): Record<string, unknown> => {
-    if (annotation.type === 'draw') return { points: annotation.points }
-    if (annotation.type === 'text') return { point: annotation.point, text: annotation.text }
-    return { start: annotation.start, end: annotation.end }
+    const page = annotation.page ?? (kind === 'pdf' ? pdfPage : 1)
+    if (annotation.type === 'draw') return { points: annotation.points, page }
+    if (annotation.type === 'text') return { point: annotation.point, text: annotation.text, page }
+    return { start: annotation.start, end: annotation.end, page }
   }
 
   const persistAnnotation = async (annotation: ReviewAnnotation | DraftAnnotation) => {
@@ -519,6 +529,7 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
       const saved = await api.addAnnotation(currentDelivery.id, {
         type: annotation.type,
         version: annotation.version,
+        page: annotation.page ?? (kind === 'pdf' ? pdfPage : 1),
         color: annotation.color,
         width: 'width' in annotation ? annotation.width : 3,
         payload: annotationPayload(annotation),
@@ -565,6 +576,7 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
       const created = await api.addComment(currentDelivery.id, {
         text: fullText,
         version: activeVersion,
+        page: kind === 'pdf' ? pdfPage : 1,
         point: pendingPoint ?? undefined,
         annotationId: pendingAnnotationId ?? undefined,
       })
@@ -745,7 +757,7 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
           </div>
           <div className="file-review-controls">
             <div className="file-review-view-controls">
-              {supportsCanvas && <><button type="button" className={railVisible ? 'active' : ''} onClick={() => setRailVisible((value) => !value)} aria-label="Alternar miniatura" title="Miniatura"><img src={figmaAsset('design_review.imgPhSidebarBold')} alt="" /></button>
+              {hasRail && <><button type="button" className={railVisible ? 'active' : ''} onClick={() => setRailVisible((value) => !value)} aria-label="Alternar miniatura" title="Miniatura"><img src={figmaAsset('design_review.imgPhSidebarBold')} alt="" /></button>
               <button type="button" className={effectiveTool === 'pan' ? 'active' : ''} onClick={() => chooseTool('pan')} aria-pressed={effectiveTool === 'pan'} aria-label="Mover arquivo" title="Mover arquivo"><Hand size={20} /></button>
               <label className="file-review-select file-review-zoom">
                 <select
@@ -854,53 +866,32 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
           </div>
         </header>
 
-        {supportsCanvas && (
+        {hasRail && (
           <aside className={`file-review-rail${railVisible ? '' : ' is-hidden'}`} aria-label="Navegação de páginas">
-            {kind === 'pdf' && pdfNumPages > 1 ? (
-              <div className="file-review-rail-list">
-                {Array.from({ length: pdfNumPages }, (_, i) => i + 1).map((pageNum) => {
-                  const isSelected = pageNum === pdfPage;
-                  return (
-                    <button
-                      key={pageNum}
-                      type="button"
-                      className={`file-review-rail-page ${isSelected ? 'active' : ''}`}
-                      onClick={() => setPdfPage(pageNum)}
-                      title={`Página ${pageNum}`}
-                    >
-                      <PdfPageThumb pdfDoc={pdfDoc} pageNum={pageNum} />
-                      <span>
-                        <b>{pageNum}</b>
-                        <small>{isSelected ? 'Atual' : `Pág. ${pageNum}`}</small>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : kind !== 'pdf' && sortedVersions.length > 1 ? (
-              <div className="file-review-rail-list">
-                {sortedVersions.map((v) => {
-                  const vNum = parseVersionNum(v.version);
-                  const isSelected = v.id === currentDelivery.id;
-                  return (
-                    <button
-                      key={v.id}
-                      type="button"
-                      className={isSelected ? 'active' : ''}
-                      onClick={() => setCurrentDelivery(v)}
-                      title={`Versão ${vNum}`}
-                    >
-                      <img src={v.thumbnailUrl || v.fileUrl || fileUrl || ''} alt={`Miniatura da versão ${vNum}`} />
-                      <span><b>{vNum}</b><small>{isSelected ? 'Atual' : `v${vNum}`}</small></span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
+            <div className="file-review-rail-list">
+              {Array.from({ length: pdfNumPages }, (_, i) => i + 1).map((pageNum) => {
+                const isSelected = pageNum === pdfPage;
+                return (
+                  <button
+                    key={pageNum}
+                    type="button"
+                    className={`file-review-rail-page ${isSelected ? 'active' : ''}`}
+                    onClick={() => setPdfPage(pageNum)}
+                    title={`Página ${pageNum}`}
+                  >
+                    <PdfPageThumb pdfDoc={pdfDoc} pageNum={pageNum} />
+                    <span>
+                      <b>{pageNum}</b>
+                      <small>{isSelected ? 'Atual' : `Pág. ${pageNum}`}</small>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </aside>
         )}
 
-        <main ref={artStageRef} className={`file-review-art-stage${railVisible ? '' : ' is-expanded'} is-${effectiveTool}${isPanning ? ' is-panning' : ''}`}>
+        <main ref={artStageRef} className={`file-review-art-stage${hasRail && railVisible ? '' : ' is-expanded'} is-${effectiveTool}${isPanning ? ' is-panning' : ''}`}>
           <div
             className={`file-review-art file-review-art--v${activeVersion}${artReady ? ' is-ready' : ' is-transitioning'}`}
             ref={artRef}
@@ -975,7 +966,7 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
                 </button>
               </div>
             )}
-            {supportsCanvas && !projectCompleted && pendingPoint && <span className="file-review-pin is-pending" style={{ left: `${pendingPoint.x}%`, top: `${pendingPoint.y}%` }}><span>{pointedComments.length + 1}</span></span>}
+            {supportsCanvas && !projectCompleted && pendingPoint && <span className="file-review-pin is-pending" style={{ left: `${pendingPoint.x}%`, top: `${pendingPoint.y}%` }}><span>{allVersionPointedComments.length + 1}</span></span>}
 
             {!projectCompleted && pendingPoint && <form className={`file-review-inline-comment${pendingPoint.x > 62 ? ' is-left' : ''}`} style={{ left: `${pendingPoint.x}%`, top: `${Math.min(78, Math.max(12, pendingPoint.y))}%` }} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()} onSubmit={addComment}>
               <header><strong>Comentário neste ponto</strong><button type="button" onClick={() => { setPendingPoint(null); setSelectedSnippet(null); }} aria-label="Cancelar comentário pontual"><X size={18} /></button></header>
@@ -1011,7 +1002,7 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
                   id={`review-comment-${comment.id}`}
                   className={`${comment.resolved ? 'is-resolved ' : ''}${selectedCommentId === comment.id ? 'is-selected ' : ''}${isHovered ? 'is-hovered' : ''}`}
                   key={comment.id}
-                  onClick={() => setSelectedCommentId(comment.id)}
+                  onClick={() => selectComment(comment)}
                   onMouseEnter={() => setHoveredCommentId(comment.id)}
                   onMouseLeave={() => setHoveredCommentId(null)}
                 >
@@ -1029,7 +1020,15 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
                     )}
                   </header>
                   <time>{comment.time}</time>
-                  {(comment.point || annotation) && <span className="file-review-comment-kind">{comment.point ? `Marcação ${number}` : annotationLabel(annotation)}</span>}
+                  {(comment.point || annotation || (kind === 'pdf' && comment.page)) && (
+                    <span className="file-review-comment-kind">
+                      {comment.point
+                        ? `Marcação ${number}${kind === 'pdf' && comment.page ? ` · Pág. ${comment.page}` : ''}`
+                        : annotation
+                        ? `${annotationLabel(annotation)}${kind === 'pdf' && (comment.page || annotation?.page) ? ` · Pág. ${comment.page || annotation?.page}` : ''}`
+                        : `Pág. ${comment.page}`}
+                    </span>
+                  )}
                   {parsed.snippet && (
                     <div className="file-review-comment-snippet">
                       <span>“{parsed.snippet}”</span>

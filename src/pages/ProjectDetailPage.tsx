@@ -26,6 +26,21 @@ interface ProjectTimelineEvent {
   completed?: boolean
 }
 
+
+const getBaseMaterialName = (rawName?: string | null): string => {
+  if (!rawName) return ''
+  let name = cleanDecodedText(rawName).toLowerCase().trim()
+  const dotIndex = name.lastIndexOf('.')
+  const ext = dotIndex > 0 ? name.slice(dotIndex) : ''
+  const stem = dotIndex > 0 ? name.slice(0, dotIndex) : name
+  const cleanStem = stem
+    .replace(/[\s\-_]+(?:\d+\s*[\-_]\s*)*v?(ers[aã]o)?\s*\d+$/i, '')
+    .replace(/\s*[\(\[]v?\d+[\)\]]$/i, '')
+    .replace(/[\s\-_]+v?\d+$/i, '')
+    .trim()
+  return cleanStem + ext
+}
+
 const cleanDecodedText = (text?: string | null): string => {
   if (!text) return ''
   try {
@@ -219,7 +234,8 @@ export function ProjectDetailPage() {
   const groupedDesigns = useMemo(() => {
     const groups: Record<string, DesignSummary[]> = {}
     for (const design of designList) {
-      const key = design.taskId ? `task-${design.taskId}` : `name-${cleanDecodedText(design.name).toLowerCase().trim()}`
+      const baseMaterial = getBaseMaterialName(design.name) || cleanDecodedText(design.name).toLowerCase().trim()
+      const key = design.taskId ? `task-${design.taskId}-${baseMaterial}` : `name-${baseMaterial}`
       if (!groups[key]) groups[key] = []
       groups[key].push(design)
     }
@@ -652,9 +668,11 @@ export function ProjectDetailPage() {
       {reviewing !== null && (() => {
         const targetDelivery = designList.find((item) => item.id === reviewing)
         if (!targetDelivery) return null
-        const targetKey = targetDelivery.taskId ? `task-${targetDelivery.taskId}` : `name-${cleanDecodedText(targetDelivery.name).toLowerCase().trim()}`
+        const targetBase = getBaseMaterialName(targetDelivery.name) || cleanDecodedText(targetDelivery.name).toLowerCase().trim()
+        const targetKey = targetDelivery.taskId ? `task-${targetDelivery.taskId}-${targetBase}` : `name-${targetBase}`
         const siblingVersions = designList.filter((item) => {
-          const itemKey = item.taskId ? `task-${item.taskId}` : `name-${cleanDecodedText(item.name).toLowerCase().trim()}`
+          const itemBase = getBaseMaterialName(item.name) || cleanDecodedText(item.name).toLowerCase().trim()
+          const itemKey = item.taskId ? `task-${item.taskId}-${itemBase}` : `name-${itemBase}`
           return itemKey === targetKey
         }).sort((a, b) => {
           return parseVersionNum(b.version) - parseVersionNum(a.version) || b.id - a.id
