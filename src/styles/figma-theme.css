@@ -2293,3 +2293,6 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
   .new-project-flow-footer .secondary-button { font-size: 0; flex: 0 0 44px; }
   .new-project-flow-footer .secondary-button svg { width: 17px; }
 }
+
+.file-review-annotation-layer :is(polyline, line, rect) { vector-effect: non-scaling-stroke; }
+.file-review-art-stage:is(.is-draw, .is-arrow, .is-rectangle, .is-pan) .textLayer { pointer-events: none !important; user-select: none !important; }
