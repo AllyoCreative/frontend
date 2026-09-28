@@ -583,7 +583,7 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 /* Project list */
 .projects-page { min-height: 830px; padding: 28px 20px 80px; }
 .projects-screen { width: min(1240px, 100%); display: grid; grid-template-columns: minmax(0, 1fr) 354px; align-items: start; gap: 24px; margin: 0 auto; }
-.projects-screen__main { min-width: 0; }
+.projects-screen__main { width: 100%; min-width: 0; max-width: 100%; }
 .projects-topbar { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .projects-title-tabs, .projects-view-tabs, .projects-display-controls, .projects-display-by { display: flex; align-items: center; }
 .projects-title-tabs { gap: 24px; }
@@ -609,7 +609,7 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .projects-search-control:focus-within { width: 220px; background: #fff; }
 .projects-search-control:focus-within > img { z-index: 1; inset: 0 10px 0 auto; margin-block: auto; }
 .projects-search-control:focus-within input { width: 100%; height: 40px; padding: 0 38px 0 14px; background: #fff; opacity: 1; }
-.projects-filterbar { min-height: 40px; display: flex; align-items: center; gap: 7px; margin-top: 20px; overflow: visible; }
+.projects-filterbar { width: 100%; min-height: 40px; display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 20px; overflow: visible; }
 .projects-filter-chip { min-height: 36px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 14px; border: 0; border-radius: 100px; background: #e7e9e7; color: #0d1e1d; font-size: 12px; font-weight: 650; line-height: 18px; white-space: nowrap; transition: background-color .16s ease, color .16s ease, transform .16s ease; }
 .projects-filter-chip:hover { background: #dce1dd; }.projects-filter-chip:active { transform: scale(.97); }
 .projects-filter-chip img { width: 16px; height: 14px; transform: rotate(90deg); }
@@ -627,14 +627,18 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .projects-groups { display: grid; gap: 40px; margin-top: 32px; }
 .projects-group__heading { min-height: 40px; display: flex; align-items: center; gap: 7px; padding: 0 8px; border: 0; border-radius: 7px; background: transparent; color: #131f15; font-size: 16px; font-weight: 650; line-height: 22px; transition: background-color .16s ease; }
 .projects-group__heading:hover { background: #e8ece7; }
+.projects-group__heading > span { display: flex; align-items: center; gap: 8px; }
+.projects-group__heading small { min-width: 22px; height: 22px; display: grid; place-items: center; padding-inline: 6px; border-radius: 999px; background: #e4e9e5; color: #5f6b64; font-size: 10px; }
 .projects-group__heading img { width: 17px; height: 15px; transform: rotate(90deg); }
-.projects-group__rows { margin-top: 12px; }
+.projects-group.is-collapsed .projects-group__heading img { transform: rotate(0deg); }
+.projects-group__rows { display: grid; gap: 12px; margin-top: 12px; }
+.projects-project-stack { min-width: 0; overflow: hidden; border-radius: 6px; }
 .projects-figma-row {
   width: 100%;
   min-height: 72px;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(210px,1fr) minmax(260px,auto) 250px;
   align-items: center;
-  justify-content: space-between;
   gap: 18px;
   padding: 10px 12px 10px 16px;
   border: 0;
@@ -643,21 +647,26 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
   text-align: left;
   transition: background-color .16s ease, transform .16s ease;
 }
-.projects-figma-row.project-card { min-width: 0; overflow: hidden; border: 0; border-radius: 5px 5px 0 0; background: #fff; box-shadow: none; transform: none; }
+.projects-figma-row.project-card { position: relative; min-width: 0; overflow: hidden; border: 0; border-radius: 5px 5px 0 0; background: #fff; box-shadow: none; transform: none; cursor: pointer; }
+.projects-project-open { position: absolute; z-index: 1; inset: 0; width: 100%; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.projects-figma-row--project > span { position: relative; z-index: 2; pointer-events: none; }
 .projects-figma-row.project-card:hover, .projects-figma-row--task:hover { border-color: transparent; background: #fafbf9; box-shadow: none; transform: translateY(-1px); }
 .projects-figma-row--task { border-top: 1px solid #d6d9d6; }
 .projects-figma-row--task:last-child { border-radius: 0 0 5px 5px; }
 .projects-figma-row--task.is-separated { margin-top: 5px; border-top: 0; border-radius: 5px; }
-.projects-row-name { width: 260px; flex: none; display: grid; gap: 7px; }
+.projects-row-name { min-width: 0; display: grid; gap: 7px; }
 .projects-row-name strong, .projects-row-name h3 { overflow: hidden; margin: 0; font-size: 14px; font-weight: 650; line-height: 20px; white-space: nowrap; text-overflow: ellipsis; }
 .projects-row-name > small { display: flex; align-items: center; gap: 6px; color: #68726c; font-size: 11px; font-weight: 450; line-height: 16px; }
 .projects-row-name > small i { width: 11px; height: 11px; flex: none; border-radius: 2px; background: #25ce98; }
 .projects-row-name--project { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .projects-row-name--project img:first-child { width: 17px; height: 14px; flex: none; }
-.projects-row-name--project img:nth-child(2) { width: 13px; height: 12px; flex: none; }
+.projects-favorite { position: relative; z-index: 3; width: 30px; height: 30px; display: grid; place-items: center; flex: none; padding: 0; border: 0; border-radius: 7px; background: transparent; color: #9aa29d; pointer-events: auto; }
+.projects-favorite:hover { background: #fff7d8; color: #e6a700; }
+.projects-favorite.is-favorite { color: #f4b400; }
+.projects-favorite:disabled { opacity: .55; cursor: wait; }
 .projects-row-name--project h3 { min-width: 0; flex: 1; }
 .projects-row-name--project > small { color: #68726c; font-size: 12px; font-weight: 600; line-height: 16px; }
-.projects-row-meta { flex: none; display: flex; align-items: center; gap: 24px; }
+.projects-row-meta { min-width: 0; display: grid; grid-template-columns: minmax(120px,1fr) auto; align-items: center; justify-self: end; gap: 18px; }
 .projects-row-meta > small { color: #68726c; font-size: 12px; font-weight: 450; line-height: 16px; white-space: nowrap; }
 .projects-row-meta > b { min-height: 28px; display: inline-flex; align-items: center; padding: 5px 10px; border-radius: 100px; font-size: 12px; font-weight: 650; line-height: 18px; white-space: nowrap; }
 .projects-row-meta .is-done { background: #25ce98; color: #004c46; }
@@ -675,10 +684,10 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .projects-empty-state h2 { margin: 0; font-size: 20px; }
 .projects-empty-state p { margin: 8px 0 0; color: #68726c; font-size: 13px; }
 
-.projects-calendar { margin-top: 28px; overflow-x: auto; border: 1px solid #d8dcd5; border-radius: 12px; background: #fff; box-shadow: 0 10px 28px rgba(13,30,29,.035); scrollbar-width: thin; }
+.projects-calendar { width: 100%; max-width: 100%; margin-top: 28px; overflow-x: auto; border: 1px solid #d8dcd5; border-radius: 12px; background: #fff; box-shadow: 0 10px 28px rgba(13,30,29,.035); scrollbar-width: thin; }
 .projects-calendar__header { min-width: 820px; min-height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 12px 16px; border-bottom: 1px solid #d8dcd5; }
 .projects-calendar__navigation { display: flex; align-items: center; gap: 6px; }
-.projects-calendar__navigation h2 { min-width: 205px; margin: 0; color: #131f15; font-size: 20px; font-weight: 650; line-height: 28px; text-transform: capitalize; }
+.projects-calendar__navigation h2 { min-width: 205px; margin: 0; color: #131f15; font-size: 20px; font-weight: 650; line-height: 28px; }
 .projects-calendar__navigation button { width: 40px; height: 40px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #4d5851; transition: background-color .16s ease, transform .16s ease; }
 .projects-calendar__navigation button:hover { background: #edf0ed; }.projects-calendar__navigation button:active { transform: scale(.96); }
 .projects-calendar__navigation .projects-calendar__today { width: auto; min-width: 68px; margin-left: 6px; padding-inline: 13px; background: #f1f3f1; color: #131f15; font-size: 13px; font-weight: 650; }
@@ -701,6 +710,7 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .projects-calendar__day.is-today { background: #fafcf9; }
 .projects-calendar__day.is-today > time { background: #004c46; color: #fff; }
 .projects-calendar__events { display: grid; gap: 5px; margin-top: 5px; }
+.projects-calendar__event-placeholder { min-height: 30px; }
 .projects-calendar__event { min-width: 0; min-height: 36px; display: grid; grid-template-columns: 5px minmax(0,1fr) auto; align-items: center; gap: 7px; padding: 5px 7px; overflow: hidden; border: 1px solid #e1e5e1; border-radius: 7px; background: #fff; color: #131f15; text-align: left; box-shadow: 0 2px 7px rgba(13,30,29,.07); transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease; }
 .projects-calendar__event:hover { border-color: #afb8b1; box-shadow: 0 5px 12px rgba(13,30,29,.11); transform: translateY(-1px); }
 .projects-calendar__event > i { width: 5px; height: 22px; border-radius: 99px; background: var(--project-accent,#d0f08e); }
@@ -709,6 +719,13 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .projects-calendar__event.is-em-revisao { border-color: #efd7a5; background: #fffaf0; }
 .projects-calendar__event.is-concluido { opacity: .68; }
 .projects-calendar__event.is-rascunho { border-style: dashed; box-shadow: none; }
+.projects-calendar__event--range { width: calc(100% + 16px); min-height: 30px; grid-template-columns: minmax(0,1fr) auto; gap: 6px; margin-inline: -8px; padding: 5px 9px; border: 0; border-radius: 0; background: var(--project-accent,#d0f08e); box-shadow: none; }
+.projects-calendar__event--range:hover { border-color: transparent; box-shadow: inset 0 0 0 2px rgba(0,76,70,.28); transform: none; }
+.projects-calendar__event--range.is-range-start { width: calc(100% + 8px); margin-left: 0; border-radius: 7px 0 0 7px; }
+.projects-calendar__event--range.is-range-end { width: calc(100% + 8px); margin-right: 0; border-radius: 0 7px 7px 0; }
+.projects-calendar__event--range.is-range-single { width: 100%; margin-inline: 0; border-radius: 7px; }
+.projects-calendar__event--range > span { overflow: hidden; font-size: 10px; font-weight: 750; line-height: 15px; white-space: nowrap; text-overflow: ellipsis; }
+.projects-calendar__event--range > time { font-size: 9px; font-weight: 750; line-height: 15px; white-space: nowrap; }
 .projects-calendar__unscheduled { min-width: 820px; display: grid; grid-template-columns: 230px minmax(0,1fr); align-items: start; gap: 18px; padding: 16px; background: #f7f8f6; }
 .projects-calendar__unscheduled > div:first-child { display: grid; gap: 3px; padding-top: 8px; }
 .projects-calendar__unscheduled strong { font-size: 13px; line-height: 18px; }.projects-calendar__unscheduled > div:first-child span { color: #727c75; font-size: 10px; line-height: 15px; }
@@ -1513,6 +1530,7 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
   .projects-allocation-panel, .projects-allocation-panel .home-allocation-card { width: 100%; }
   .projects-allocation-panel .home-allocation-progress { width: 100%; }
   .projects-delivery, .projects-delivery-spacer { display: none; }
+  .projects-figma-row { grid-template-columns: minmax(180px,1fr) minmax(235px,auto); }
 }
 
 @media (max-width: 1180px) {

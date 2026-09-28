@@ -1,19 +1,11 @@
-import { useMemo, useState, type CSSProperties } from 'react'
+import { useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CalendarDays, ChevronLeft, ChevronRight, List } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, List, Star } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
-import type { Project, ProjectStatus } from '../types'
+import type { Project, ProjectStatus, ProjectTask } from '../types'
 
 type AssetName = Parameters<typeof figmaAsset>[0]
-
-interface ProjectTask {
-  title?: string
-  team?: string
-  deadlineDays?: number
-  status: 'Concluído' | 'Em andamento'
-  delivery?: 'Aprovado' | 'Aguardando aprovação'
-}
 
 type ProjectsView = 'list' | 'calendar'
 
@@ -38,13 +30,34 @@ function startOfDay(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate())
 }
 
-function deadlineDate(deadline: string, today: Date): Date | null {
-  if (deadline.toLocaleLowerCase('pt-BR') === 'hoje') return startOfDay(today)
-  const match = deadline.trim().toLocaleLowerCase('pt-BR').match(/^(\d{1,2})\s+([a-zç]{3})$/)
+function parseDate(value: string | null | undefined, today = new Date()): Date | null {
+  if (!value || value === 'A definir') return null
+  if (value.toLocaleLowerCase('pt-BR') === 'hoje') return startOfDay(today)
+  const dateOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (dateOnly) return new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+  const parsed = new Date(value)
+  if (!Number.isNaN(parsed.getTime())) return parsed
+  const match = value.trim().toLocaleLowerCase('pt-BR').match(/^(\d{1,2})\s+([a-zç]{3})$/)
   if (!match) return null
   const month = monthNumbers[match[2]]
   if (month === undefined) return null
   return new Date(today.getFullYear(), month, Number(match[1]))
+}
+
+function formatDeadline(value: string | null | undefined, today = new Date()) {
+  const date = parseDate(value, today)
+  if (!date) return 'Sem prazo definido'
+  const sameDay = dateKey(date) === dateKey(today)
+  const dateLabel = sameDay ? 'Hoje' : new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(date).replace('.', '')
+  const hasTime = Boolean(value?.includes('T'))
+  return hasTime ? `${dateLabel}, ${new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(date)}` : dateLabel
+}
+
+function effectiveStatus(project: Project): ProjectStatus {
+  const tasks = project.tasksList || []
+  if (tasks.length > 0 && tasks.every((task) => task.status === 'Concluído')) return 'Concluído'
+  if (project.status === 'Concluído' && tasks.length > 0) return tasks.some((task) => task.status === 'Em revisão') ? 'Em revisão' : 'Em andamento'
+  return project.status
 }
 
 function dateKey(date: Date) {
@@ -121,28 +134,43 @@ function DeliveryCard({ state }: { state: 'Aprovado' | 'Aguardando aprovação' 
   )
 }
 
-function ProjectStatusBadge({ status }: { status: ProjectStatus | 'Concluído' | 'Em andamento' }) {
+function ProjectStatusBadge({ status }: { status: string }) {
   const isDone = status === 'Concluído'
   return <b className={isDone ? 'is-done' : 'is-progress'}>{status}</b>
 }
 
 function ProjectRow({ project }: { project: Project }) {
   const navigate = useNavigate()
+  const { toggleProjectFavorite } = useApp()
+  const [savingFavorite, setSavingFavorite] = useState(false)
+  const status = effectiveStatus(project)
+
+  const toggleFavorite = async (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    if (savingFavorite) return
+    setSavingFavorite(true)
+    try {
+      await toggleProjectFavorite(project.id)
+    } finally {
+      setSavingFavorite(false)
+    }
+  }
 
   return (
-    <button className="projects-figma-row projects-figma-row--project project-card" onClick={() => navigate(`/projetos/${project.id}`)}>
+    <article className="projects-figma-row projects-figma-row--project project-card">
+      <button type="button" className="projects-project-open" onClick={() => navigate(`/projetos/${project.id}`)} aria-label={`Abrir projeto ${project.name}`} />
       <span className="projects-row-name projects-row-name--project">
         <FigmaIcon asset="projects.imgVector11" />
-        <FigmaIcon asset="projects.imgVector12" />
+        <button type="button" className={`projects-favorite${project.favorite ? ' is-favorite' : ''}`} disabled={savingFavorite} onClick={(event) => void toggleFavorite(event)} aria-label={project.favorite ? `Remover ${project.name} dos favoritos` : `Adicionar ${project.name} aos favoritos`} aria-pressed={Boolean(project.favorite)}><Star size={17} fill={project.favorite ? 'currentColor' : 'none'} /></button>
         <h3>{project.name}</h3>
-        <small>{project.tasks}</small>
+        <small>{project.tasksList?.length || project.tasks}</small>
       </span>
       <span className="projects-row-meta">
-        <small>{project.deadline === 'A definir' ? 'sem prazo definido' : `prazo ${project.deadline}`}</small>
-        <ProjectStatusBadge status={project.status} />
+        <small>Prazo: {formatDeadline(project.deadline)}</small>
+        <ProjectStatusBadge status={status} />
       </span>
       <span className="projects-delivery-spacer" />
-    </button>
+    </article>
   )
 }
 
@@ -159,7 +187,7 @@ function TaskRow({ project, task, separated = false }: { project: Project; task:
         <small><i /> {task.team || 'Sem equipe'}</small>
       </span>
       <span className="projects-row-meta">
-        <small>{task.deadlineDays !== undefined ? `prazo de ${task.deadlineDays} dia(s)` : 'sem prazo definido'}</small>
+        <small>{task.deadlineAt ? `Prazo: ${formatDeadline(task.deadlineAt)}` : task.deadlineDays !== undefined ? `Prazo estimado: ${task.deadlineDays} ${task.deadlineDays === 1 ? 'dia' : 'dias'}` : 'Sem prazo definido'}</small>
         <ProjectStatusBadge status={task.status} />
       </span>
       {task.delivery ? <DeliveryCard state={task.delivery} /> : <span className="projects-delivery-spacer" />}
@@ -167,21 +195,24 @@ function TaskRow({ project, task, separated = false }: { project: Project; task:
   )
 }
 
-function ProjectGroup({ title, project, tasks }: {
+function StatusGroup({ title, projects, collapsed, onToggle }: {
   title: string
-  project: Project
-  tasks: ProjectTask[]
+  projects: Project[]
+  collapsed: boolean
+  onToggle: () => void
 }) {
   return (
-    <section className="projects-group">
-      <button className="projects-group__heading">
-        {title}
+    <section className={`projects-group${collapsed ? ' is-collapsed' : ''}`}>
+      <button className="projects-group__heading" type="button" onClick={onToggle} aria-expanded={!collapsed}>
+        <span>{title}<small>{projects.length}</small></span>
         <FigmaIcon asset="projects.imgWeuiArrowOutlined1" />
       </button>
-      <div className="projects-group__rows">
-        <ProjectRow project={project} />
-        {tasks.map((task, index) => <TaskRow key={`${task.status}-${index}`} project={project} task={task} separated={index === 2} />)}
-      </div>
+      {!collapsed && <div className="projects-group__rows">
+        {projects.map((project) => <div className="projects-project-stack" key={project.id}>
+          <ProjectRow project={project} />
+          {(project.tasksList || []).map((task) => <TaskRow key={task.id} project={project} task={task} />)}
+        </div>)}
+      </div>}
     </section>
   )
 }
@@ -224,14 +255,20 @@ function ProjectsCalendar({ projects, cursor, showWeekends, onCursorChange, onSh
   const navigate = useNavigate()
   const today = useMemo(() => startOfDay(new Date()), [])
   const days = useMemo(() => monthCalendarDays(cursor), [cursor])
-  const datedProjects = useMemo(() => projects.flatMap((project) => {
-    const date = deadlineDate(project.deadline, today)
-    return date ? [{ project, date }] : []
-  }), [projects, today])
-  const unscheduledProjects = projects.filter((project) => !deadlineDate(project.deadline, today))
   const visibleDays = showWeekends ? days : days.filter((date) => date.getDay() !== 0 && date.getDay() !== 6)
   const visibleWeekDays = showWeekends ? weekDayNames : weekDayNames.slice(0, 5)
-  const monthLabel = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(cursor)
+  const taskEntries = useMemo(() => projects.flatMap((project) => (project.tasksList || [])
+    .filter((task) => task.status !== 'Inativa')
+    .map((task) => ({
+      project,
+      task,
+      start: parseDate(task.createdAt || project.createdAt, today),
+      end: parseDate(task.deadlineAt || project.deadline, today),
+    }))), [projects, today])
+  const scheduledTasks = taskEntries.filter((entry): entry is typeof entry & { start: Date; end: Date } => Boolean(entry.start && entry.end))
+  const unscheduledTasks = taskEntries.filter((entry) => !entry.start || !entry.end)
+  const rawMonthLabel = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(cursor)
+  const monthLabel = rawMonthLabel.charAt(0).toUpperCase() + rawMonthLabel.slice(1)
 
   const changeMonth = (amount: number) => {
     onCursorChange(new Date(cursor.getFullYear(), cursor.getMonth() + amount, 1))
@@ -255,37 +292,51 @@ function ProjectsCalendar({ projects, cursor, showWeekends, onCursorChange, onSh
 
       <div className={`projects-calendar__grid${showWeekends ? ' has-weekends' : ''}`} role="grid" aria-label={monthLabel}>
         {visibleWeekDays.map((day) => <div className="projects-calendar__weekday" role="columnheader" key={day}>{day}</div>)}
-        {visibleDays.map((date) => {
-          const events = datedProjects.filter((entry) => dateKey(entry.date) === dateKey(date))
+        {visibleDays.map((date, dayIndex) => {
+          const day = startOfDay(date)
+          const columnCount = showWeekends ? 7 : 5
+          const weekStart = Math.floor(dayIndex / columnCount) * columnCount
+          const weekDays = visibleDays.slice(weekStart, weekStart + columnCount)
+          const weekStartDate = startOfDay(weekDays[0])
+          const weekEndDate = startOfDay(weekDays[weekDays.length - 1])
+          const weekRanges = scheduledTasks.filter((entry) => startOfDay(entry.end) >= weekStartDate && startOfDay(entry.start) <= weekEndDate)
           const isToday = dateKey(date) === dateKey(today)
           const isOutsideMonth = date.getMonth() !== cursor.getMonth()
           return (
             <div className={`projects-calendar__day${isOutsideMonth ? ' is-outside' : ''}${isToday ? ' is-today' : ''}`} role="gridcell" aria-label={new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long' }).format(date)} key={dateKey(date)}>
               <time dateTime={`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`}>{date.getDate()}</time>
               <div className="projects-calendar__events">
-                {events.map(({ project }) => (
-                  <button
+                {weekRanges.map(({ project, task, start, end }) => {
+                  const activeOnDay = day >= startOfDay(start) && day <= startOfDay(end)
+                  if (!activeOnDay) return <span className="projects-calendar__event-placeholder" aria-hidden="true" key={task.id} />
+                  const startsHere = dateKey(start) === dateKey(day)
+                  const endsHere = dateKey(end) === dateKey(day)
+                  const visualStart = startsHere || dayIndex % columnCount === 0
+                  const visualEnd = endsHere || dayIndex % columnCount === columnCount - 1
+                  const beginsVisibleRange = visualStart
+                  const deadlineTime = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(end)
+                  return <button
                     type="button"
-                    className={`projects-calendar__event is-${project.status.toLowerCase().replaceAll(' ', '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '')}`}
+                    className={`projects-calendar__event projects-calendar__event--range${visualStart ? ' is-range-start' : ''}${visualEnd ? ' is-range-end' : ''}${visualStart && visualEnd ? ' is-range-single' : ''}${task.status === 'Concluído' ? ' is-concluido' : ''}`}
                     style={{ '--project-accent': project.accent } as CSSProperties}
                     onClick={() => navigate(`/projetos/${project.id}`)}
-                    title={`${project.name} — deadline ${project.deadline}`}
-                    key={project.id}
+                    title={`${task.title} · ${project.name} · prazo ${new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(end)}`}
+                    aria-label={`${task.title} · ${new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(day)}`}
+                    key={task.id}
                   >
-                    <i />
-                    <span>{project.name}</span>
-                    {project.unread > 0 && <b>{project.unread}</b>}
+                    <span>{beginsVisibleRange ? task.title : ''}</span>
+                    {endsHere && <time>{deadlineTime}</time>}
                   </button>
-                ))}
+                } )}
               </div>
             </div>
           )
         })}
       </div>
 
-      {unscheduledProjects.length > 0 && <div className="projects-calendar__unscheduled">
-        <div><strong>Sem data no calendário</strong><span>Projetos contínuos ou ainda sem deadline definido</span></div>
-        <div>{unscheduledProjects.map((project) => <button type="button" onClick={() => navigate(`/projetos/${project.id}`)} key={project.id}><i style={{ background: project.accent }} /><span>{project.name}</span><small>{project.deadline}</small></button>)}</div>
+      {unscheduledTasks.length > 0 && <div className="projects-calendar__unscheduled">
+        <div><strong>Tarefas sem data</strong><span>Sem criação ou deadline definido</span></div>
+        <div>{unscheduledTasks.map(({ project, task }) => <button type="button" onClick={() => navigate(`/projetos/${project.id}`)} key={task.id}><i style={{ background: project.accent }} /><span>{task.title}</span><small>{project.name}</small></button>)}</div>
       </div>}
     </section>
   )
@@ -308,33 +359,36 @@ export function ProjectsPage() {
   const [teamFilter, setTeamFilter] = useState('')
   const [sortBy, setSortBy] = useState('status')
   const [reverse, setReverse] = useState(false)
+  const [collapsedStatuses, setCollapsedStatuses] = useState<Set<string>>(() => new Set())
+
+  const displayProjects = useMemo(() => projects.map((project) => ({ ...project, status: effectiveStatus(project) })), [projects])
 
   const statusOptions = useMemo(() => [
     { value: '', label: 'Todos os status' },
-    ...Array.from(new Set(projects.map((project) => project.status))).sort().map((status) => ({ value: status, label: status })),
-  ], [projects])
+    ...Array.from(new Set(displayProjects.map((project) => project.status))).sort().map((status) => ({ value: status, label: status })),
+  ], [displayProjects])
 
   const collaboratorOptions = useMemo(() => {
-    const projectInitials = new Set(projects.flatMap((project) => project.team))
+    const projectInitials = new Set(displayProjects.flatMap((project) => project.team))
     return [
       { value: '', label: 'Todos os colaboradores' },
       ...members.filter((member) => member.avatarInitials && projectInitials.has(member.avatarInitials)).map((member) => ({ value: member.avatarInitials!, label: member.name })),
     ]
-  }, [members, projects])
+  }, [displayProjects, members])
 
   const teamOptions = useMemo(() => {
-    const names = new Set(projects.flatMap((project) => (project as Project & { tasksList?: ProjectTask[] }).tasksList?.map((task) => task.team).filter(Boolean) || []))
+    const names = new Set(displayProjects.flatMap((project) => project.tasksList?.map((task) => task.team).filter(Boolean) || []))
     return [{ value: '', label: 'Todos os times' }, ...Array.from(names).sort().map((name) => ({ value: name!, label: name! }))]
-  }, [projects])
+  }, [displayProjects])
 
   const visible = useMemo(() => {
-    const filtered = projects.filter((project) => {
+    const filtered = displayProjects.filter((project) => {
       const matchesQuery = `${project.name} ${project.service}`.toLowerCase().includes(query.toLowerCase())
       const matchesAttention = !attentionOnly || project.status === 'Em revisão'
       const matchesUnread = !unreadOnly || project.unread > 0
       const matchesStatus = !statusFilter || project.status === statusFilter
       const matchesCollaborator = !collaboratorFilter || project.team.includes(collaboratorFilter)
-      const projectDeadline = deadlineDate(project.deadline, startOfDay(new Date()))
+      const projectDeadline = parseDate(project.deadline, startOfDay(new Date()))
       const today = startOfDay(new Date())
       const sevenDays = new Date(today)
       sevenDays.setDate(today.getDate() + 7)
@@ -343,7 +397,7 @@ export function ProjectsPage() {
         || (deadlineFilter === 'week' && projectDeadline && projectDeadline >= today && projectDeadline <= sevenDays)
         || (deadlineFilter === 'overdue' && projectDeadline && projectDeadline < today)
         || (deadlineFilter === 'unscheduled' && !projectDeadline)
-      const taskTeams = (project as Project & { tasksList?: ProjectTask[] }).tasksList?.map((task) => task.team) || []
+      const taskTeams = project.tasksList?.map((task) => task.team) || []
       const matchesTeam = !teamFilter || taskTeams.includes(teamFilter)
       return matchesQuery && matchesAttention && matchesUnread && matchesStatus && matchesCollaborator && matchesDeadline && matchesTeam
     })
@@ -351,14 +405,32 @@ export function ProjectsPage() {
       if (sortBy === 'name') return left.name.localeCompare(right.name, 'pt-BR')
       if (sortBy === 'deadline') {
         const today = startOfDay(new Date())
-        const leftDate = deadlineDate(left.deadline, today)?.getTime() ?? Number.MAX_SAFE_INTEGER
-        const rightDate = deadlineDate(right.deadline, today)?.getTime() ?? Number.MAX_SAFE_INTEGER
+        const leftDate = parseDate(left.deadline, today)?.getTime() ?? Number.MAX_SAFE_INTEGER
+        const rightDate = parseDate(right.deadline, today)?.getTime() ?? Number.MAX_SAFE_INTEGER
         return leftDate - rightDate
       }
       return left.status.localeCompare(right.status, 'pt-BR') || left.name.localeCompare(right.name, 'pt-BR')
     })
     return reverse ? sorted.reverse() : sorted
-  }, [attentionOnly, collaboratorFilter, deadlineFilter, projects, query, reverse, sortBy, statusFilter, teamFilter, unreadOnly])
+  }, [attentionOnly, collaboratorFilter, deadlineFilter, displayProjects, query, reverse, sortBy, statusFilter, teamFilter, unreadOnly])
+
+  const statusGroups = useMemo(() => {
+    const preferredOrder: ProjectStatus[] = ['Em revisão', 'Em andamento', 'Rascunho', 'Concluído']
+    const grouped = new Map<string, Project[]>()
+    visible.forEach((project) => grouped.set(project.status, [...(grouped.get(project.status) || []), project]))
+    return Array.from(grouped.entries()).sort(([left], [right]) => {
+      const leftIndex = preferredOrder.indexOf(left as ProjectStatus)
+      const rightIndex = preferredOrder.indexOf(right as ProjectStatus)
+      return (leftIndex < 0 ? 99 : leftIndex) - (rightIndex < 0 ? 99 : rightIndex)
+    })
+  }, [visible])
+
+  const toggleStatus = (status: string) => setCollapsedStatuses((current) => {
+    const next = new Set(current)
+    if (next.has(status)) next.delete(status)
+    else next.add(status)
+    return next
+  })
 
   return (
     <div className="page projects-page" data-node-id="1:395">
@@ -398,21 +470,7 @@ export function ProjectsPage() {
             <ProjectsCalendar projects={visible} cursor={calendarCursor} showWeekends={showWeekends} onCursorChange={setCalendarCursor} onShowWeekendsChange={setShowWeekends} />
           ) : visible.length > 0 ? (
             <div className="projects-groups">
-              {visible.map((project) => {
-                const projectWithTasks = project as Project & {
-                  tasksList?: Array<{ title?: string; team?: string; deadlineDays?: number; status: 'Concluído' | 'Em andamento'; delivery?: 'Aprovado' | 'Aguardando aprovação' }>
-                }
-                const rawTasks = projectWithTasks.tasksList
-                const tasks: ProjectTask[] = rawTasks ?? []
-                return (
-                  <ProjectGroup
-                    key={project.id}
-                    title={project.status}
-                    project={project}
-                    tasks={tasks}
-                  />
-                )
-              })}
+              {statusGroups.map(([status, groupedProjects]) => <StatusGroup key={status} title={status} projects={groupedProjects} collapsed={collapsedStatuses.has(status)} onToggle={() => toggleStatus(status)} />)}
             </div>
           ) : projects.length === 0 ? (
             <div className="projects-empty-state">

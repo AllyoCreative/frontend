@@ -33,6 +33,7 @@ interface AppContextValue {
   addBrand: (data: Pick<ManagedBrand, 'name' | 'description' | 'color'>) => Promise<void>
   createTask: (projectId: string, title: string, team?: string) => Promise<ProjectTask>
   toggleTaskStatus: (projectId: string, taskId: string, currentStatus: string) => Promise<ProjectTask>
+  toggleProjectFavorite: (projectId: string) => Promise<boolean>
   logout: () => void
 }
 
@@ -292,6 +293,18 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
     }
   }, [notify])
 
+  const toggleProjectFavorite = useCallback(async (projectId: string) => {
+    try {
+      const updated = await api.toggleFavorite(projectId)
+      setProjects((current) => current.map((project) => project.id === projectId ? { ...project, favorite: updated.favorite } : project))
+      notify(updated.favorite ? 'Projeto adicionado aos favoritos' : 'Projeto removido dos favoritos')
+      return updated.favorite
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : 'Não foi possível atualizar o favorito')
+      throw error
+    }
+  }, [notify])
+
 
   const value = useMemo(() => ({
     projects,
@@ -312,6 +325,7 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
     addBrand,
     createTask,
     toggleTaskStatus,
+    toggleProjectFavorite,
     logout,
   }), [
     projects,
@@ -332,6 +346,7 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
     addBrand,
     createTask,
     toggleTaskStatus,
+    toggleProjectFavorite,
     logout,
   ])
 
