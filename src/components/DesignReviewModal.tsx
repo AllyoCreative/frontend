@@ -77,10 +77,12 @@ type AnnotationAction =
 
 type DesignReviewModalProps = {
   delivery: DesignSummary
-  isApproved: boolean
+  versions?: DesignSummary[]
+  approvedIds?: number[]
+  isApproved?: boolean
   projectCompleted: boolean
   origin: ReviewOrigin | null
-  onApprovalChange: (approved: boolean, feedback?: { rating: number; comment?: string }) => Promise<void>
+  onApprovalChange: (approved: boolean, feedback?: { rating: number; comment?: string }, targetDeliveryId?: number) => Promise<void>
   onClose: () => void
   notify: (message: string) => void
 }
@@ -115,19 +117,32 @@ function contentKind(delivery: DesignSummary) {
   return 'file' as const
 }
 
-export function DesignReviewModal({ delivery, isApproved, projectCompleted, origin, onApprovalChange, onClose, notify }: DesignReviewModalProps) {
+export function DesignReviewModal({ delivery, versions = [delivery], approvedIds, isApproved: propIsApproved, projectCompleted, origin, onApprovalChange, onClose, notify }: DesignReviewModalProps) {
+  const [currentDelivery, setCurrentDelivery] = useState<DesignSummary>(delivery)
+
+  useEffect(() => {
+    setCurrentDelivery(delivery)
+  }, [delivery])
+
+  const parseVersionNum = (v?: string) => Number((v || '').replace(/\D/g, '')) || 1
+  const sortedVersions = useMemo(() => {
+    const list = [...versions]
+    return list.sort((a, b) => parseVersionNum(b.version) - parseVersionNum(a.version) || b.id - a.id)
+  }, [versions])
+
+  const isApproved = approvedIds ? approvedIds.includes(currentDelivery.id) : (currentDelivery.id === delivery.id ? Boolean(propIsApproved) : currentDelivery.approved)
+
   const cleanName = (() => {
     try {
-      return decodeURIComponent(delivery.name)
+      return decodeURIComponent(currentDelivery.name)
     } catch {
-      return delivery.name
+      return currentDelivery.name
     }
   })()
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  const initialVersion = Number(delivery.version.replace(/\D/g, '')) || 1
-  const kind = contentKind(delivery)
+  const activeVersion = parseVersionNum(currentDelivery.version)
+  const kind = contentKind(currentDelivery)
   const supportsCanvas = kind === 'image'
-  const activeVersion = initialVersion
   const [zoom, setZoom] = useState(supportsCanvas ? 50 : 100)
   const [filter, setFilter] = useState<'all' | 'open' | 'resolved'>('all')
   const [comments, setComments] = useState<ReviewComment[]>([])
@@ -194,7 +209,7 @@ export function DesignReviewModal({ delivery, isApproved, projectCompleted, orig
 
   useEffect(() => {
     let active = true
-    api.getDesignReview(delivery.id).then((review) => {
+    api.getDesignReview(currentDelivery.id).then((review) => {
       if (!active) return
       setComments(review.comments as ReviewComment[])
       dispatchAnnotation({ type: 'replace', annotations: review.annotations as ReviewAnnotation[] })
@@ -204,7 +219,7 @@ export function DesignReviewModal({ delivery, isApproved, projectCompleted, orig
       if (active) setReviewLoading(false)
     })
     return () => { active = false }
-  }, [delivery.id, notify])
+  }, [currentDelivery.id, notify])
 
   useLayoutEffect(() => {
     if (!clonePhase || !origin || !artRef.current || !cloneRef.current) return
@@ -429,7 +444,7 @@ export function DesignReviewModal({ delivery, isApproved, projectCompleted, orig
   const persistAnnotation = async (annotation: ReviewAnnotation | DraftAnnotation) => {
     if (projectCompleted) return
     try {
-      const saved = await api.addAnnotation(delivery.id, {
+      const saved = await api.addAnnotation(currentDelivery.id, {
         type: annotation.type,
         version: annotation.version,
         color: annotation.color,
@@ -470,7 +485,7 @@ export function DesignReviewModal({ delivery, isApproved, projectCompleted, orig
     if (!commentDraft.trim() || commentSubmitting) return
     setCommentSubmitting(true)
     try {
-      const created = await api.addComment(delivery.id, {
+      const created = await api.addComment(currentDelivery.id, {
         text: commentDraft.trim(),
         version: activeVersion,
         point: pendingPoint ?? undefined,
@@ -494,7 +509,7 @@ export function DesignReviewModal({ delivery, isApproved, projectCompleted, orig
     const comment = comments.find((item) => item.id === id)
     if (!comment) return
     try {
-      const updated = await api.setCommentResolved(delivery.id, id, !comment.resolved)
+      const updated = await api.setCommentResolved(currentDelivery.id, id, !comment.resolved)
       setComments((current) => current.map((item) => item.id === id ? { ...item, resolved: updated.resolved } : item))
     } catch (error: unknown) {
       notify(error instanceof Error ? error.message : 'Não foi possível atualizar o comentário')
@@ -520,7 +535,7 @@ export function DesignReviewModal({ delivery, isApproved, projectCompleted, orig
     return <rect key={annotation.id} x={Math.min(start.x, end.x)} y={Math.min(start.y, end.y)} width={Math.abs(end.x - start.x)} height={Math.abs(end.y - start.y)} rx="5" fill={`${annotation.color}18`} stroke={annotation.color} strokeWidth={annotation.width} vectorEffect="non-scaling-stroke" />
   }
 
-  const fileUrl = delivery.fileUrl || delivery.thumbnailUrl || null
+  const fileUrl = currentDelivery.fileUrl || currentDelivery.thumbnailUrl || null
   const typeLabel = kind === 'copy' ? 'Copy' : kind === 'pdf' ? 'PDF' : kind === 'video' ? 'Vídeo' : kind === 'image' ? 'Imagem' : 'Arquivo'
   const loadImageDimensions = (event: React.SyntheticEvent<HTMLImageElement>) => {
     const image = event.currentTarget
@@ -545,7 +560,7 @@ export function DesignReviewModal({ delivery, isApproved, projectCompleted, orig
   ) : kind === 'video' && fileUrl ? (
     <video className="file-review-video" src={fileUrl} controls playsInline aria-label={cleanName} />
   ) : kind === 'copy' ? (
-    <article className="file-review-copy"><span>Texto para aprovação</span><h1>{cleanName}</h1><div>{delivery.textContent || 'O conteúdo desta entrega ainda não foi informado.'}</div></article>
+    <article className="file-review-copy"><span>Texto para aprovação</span><h1>{cleanName}</h1><div>{currentDelivery.textContent || 'O conteúdo desta entrega ainda não foi informado.'}</div></article>
   ) : (
     <div className="file-review-file-fallback"><FileText size={54} /><h2>{cleanName}</h2><p>Este formato não possui visualização no navegador.</p>{fileUrl && <a href={fileUrl} target="_blank" rel="noreferrer"><Download size={17} /> Baixar arquivo para revisar</a>}</div>
   )
@@ -573,7 +588,26 @@ export function DesignReviewModal({ delivery, isApproved, projectCompleted, orig
               {supportsCanvas && <><button type="button" className={railVisible ? 'active' : ''} onClick={() => setRailVisible((value) => !value)} aria-label="Alternar miniatura" title="Miniatura"><img src={figmaAsset('design_review.imgPhSidebarBold')} alt="" /></button>
               <button type="button" className={effectiveTool === 'pan' ? 'active' : ''} onClick={() => chooseTool('pan')} aria-pressed={effectiveTool === 'pan'} aria-label="Mover arquivo" title="Mover arquivo"><Hand size={20} /></button>
               <label className="file-review-select file-review-zoom"><select value={zoom} onChange={(event) => setZoom(Number(event.target.value))} aria-label="Zoom">{![25, 50, 75, 100, 125].includes(zoom) && <option value={zoom}>Ajustar ({zoom}%)</option>}<option value="25">25%</option><option value="50">50%</option><option value="75">75%</option><option value="100">100%</option><option value="125">125%</option></select></label><i /></>}
-              <span className="file-review-current-version">Versão {activeVersion}</span>
+              {sortedVersions.length > 1 ? (
+                <label className="file-review-select file-review-version">
+                  <select
+                    value={currentDelivery.id}
+                    onChange={(e) => {
+                      const next = sortedVersions.find((item) => item.id === Number(e.target.value))
+                      if (next) setCurrentDelivery(next)
+                    }}
+                    aria-label="Versão do material"
+                  >
+                    {sortedVersions.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.version || `Versão ${parseVersionNum(item.version)}`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <span className="file-review-current-version">{currentDelivery.version || `Versão ${activeVersion}`}</span>
+              )}
             </div>
 
             {projectCompleted ? <div className="file-review-review-closed" role="status"><LockKeyhole size={16} /> Projeto concluído · revisão encerrada</div> : supportsCanvas ? <div className={`file-review-annotation-toolbar${brushOpen ? ' is-expanded' : ''}`} role="toolbar" aria-label="Ferramentas de anotação">
@@ -606,7 +640,22 @@ export function DesignReviewModal({ delivery, isApproved, projectCompleted, orig
         </header>
 
         {supportsCanvas && <aside className={`file-review-rail${railVisible ? '' : ' is-hidden'}`} aria-label="Versão atual do arquivo">
-          <button type="button" className="active"><img src={delivery.thumbnailUrl || fileUrl || ''} alt={`Miniatura da versão ${activeVersion}`} /><span><b>{activeVersion}</b><small>Atual</small></span></button>
+          {sortedVersions.map((v) => {
+            const vNum = parseVersionNum(v.version);
+            const isSelected = v.id === currentDelivery.id;
+            return (
+              <button
+                key={v.id}
+                type="button"
+                className={isSelected ? 'active' : ''}
+                onClick={() => setCurrentDelivery(v)}
+                title={`Versão ${vNum}`}
+              >
+                <img src={v.thumbnailUrl || v.fileUrl || fileUrl || ''} alt={`Miniatura da versão ${vNum}`} />
+                <span><b>{vNum}</b><small>{isSelected ? 'Atual' : `v${vNum}`}</small></span>
+              </button>
+            );
+          })}
         </aside>}
 
         <main ref={artStageRef} className={`file-review-art-stage${railVisible ? '' : ' is-expanded'} is-${effectiveTool}${isPanning ? ' is-panning' : ''}`}>
@@ -633,7 +682,7 @@ export function DesignReviewModal({ delivery, isApproved, projectCompleted, orig
             role={supportsCanvas ? 'application' : 'document'}
             tabIndex={0}
             aria-label={supportsCanvas ? 'Imagem em revisão. Use a barra de ferramentas para comentar ou desenhar.' : `${typeLabel} em revisão`}
-            title={delivery.name}
+            title={currentDelivery.name}
           >
             {deliveryContent}
             {supportsCanvas && <svg className="file-review-annotation-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
@@ -689,7 +738,7 @@ export function DesignReviewModal({ delivery, isApproved, projectCompleted, orig
         </form>
       </div>}
     </div>
-    {clonePhase && cloneRect && <div className="file-review-shared-clone" ref={cloneRef} style={{ left: cloneRect.left, top: cloneRect.top, width: cloneRect.width, height: cloneRect.height }} aria-hidden="true"><img src={delivery.thumbnailUrl || delivery.fileUrl || ''} alt="" /></div>}
+    {clonePhase && cloneRect && <div className="file-review-shared-clone" ref={cloneRef} style={{ left: cloneRect.left, top: cloneRect.top, width: cloneRect.width, height: cloneRect.height }} aria-hidden="true"><img src={currentDelivery.thumbnailUrl || currentDelivery.fileUrl || ''} alt="" /></div>}
     </>,
     document.body,
   )

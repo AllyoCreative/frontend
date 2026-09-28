@@ -911,6 +911,8 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .project-design-tile { min-height: 308px; overflow: hidden; border-radius: 10px; background: #fff; }
 .project-design-tile > header { min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; }
 .project-design-tile > header span { min-width: 0; overflow: hidden; color: #273129; font-size: 13px; font-weight: 650; line-height: 18px; white-space: nowrap; text-overflow: ellipsis; }
+.project-design-version { display: inline-block; margin-left: 6px; padding: 2px 7px; border-radius: 4px; background: #eef2ee; color: #53605a; font-size: 10px; font-weight: 700; vertical-align: middle; }
+.project-design-history { display: inline-block; margin-left: 5px; color: #88938c; font-size: 10px; font-weight: 500; vertical-align: middle; }
 .project-design-tile > header span small { margin-right: 7px; padding: 3px 6px; border-radius: 999px; background: #edf2ed; color: #68726c; font-size: 9px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
 .project-design-tile > header b { min-height: 24px; flex: none; display: flex; align-items: center; justify-content: center; padding: 4px 7px; border-radius: 5px; background: #fff2a9; color: #715f00; font-size: 11px; font-weight: 600; line-height: 16px; }
 .project-design-tile > header b.is-approved { background: #d5e7d3; color: #004c46; }

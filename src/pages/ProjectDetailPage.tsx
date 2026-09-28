@@ -213,6 +213,24 @@ export function ProjectDetailPage() {
   const [draft, setDraft] = useState('')
   const [approved, setApproved] = useState<number[]>([])
   const [reviewing, setReviewing] = useState<number | null>(null)
+
+  const parseVersionNum = (v?: string) => Number((v || '').replace(/\D/g, '')) || 1
+
+  const groupedDesigns = useMemo(() => {
+    const groups: Record<string, DesignSummary[]> = {}
+    for (const design of designList) {
+      const key = design.taskId ? `task-${design.taskId}` : `name-${cleanDecodedText(design.name).toLowerCase().trim()}`
+      if (!groups[key]) groups[key] = []
+      groups[key].push(design)
+    }
+    return Object.values(groups).map((versions: DesignSummary[]) => {
+      versions.sort((a: DesignSummary, b: DesignSummary) => parseVersionNum(b.version) - parseVersionNum(a.version) || b.id - a.id)
+      return {
+        latest: versions[0],
+        all: versions,
+      }
+    })
+  }, [designList])
   const [reviewOrigin, setReviewOrigin] = useState<ReviewOrigin | null>(null)
   const projectFileInputRef = useRef<HTMLInputElement>(null)
 
@@ -594,12 +612,20 @@ export function ProjectDetailPage() {
 
           {loadingAssets && <div className="project-gallery-empty">Carregando arquivos...</div>}
 
-          {!loadingAssets && (tab === 'entregas' || tab === 'designs') && (designList.length > 0 ? <div className="project-designs-grid">
-            {designList.map((design) => {
+          {!loadingAssets && (tab === 'entregas' || tab === 'designs') && (groupedDesigns.length > 0 ? <div className="project-designs-grid">
+            {groupedDesigns.map(({ latest: design, all: versions }) => {
               const isApproved = approved.includes(design.id)
               const kind = deliveryKind(design)
               return <article key={design.id} className="project-design-tile">
-                <header><span><small>{deliveryTypeLabel(kind)}</small>{cleanDecodedText(design.name)}</span><b className={isApproved ? 'is-approved' : ''}>{isApproved ? 'Aprovado' : 'Aguardando aprovação'}</b></header>
+                <header>
+                  <span>
+                    <small>{deliveryTypeLabel(kind)}</small>
+                    {cleanDecodedText(design.name)}
+                    <span className="project-design-version">{design.version || 'v1'}</span>
+                    {versions.length > 1 && <span className="project-design-history">({versions.length} versões)</span>}
+                  </span>
+                  <b className={isApproved ? 'is-approved' : ''}>{isApproved ? 'Aprovado' : 'Aguardando aprovação'}</b>
+                </header>
                 <button onClick={(event) => openReview(design.id, event.currentTarget)} aria-label={`Abrir ${cleanDecodedText(design.name)}`}>
                   <DeliveryPreview delivery={design} />
                   <span className="project-design-open"><ExternalLink size={15} /> Revisar</span>
@@ -623,15 +649,31 @@ export function ProjectDetailPage() {
         </section>
       )}
 
-      {reviewing !== null && <DesignReviewModal
-        delivery={designList.find((item) => item.id === reviewing)!}
-        isApproved={approved.includes(reviewing)}
-        projectCompleted={projectCompleted}
-        origin={reviewOrigin}
-        notify={notify}
-        onApprovalChange={(nextApproved, feedback) => handleApprovalChange(reviewing, nextApproved, feedback)}
-        onClose={closeReview}
-      />}
+      {reviewing !== null && (() => {
+        const targetDelivery = designList.find((item) => item.id === reviewing)
+        if (!targetDelivery) return null
+        const targetKey = targetDelivery.taskId ? `task-${targetDelivery.taskId}` : `name-${cleanDecodedText(targetDelivery.name).toLowerCase().trim()}`
+        const siblingVersions = designList.filter((item) => {
+          const itemKey = item.taskId ? `task-${item.taskId}` : `name-${cleanDecodedText(item.name).toLowerCase().trim()}`
+          return itemKey === targetKey
+        }).sort((a, b) => {
+          return parseVersionNum(b.version) - parseVersionNum(a.version) || b.id - a.id
+        })
+
+        return (
+          <DesignReviewModal
+            delivery={targetDelivery}
+            versions={siblingVersions}
+            approvedIds={approved}
+            isApproved={approved.includes(reviewing)}
+            projectCompleted={projectCompleted}
+            origin={reviewOrigin}
+            notify={notify}
+            onApprovalChange={(nextApproved, feedback, targetId) => handleApprovalChange(targetId || reviewing, nextApproved, feedback)}
+            onClose={closeReview}
+          />
+        )
+      })()}
     </div>
   )
 }
