@@ -20,6 +20,19 @@ import {
 } from 'lucide-react'
 import { figmaAsset } from '../assets/figma'
 import { api, type DesignSummary } from '../services/api'
+import { PdfReviewCanvas } from './PdfReviewCanvas'
+
+export function parseQuotedSnippet(rawText: string): { snippet: string | null; cleanText: string } {
+  if (!rawText) return { snippet: null, cleanText: '' }
+  const match = rawText.match(/\[Trecho(?: selecionado)?: "(.*?)"\]\s*/s)
+  if (match) {
+    return {
+      snippet: match[1],
+      cleanText: rawText.replace(match[0], '').trim(),
+    }
+  }
+  return { snippet: null, cleanText: rawText }
+}
 
 export type ReviewOrigin = { left: number; top: number; width: number; height: number }
 
@@ -142,7 +155,30 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   const activeVersion = parseVersionNum(currentDelivery.version)
   const kind = contentKind(currentDelivery)
-  const supportsCanvas = kind === 'image'
+  const supportsCanvas = kind === 'image' || kind === 'pdf'
+  const [hoveredCommentId, setHoveredCommentId] = useState<number | null>(null)
+  const [activeTextSelection, setActiveTextSelection] = useState<{ text: string; point: ReviewPoint } | null>(null)
+  const [selectedSnippet, setSelectedSnippet] = useState<string | null>(null)
+  const copyContainerRef = useRef<HTMLElement>(null)
+
+  const handleCopyMouseUp = () => {
+    const sel = window.getSelection()
+    if (!sel || sel.isCollapsed) return
+    const text = sel.toString().trim()
+    if (text.length < 2) return
+    try {
+      const range = sel.getRangeAt(0)
+      const rect = range.getBoundingClientRect()
+      const container = copyContainerRef.current
+      if (!container) return
+      const cRect = container.getBoundingClientRect()
+      const point = {
+        x: Math.max(0, Math.min(100, ((rect.left + rect.width / 2 - cRect.left) / cRect.width) * 100)),
+        y: Math.max(0, Math.min(100, ((rect.top - cRect.top) / cRect.height) * 100)),
+      }
+      setActiveTextSelection({ text, point })
+    } catch {}
+  }
   const [zoom, setZoom] = useState(supportsCanvas ? 50 : 100)
   const [filter, setFilter] = useState<'all' | 'open' | 'resolved'>('all')
   const [comments, setComments] = useState<ReviewComment[]>([])
@@ -484,9 +520,13 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
     }
     if (!commentDraft.trim() || commentSubmitting) return
     setCommentSubmitting(true)
+    const fullText = selectedSnippet
+      ? `[Trecho selecionado: "${selectedSnippet}"]\n${commentDraft.trim()}`
+      : commentDraft.trim()
+
     try {
       const created = await api.addComment(currentDelivery.id, {
-        text: commentDraft.trim(),
+        text: fullText,
         version: activeVersion,
         point: pendingPoint ?? undefined,
         annotationId: pendingAnnotationId ?? undefined,
@@ -494,6 +534,7 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
       setComments((current) => [...current, created as ReviewComment])
       setSelectedCommentId(created.id)
       setCommentDraft('')
+      setSelectedSnippet(null)
       setPendingPoint(null)
       setPendingAnnotationId(null)
       notify('Comentário adicionado à entrega')
@@ -556,11 +597,78 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
   ) : kind === 'image' ? (
     <div className="file-review-file-fallback"><FileText size={54} /><h2>Não foi possível carregar a imagem</h2><p>O link pode ter expirado. Feche e abra novamente; se continuar, peça um novo envio ao time.</p>{fileUrl && <a href={fileUrl} target="_blank" rel="noreferrer"><Download size={17} /> Abrir arquivo original</a>}</div>
   ) : kind === 'pdf' && fileUrl ? (
-    <div className="file-review-document-wrap"><iframe className="file-review-document" src={`${fileUrl}#toolbar=1&navpanes=0`} title={`PDF ${cleanName}`} /><a href={fileUrl} target="_blank" rel="noreferrer"><Download size={16} /> Abrir PDF em nova aba</a></div>
+    <PdfReviewCanvas
+      url={fileUrl}
+      altName={cleanName}
+      onDimensions={({ width, height }) => {
+        setCanvasSize({ width, height })
+        const stage = artStageRef.current
+        if (stage) {
+          const fittedZoom = Math.min(100, ((stage.clientWidth - 36) / width) * 100, ((stage.clientHeight - 36) / height) * 100)
+          setZoom(Math.max(15, Math.floor(fittedZoom)))
+        }
+      }}
+      onTextSelect={(sel) => {
+        if (sel) {
+          setActiveTextSelection({ text: sel.text, point: sel.point })
+        } else {
+          setActiveTextSelection(null)
+        }
+      }}
+    />
   ) : kind === 'video' && fileUrl ? (
     <video className="file-review-video" src={fileUrl} controls playsInline aria-label={cleanName} />
   ) : kind === 'copy' ? (
-    <article className="file-review-copy"><span>Texto para aprovação</span><h1>{cleanName}</h1><div>{currentDelivery.textContent || 'O conteúdo desta entrega ainda não foi informado.'}</div></article>
+    <article
+      ref={copyContainerRef}
+      onMouseUp={handleCopyMouseUp}
+      className="file-review-copy"
+      style={{ position: 'relative', userSelect: 'text' }}
+    >
+      <span>Texto para aprovação</span>
+      <h1>{cleanName}</h1>
+      <div style={{ userSelect: 'text' }}>{currentDelivery.textContent || 'O conteúdo desta entrega ainda não foi informado.'}</div>
+
+      {activeTextSelection && (
+        <div
+          className="file-review-selection-pill"
+          style={{ left: `${activeTextSelection.point.x}%`, top: `${activeTextSelection.point.y}%` }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedSnippet(activeTextSelection.text)
+              setPendingPoint(activeTextSelection.point)
+              setActiveTextSelection(null)
+              setCommentDraft('')
+              requestAnimationFrame(() => inlineCommentInputRef.current?.focus())
+            }}
+          >
+            <MessageSquare size={13} />
+            Comentar este trecho
+          </button>
+        </div>
+      )}
+
+      {pointedComments.map((comment) => (
+        <button
+          key={comment.id}
+          type="button"
+          className={`file-review-pin${comment.resolved ? ' is-resolved' : ''}${selectedCommentId === comment.id ? ' is-selected' : ''}${hoveredCommentId === comment.id ? ' is-hovered' : ''}`}
+          style={{ left: `${comment.point?.x}%`, top: `${comment.point?.y}%` }}
+          onClick={(event) => { event.stopPropagation(); selectComment(comment) }}
+          onMouseEnter={() => {
+            setHoveredCommentId(comment.id)
+            const el = document.getElementById(`review-comment-${comment.id}`)
+            el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+          }}
+          onMouseLeave={() => setHoveredCommentId(null)}
+          aria-label={`Comentário ${markerNumber(comment.id)}: ${comment.text}`}
+        >
+          <span>{markerNumber(comment.id)}</span>
+        </button>
+      ))}
+    </article>
   ) : (
     <div className="file-review-file-fallback"><FileText size={54} /><h2>{cleanName}</h2><p>Este formato não possui visualização no navegador.</p>{fileUrl && <a href={fileUrl} target="_blank" rel="noreferrer"><Download size={17} /> Baixar arquivo para revisar</a>}</div>
   )
@@ -691,12 +799,58 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
               {draftAnnotation && renderAnnotation(draftAnnotation)}
             </svg>}
             {supportsCanvas && visibleAnnotations.filter((annotation): annotation is TextAnnotation => annotation.type === 'text').map(renderAnnotation)}
-            {supportsCanvas && pointedComments.map((comment) => <button type="button" className={`file-review-pin${comment.resolved ? ' is-resolved' : ''}${selectedCommentId === comment.id ? ' is-selected' : ''}`} style={{ left: `${comment.point?.x}%`, top: `${comment.point?.y}%` }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); selectComment(comment) }} aria-label={`Comentário ${markerNumber(comment.id)}: ${comment.text}`} key={comment.id}><span>{markerNumber(comment.id)}</span></button>)}
+            {supportsCanvas && pointedComments.map((comment) => (
+              <button
+                type="button"
+                className={`file-review-pin${comment.resolved ? ' is-resolved' : ''}${selectedCommentId === comment.id ? ' is-selected' : ''}${hoveredCommentId === comment.id ? ' is-hovered' : ''}`}
+                style={{ left: `${comment.point?.x}%`, top: `${comment.point?.y}%` }}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => { event.stopPropagation(); selectComment(comment) }}
+                onMouseEnter={() => {
+                  setHoveredCommentId(comment.id)
+                  const el = document.getElementById(`review-comment-${comment.id}`)
+                  el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+                }}
+                onMouseLeave={() => setHoveredCommentId(null)}
+                aria-label={`Comentário ${markerNumber(comment.id)}: ${comment.text}`}
+                key={comment.id}
+              >
+                <span>{markerNumber(comment.id)}</span>
+              </button>
+            ))}
+            {supportsCanvas && activeTextSelection && (
+              <div
+                className="file-review-selection-pill"
+                style={{ left: `${activeTextSelection.point.x}%`, top: `${activeTextSelection.point.y}%` }}
+              >
+                <button
+                  type="button"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setSelectedSnippet(activeTextSelection.text)
+                    setPendingPoint(activeTextSelection.point)
+                    setActiveTextSelection(null)
+                    setCommentDraft('')
+                    requestAnimationFrame(() => inlineCommentInputRef.current?.focus())
+                  }}
+                >
+                  <MessageSquare size={13} />
+                  Comentar este trecho
+                </button>
+              </div>
+            )}
             {supportsCanvas && !projectCompleted && pendingPoint && <span className="file-review-pin is-pending" style={{ left: `${pendingPoint.x}%`, top: `${pendingPoint.y}%` }}><span>{pointedComments.length + 1}</span></span>}
 
             {!projectCompleted && pendingPoint && <form className={`file-review-inline-comment${pendingPoint.x > 62 ? ' is-left' : ''}`} style={{ left: `${pendingPoint.x}%`, top: `${Math.min(78, Math.max(12, pendingPoint.y))}%` }} onPointerDown={(event) => event.stopPropagation()} onSubmit={addComment}>
-              <header><strong>Comentário neste ponto</strong><button type="button" onClick={() => setPendingPoint(null)} aria-label="Cancelar comentário pontual"><X size={18} /></button></header>
-              <textarea ref={inlineCommentInputRef} value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} placeholder="O que precisa ser ajustado aqui?" aria-label="Comentário neste ponto" />
+              <header><strong>Comentário neste ponto</strong><button type="button" onClick={() => { setPendingPoint(null); setSelectedSnippet(null); }} aria-label="Cancelar comentário pontual"><X size={18} /></button></header>
+              {selectedSnippet && (
+                <div className="file-review-comment-snippet-badge">
+                  <span><strong>Trecho:</strong> "{selectedSnippet}"</span>
+                  <button type="button" onClick={() => setSelectedSnippet(null)} title="Remover trecho"><X size={12} /></button>
+                </div>
+              )}
+              <textarea ref={inlineCommentInputRef} value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} placeholder={selectedSnippet ? "O que ajustar neste trecho?" : "O que precisa ser ajustado aqui?"} aria-label="Comentário neste ponto" />
               <footer><span>Vinculado à versão {activeVersion}</span><button type="submit" disabled={!commentDraft.trim() || commentSubmitting}>{commentSubmitting ? 'Enviando...' : 'Comentar'}</button></footer>
             </form>}
 
@@ -715,14 +869,54 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
             {!reviewLoading && visibleComments.map((comment) => {
               const annotation = comment.annotationId ? annotations.find((item) => item.id === comment.annotationId) : undefined
               const number = comment.point ? markerNumber(comment.id) : 0
-              return <article id={`review-comment-${comment.id}`} className={`${comment.resolved ? 'is-resolved ' : ''}${selectedCommentId === comment.id ? 'is-selected' : ''}`} key={comment.id} onClick={() => setSelectedCommentId(comment.id)}><header><span>{number > 0 && <b className="file-review-comment-number">{number}</b>}<img src={figmaAsset('design_review.imgEllipse24')} alt="" /><strong>{comment.author}</strong></span>{!projectCompleted && <span><button type="button" aria-label="Mais opções do comentário"><img src={figmaAsset('design_review.imgTablerDots1')} alt="" /></button><button type="button" onClick={() => void toggleResolved(comment.id)} aria-label={comment.resolved ? 'Reabrir comentário' : 'Resolver comentário'}><img src={figmaAsset('design_review.imgGroup2')} alt="" /></button></span>}</header><time>{comment.time}</time>{(comment.point || annotation) && <span className="file-review-comment-kind">{comment.point ? `Marcação ${number}` : annotationLabel(annotation)}</span>}<p>{comment.text}</p>{!projectCompleted && <button type="button" className="file-review-reply"><img src={figmaAsset('design_review.imgMaterialSymbolsReplyRounded')} alt="" />Responder</button>}</article>
+              const parsed = parseQuotedSnippet(comment.text)
+              const isHovered = hoveredCommentId === comment.id
+              return (
+                <article
+                  id={`review-comment-${comment.id}`}
+                  className={`${comment.resolved ? 'is-resolved ' : ''}${selectedCommentId === comment.id ? 'is-selected ' : ''}${isHovered ? 'is-hovered' : ''}`}
+                  key={comment.id}
+                  onClick={() => setSelectedCommentId(comment.id)}
+                  onMouseEnter={() => setHoveredCommentId(comment.id)}
+                  onMouseLeave={() => setHoveredCommentId(null)}
+                >
+                  <header>
+                    <span>
+                      {number > 0 && <b className="file-review-comment-number">{number}</b>}
+                      <img src={figmaAsset('design_review.imgEllipse24')} alt="" />
+                      <strong>{comment.author}</strong>
+                    </span>
+                    {!projectCompleted && (
+                      <span>
+                        <button type="button" aria-label="Mais opções do comentário"><img src={figmaAsset('design_review.imgTablerDots1')} alt="" /></button>
+                        <button type="button" onClick={() => void toggleResolved(comment.id)} aria-label={comment.resolved ? 'Reabrir comentário' : 'Resolver comentário'}><img src={figmaAsset('design_review.imgGroup2')} alt="" /></button>
+                      </span>
+                    )}
+                  </header>
+                  <time>{comment.time}</time>
+                  {(comment.point || annotation) && <span className="file-review-comment-kind">{comment.point ? `Marcação ${number}` : annotationLabel(annotation)}</span>}
+                  {parsed.snippet && (
+                    <div className="file-review-comment-snippet">
+                      <span>“{parsed.snippet}”</span>
+                    </div>
+                  )}
+                  <p>{parsed.cleanText}</p>
+                  {!projectCompleted && <button type="button" className="file-review-reply"><img src={figmaAsset('design_review.imgMaterialSymbolsReplyRounded')} alt="" />Responder</button>}
+                </article>
+              )
             })}
             {!reviewLoading && visibleComments.length === 0 && <p className="file-review-comments-empty">Nenhum comentário nesta versão.</p>}
           </div>
           {projectCompleted ? <div className="file-review-comment-closed"><LockKeyhole size={18} /><div><strong>Revisão encerrada</strong><span>Todas as tarefas do projeto foram concluídas.</span></div></div> : <form className={`file-review-comment-form${pendingPoint ? ' is-point-pending' : ''}`} onSubmit={addComment}>
             <div><strong>{commentFormTitle}</strong>{(pendingPoint || contextAnnotation) && <button type="button" onClick={() => chooseTool('general')}>Alterar para geral</button>}</div>
             {pendingPoint ? <p>Escreva no campo que abriu ao lado do marcador na arte.</p> : <>
-              <textarea ref={commentInputRef} value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} placeholder={contextAnnotation ? 'Descreva o ajuste relacionado à anotação...' : 'Adicionar comentário geral...'} aria-label="Novo comentário" />
+              {selectedSnippet && (
+                <div className="file-review-comment-snippet-badge">
+                  <span><strong>Trecho:</strong> "{selectedSnippet}"</span>
+                  <button type="button" onClick={() => setSelectedSnippet(null)} title="Remover trecho"><X size={12} /></button>
+                </div>
+              )}
+              <textarea ref={commentInputRef} value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} placeholder={selectedSnippet ? "O que ajustar no trecho selecionado..." : contextAnnotation ? 'Descreva o ajuste relacionado à anotação...' : 'Adicionar comentário geral...'} aria-label="Novo comentário" />
               <button type="submit" disabled={!commentDraft.trim() || commentSubmitting}>{commentSubmitting ? 'Enviando...' : 'Comentar'}</button>
             </>}
           </form>}

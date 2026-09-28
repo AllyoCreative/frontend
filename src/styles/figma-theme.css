@@ -1123,6 +1123,15 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .file-review-pin > span { display: grid; place-items: center; font-size: 13px; font-weight: 800; line-height: 1; transform: rotate(45deg); }
 .file-review-pin:hover, .file-review-pin.is-selected { z-index: 5; background: #004c46; box-shadow: 0 0 0 4px rgba(0,76,70,.18),0 6px 18px rgba(13,30,29,.3); }
 .file-review-pin.is-resolved { opacity: .52; }.file-review-pin.is-pending { pointer-events: none; background: #8c86d6; filter: drop-shadow(0 4px 10px rgba(0,76,70,.2)); }
+.file-review-pin.is-hovered { z-index: 25 !important; background: #f59e0b !important; color: #000 !important; box-shadow: 0 0 0 4px #fde68a, 0 8px 24px rgba(245,158,11,0.5) !important; transform: translate(-50%,-82%) rotate(-45deg) scale(1.25) !important; }
+.file-review-comment-list article.is-hovered { border-color: #f59e0b !important; background: rgba(245,158,11,0.08) !important; box-shadow: 0 0 0 2px rgba(245,158,11,0.4) !important; transform: translateY(-1px); }
+.file-review-comment-snippet { margin: 6px 0; padding: 6px 10px; background: rgba(245,158,11,0.12); border-left: 3px solid #f59e0b; border-radius: 4px; font-size: 11px; line-height: 1.4; color: #b45309; font-style: italic; display: flex; align-items: flex-start; gap: 6px; }
+.file-review-comment-snippet-badge { margin-bottom: 8px; padding: 6px 10px; background: rgba(245,158,11,0.14); border: 1px solid rgba(245,158,11,0.3); border-radius: 6px; font-size: 11px; color: #92400e; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.file-review-comment-snippet-badge button { background: transparent; border: none; color: #b45309; cursor: pointer; padding: 2px; display: grid; place-items: center; }
+.file-review-comment-snippet-badge button:hover { color: #78350f; }
+.file-review-selection-pill { position: absolute; z-index: 60; transform: translate(-50%, -100%); margin-top: -10px; pointer-events: auto; }
+.file-review-selection-pill button { display: inline-flex; align-items: center; gap: 6px; background: #5d55c7; color: #fff; font-size: 12px; font-weight: 700; padding: 7px 14px; border-radius: 9999px; border: 2px solid #fff; box-shadow: 0 6px 20px rgba(0,0,0,0.35); cursor: pointer; white-space: nowrap; transition: transform 0.15s ease, background 0.15s ease; }
+.file-review-selection-pill button:hover { background: #6e66db; transform: scale(1.06); }
 .file-review-inline-comment { position: absolute; z-index: 8; width: min(360px,75%); display: grid; gap: 10px; padding: 13px; border: 1px solid #dfe3df; border-radius: 10px; background: rgba(255,255,255,.97); box-shadow: 0 16px 40px rgba(13,30,29,.22); transform: translate(22px,-18px); animation: file-review-composer-in .2s cubic-bezier(.22,1,.36,1) both; }
 .file-review-inline-comment.is-left { transform: translate(calc(-100% - 22px),-18px); }
 .file-review-inline-comment header, .file-review-inline-comment footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
