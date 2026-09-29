@@ -165,6 +165,21 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
   const kind = contentKind(currentDelivery)
   const supportsCanvas = kind === 'image' || kind === 'pdf'
   const [hoveredCommentId, setHoveredCommentId] = useState<number | null>(null)
+
+  const scrollCommentIntoView = (commentId: number) => {
+    setHoveredCommentId(commentId)
+    const panel = commentsPanelRef.current
+    const el = document.getElementById(`review-comment-${commentId}`)
+    if (!panel || !el) return
+    const panelRect = panel.getBoundingClientRect()
+    const elRect = el.getBoundingClientRect()
+    const filterOffset = 62
+    if (elRect.top < panelRect.top + filterOffset) {
+      panel.scrollTo({ top: Math.max(0, panel.scrollTop + (elRect.top - panelRect.top) - filterOffset), behavior: 'smooth' })
+    } else if (elRect.bottom > panelRect.bottom - 12) {
+      panel.scrollTo({ top: panel.scrollTop + (elRect.bottom - panelRect.bottom) + 16, behavior: 'smooth' })
+    }
+  }
   const [activeTextSelection, setActiveTextSelection] = useState<{ text: string; point: ReviewPoint } | null>(null)
   const [selectedSnippet, setSelectedSnippet] = useState<string | null>(null)
   const copyContainerRef = useRef<HTMLElement>(null)
@@ -289,7 +304,7 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
       const panel = commentsPanelRef.current
       const target = document.getElementById(`review-comment-${comment.id}`)
       if (!panel || !target) return
-      panel.scrollTo({ top: Math.max(0, target.offsetTop - 54), behavior: 'smooth' })
+      panel.scrollTo({ top: Math.max(0, target.offsetTop - 62), behavior: 'smooth' })
     })
   }
 
@@ -756,11 +771,7 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
           className={`file-review-pin${comment.resolved ? ' is-resolved' : ''}${selectedCommentId === comment.id ? ' is-selected' : ''}${hoveredCommentId === comment.id ? ' is-hovered' : ''}`}
           style={{ left: `${comment.point?.x}%`, top: `${comment.point?.y}%` }}
           onClick={(event) => { event.stopPropagation(); selectComment(comment) }}
-          onMouseEnter={() => {
-            setHoveredCommentId(comment.id)
-            const el = document.getElementById(`review-comment-${comment.id}`)
-            el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-          }}
+          onMouseEnter={() => scrollCommentIntoView(comment.id)}
           onMouseLeave={() => setHoveredCommentId(null)}
           aria-label={`Comentário ${markerNumber(comment.id)}: ${comment.text}`}
         >
@@ -1052,11 +1063,7 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
                 style={{ left: `${comment.point?.x}%`, top: `${comment.point?.y}%` }}
                 onPointerDown={(event) => event.stopPropagation()}
                 onClick={(event) => { event.stopPropagation(); selectComment(comment) }}
-                onMouseEnter={() => {
-                  setHoveredCommentId(comment.id)
-                  const el = document.getElementById(`review-comment-${comment.id}`)
-                  el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-                }}
+                onMouseEnter={() => scrollCommentIntoView(comment.id)}
                 onMouseLeave={() => setHoveredCommentId(null)}
                 aria-label={`Comentário ${markerNumber(comment.id)}: ${comment.text}`}
                 key={comment.id}
