@@ -2325,3 +2325,192 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
   background: #ffe3d3;
   color: #b34a17;
 }
+
+/* Refined review modal controls and submission elements */
+.file-review-topline-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.file-review-topline-download {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  border: 1px solid #d8dcd5;
+  border-radius: 100px;
+  background: #f7f9f7;
+  color: #131f15;
+  font-size: 12px;
+  font-weight: 650;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.file-review-topline-download:hover {
+  background: #edf2ed;
+  border-color: #b8c4b7;
+}
+.file-review-topline-close {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #f1f3f1;
+  color: #53605a;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.file-review-topline-close:hover {
+  background: #e2e6e2;
+  color: #131f15;
+  transform: scale(1.05);
+}
+.file-review-left-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+.file-review-left-controls > button {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #24322a;
+}
+.file-review-left-controls > button.active {
+  background: #d5e7d3;
+  color: #004c46;
+}
+.file-review-divider {
+  width: 1px;
+  height: 26px;
+  flex: none;
+  margin-inline: 4px;
+  background: #d8dcd5;
+}
+.file-review-floating-pill {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px 6px 16px;
+  background: #17211c;
+  color: #fff;
+  border-radius: 100px;
+  box-shadow: 0 10px 30px rgba(13,30,29,.28);
+  font-size: 13px;
+  animation: file-review-floating-in .22s cubic-bezier(.16,1,.3,1) both;
+}
+@keyframes file-review-floating-in {
+  from { opacity: 0; transform: translate(-50%, 12px) scale(.96); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+.file-review-floating-pill-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff7a45;
+  box-shadow: 0 0 0 3px rgba(255,122,69,.25);
+}
+.file-review-floating-pill-text {
+  color: #e2e8e4;
+  font-weight: 500;
+}
+.file-review-floating-pill-text b {
+  color: #fff;
+  font-weight: 700;
+}
+.file-review-floating-submit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 100px;
+  background: #ff7a45;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s ease, transform .15s ease;
+}
+.file-review-floating-submit-btn:hover {
+  background: #ea6530;
+  transform: translateY(-1px);
+}
+.file-review-floating-submit-btn img {
+  width: 14px;
+  height: 14px;
+  filter: brightness(0) invert(1);
+}
+.file-review-sidebar-submit-card {
+  margin: 10px 14px 6px;
+  padding: 12px 14px;
+  border: 1px solid #ffd8bf;
+  border-radius: 10px;
+  background: #fff8f3;
+  display: grid;
+  gap: 8px;
+}
+.file-review-sidebar-submit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.file-review-submit-count {
+  color: #bf4915;
+  font-size: 11px;
+  font-weight: 700;
+}
+.file-review-submit-tag {
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #ffe3d1;
+  color: #9c3b12;
+  font-size: 10px;
+  font-weight: 650;
+}
+.file-review-submit-changes-btn {
+  width: 100%;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 7px;
+  background: #ff7a45;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.file-review-submit-changes-btn:hover:not(:disabled) {
+  background: #ea6530;
+}
+.file-review-submit-changes-btn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+.file-review-submit-changes-btn img {
+  width: 14px;
+  height: 14px;
+  filter: brightness(0) invert(1);
+}

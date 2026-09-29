@@ -161,6 +161,7 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
   })()
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   const activeVersion = parseVersionNum(currentDelivery.version)
+
   const kind = contentKind(currentDelivery)
   const supportsCanvas = kind === 'image' || kind === 'pdf'
   const [hoveredCommentId, setHoveredCommentId] = useState<number | null>(null)
@@ -255,6 +256,12 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
     if (filter === 'resolved') return comment.resolved
     return true
   }), [activeVersion, comments, filter])
+  const totalFeedbackCount = useMemo(() => {
+    const versionCommentsCount = comments.filter((c) => c.version === activeVersion).length
+    const versionAnnotationsCount = annotations.filter((a) => a.version === activeVersion).length
+    return versionCommentsCount + versionAnnotationsCount
+  }, [comments, annotations, activeVersion])
+
   const allVersionPointedComments = useMemo(() => comments
     .filter((comment) => comment.version === activeVersion && comment.point)
     .sort((left, right) => left.id - right.id), [activeVersion, comments])
@@ -776,17 +783,72 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
               <strong title={cleanName}>{cleanName}</strong>
               <span className="file-review-kind">{typeLabel}</span>
               <span className={`file-review-status${isApproved ? ' is-approved' : isAlteracao ? ' is-alteracao' : ''}`}>{isApproved ? 'Aprovado' : isAlteracao ? 'Em alteração' : 'Aguardando aprovação'}</span><i />
-              {projectCompleted
-                ? <button type="button" className="file-review-change is-closed" disabled><LockKeyhole size={16} />Alterações encerradas</button>
-                : <button type="button" className="file-review-change" onClick={() => setChangesConfirmOpen(true)} title="Enviar anotações e solicitar alterações"><img src={figmaAsset('design_review.imgGardenReloadFill16')} alt="" />Solicitar alterações</button>}
+              {projectCompleted ? (
+                <button type="button" className="file-review-change is-closed" disabled><LockKeyhole size={16} />Alterações encerradas</button>
+              ) : (
+                <button
+                  type="button"
+                  className="file-review-change"
+                  onClick={() => {
+                    chooseTool('point')
+                    notify('Modo de anotação ativado. Clique em qualquer local da arte para adicionar seu apontamento.')
+                  }}
+                  title="Apontar ajustes e anotações na arte"
+                >
+                  <img src={figmaAsset('design_review.imgGardenReloadFill16')} alt="" />
+                  Solicitar alterações
+                </button>
+              )}
               <button type="button" className="file-review-approve" disabled={approvalSubmitting || projectCompleted} onClick={() => { if (isApproved) void revokeApproval(); else setApprovalFeedbackOpen(true) }}><img src={figmaAsset('design_review.imgGroup')} alt="" />{isApproved ? 'Aprovado' : projectCompleted ? 'Revisão encerrada' : 'Marcar como aprovado'}</button>
             </div>
-            <div className="file-review-share-actions"><button type="button" onClick={() => notify('Link de compartilhamento copiado')}><img src={figmaAsset('design_review.imgTablerShare')} alt="" />Compartilhar</button><button type="button" aria-label="Mais opções"><img src={figmaAsset('design_review.imgTablerDots')} alt="" /></button></div>
+            <div className="file-review-topline-actions">
+              {fileUrl && (
+                <a
+                  href={fileUrl}
+                  download={cleanName}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="file-review-topline-download"
+                  title="Baixar arquivo original"
+                >
+                  <Download size={15} />
+                  <span>Baixar</span>
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={closeModal}
+                className="file-review-topline-close"
+                aria-label="Fechar revisão"
+                title="Fechar revisão (Esc)"
+              >
+                <X size={19} />
+              </button>
+            </div>
           </div>
           <div className="file-review-controls">
-            <div className="file-review-view-controls">
-              {hasRail && <><button type="button" className={railVisible ? 'active' : ''} onClick={() => setRailVisible((value) => !value)} aria-label="Alternar miniatura" title="Miniatura"><img src={figmaAsset('design_review.imgPhSidebarBold')} alt="" /></button>
-              <button type="button" className={effectiveTool === 'pan' ? 'active' : ''} onClick={() => chooseTool('pan')} aria-pressed={effectiveTool === 'pan'} aria-label="Mover arquivo" title="Mover arquivo"><Hand size={20} /></button>
+            <div className="file-review-left-controls">
+              {hasRail && (
+                <button
+                  type="button"
+                  className={railVisible ? 'active' : ''}
+                  onClick={() => setRailVisible((value) => !value)}
+                  aria-label="Alternar miniatura"
+                  title="Miniatura"
+                >
+                  <img src={figmaAsset('design_review.imgPhSidebarBold')} alt="" />
+                </button>
+              )}
+              <button
+                type="button"
+                className={effectiveTool === 'pan' ? 'active' : ''}
+                onClick={() => chooseTool('pan')}
+                aria-pressed={effectiveTool === 'pan'}
+                aria-label="Mover arquivo"
+                title="Mover arquivo (Pan)"
+              >
+                <Hand size={18} />
+              </button>
               <label className="file-review-select file-review-zoom">
                 <select
                   value={zoom}
@@ -817,6 +879,7 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
                   <option value="200">200%</option>
                 </select>
               </label>
+
               {kind === 'pdf' && pdfNumPages > 1 && (
                 <div className="file-review-pdf-page-controls">
                   <button
@@ -842,7 +905,9 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
                   </button>
                 </div>
               )}
-              <i /></>}
+
+              <i className="file-review-divider" />
+
               {sortedVersions.length > 1 ? (
                 <label className="file-review-select file-review-version">
                   <select
@@ -863,34 +928,47 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
               ) : (
                 <span className="file-review-current-version">{currentDelivery.version || `Versão ${activeVersion}`}</span>
               )}
-            </div>
 
-            {projectCompleted ? <div className="file-review-review-closed" role="status"><LockKeyhole size={16} /> Projeto concluído · revisão encerrada</div> : supportsCanvas ? <div className={`file-review-annotation-toolbar${brushOpen ? ' is-expanded' : ''}`} role="toolbar" aria-label="Ferramentas de anotação">
-              <div className="file-review-primary-tools">
-                <button type="button" className={activeTool === 'point' ? 'active' : ''} onClick={() => chooseTool('point')} aria-pressed={activeTool === 'point'} aria-label="Comentário pontual" title="Comentário pontual: clique na arte">
-                  <span className="file-review-point-tool"><MessageSquare size={21} /><MousePointer2 size={13} /></span>
-                </button>
-                <button type="button" className={activeTool === 'general' ? 'active' : ''} onClick={() => chooseTool('general')} aria-pressed={activeTool === 'general'} aria-label="Comentário geral" title="Comentário geral"><MessageSquareText size={21} /></button>
-                <button type="button" className={brushOpen ? 'active' : ''} onClick={toggleBrushTools} aria-expanded={brushOpen} aria-label="Ferramentas de marcação" title="Desenhar e marcar"><Brush size={22} /></button>
-              </div>
+              <i className="file-review-divider" />
 
-              {brushOpen && <div className="file-review-brush-options" aria-label="Opções do pincel">
-                <div className="file-review-color-options" role="group" aria-label="Cor da anotação">
-                  {annotationColors.map((color) => <button type="button" className={inkColor === color ? 'active' : ''} style={{ '--annotation-color': color } as CSSProperties} onClick={() => setInkColor(color)} aria-label={`Usar cor ${color}`} aria-pressed={inkColor === color} key={color}><i /></button>)}
+              {/* ANNOTATION TOOLBAR DIRECTLY NEXT TO VERSION */}
+              {projectCompleted ? (
+                <div className="file-review-review-closed" role="status"><LockKeyhole size={16} /> Revisão encerrada</div>
+              ) : supportsCanvas ? (
+                <div className={`file-review-annotation-toolbar${brushOpen ? ' is-expanded' : ''}`} role="toolbar" aria-label="Ferramentas de anotação">
+                  <div className="file-review-primary-tools">
+                    <button type="button" className={activeTool === 'point' ? 'active' : ''} onClick={() => chooseTool('point')} aria-pressed={activeTool === 'point'} aria-label="Comentário pontual" title="Comentário pontual: clique na arte">
+                      <span className="file-review-point-tool"><MessageSquare size={19} /><MousePointer2 size={11} /></span>
+                    </button>
+                    <button type="button" className={activeTool === 'general' ? 'active' : ''} onClick={() => chooseTool('general')} aria-pressed={activeTool === 'general'} aria-label="Comentário geral" title="Comentário geral"><MessageSquareText size={19} /></button>
+                    <button type="button" className={brushOpen ? 'active' : ''} onClick={toggleBrushTools} aria-expanded={brushOpen} aria-label="Ferramentas de marcação" title="Desenhar e marcar"><Brush size={19} /></button>
+                  </div>
+
+                  {brushOpen && (
+                    <div className="file-review-brush-options" aria-label="Opções do pincel">
+                      <div className="file-review-color-options" role="group" aria-label="Cor da anotação">
+                        {annotationColors.map((color) => <button type="button" className={inkColor === color ? 'active' : ''} style={{ '--annotation-color': color } as CSSProperties} onClick={() => setInkColor(color)} aria-label={`Usar cor ${color}`} aria-pressed={inkColor === color} key={color}><i /></button>)}
+                      </div>
+                      <i />
+                      <button type="button" className="file-review-stroke" onClick={cycleStrokeWidth} aria-label={`Espessura ${strokeWidth} pixels`} title="Alterar espessura"><AlignJustify size={18} /><small>{strokeWidth}</small></button>
+                      <button type="button" className={activeTool === 'draw' ? 'active' : ''} onClick={() => chooseTool('draw')} aria-pressed={activeTool === 'draw'} aria-label="Desenho livre" title="Desenho livre"><Brush size={18} /></button>
+                      <button type="button" className={activeTool === 'text' ? 'active' : ''} onClick={() => chooseTool('text')} aria-pressed={activeTool === 'text'} aria-label="Adicionar texto" title="Adicionar texto"><Type size={18} /></button>
+                      <button type="button" className={activeTool === 'rectangle' ? 'active' : ''} onClick={() => chooseTool('rectangle')} aria-pressed={activeTool === 'rectangle'} aria-label="Destacar área" title="Destacar área"><Square size={18} /></button>
+                      <button type="button" className={activeTool === 'arrow' ? 'active' : ''} onClick={() => chooseTool('arrow')} aria-pressed={activeTool === 'arrow'} aria-label="Adicionar seta" title="Adicionar seta"><ArrowUpRight size={19} /></button>
+                      <i />
+                      <button type="button" onClick={() => dispatchAnnotation({ type: 'undo' })} disabled={annotationHistory.index === 0} aria-label="Desfazer anotação" title="Desfazer"><Undo2 size={18} /></button>
+                      <button type="button" onClick={() => dispatchAnnotation({ type: 'redo' })} disabled={annotationHistory.index === annotationHistory.snapshots.length - 1} aria-label="Refazer anotação" title="Refazer"><Redo2 size={18} /></button>
+                    </div>
+                  )}
                 </div>
-                <i />
-                <button type="button" className="file-review-stroke" onClick={cycleStrokeWidth} aria-label={`Espessura ${strokeWidth} pixels`} title="Alterar espessura"><AlignJustify size={21} /><small>{strokeWidth}</small></button>
-                <button type="button" className={activeTool === 'draw' ? 'active' : ''} onClick={() => chooseTool('draw')} aria-pressed={activeTool === 'draw'} aria-label="Desenho livre" title="Desenho livre"><Brush size={20} /></button>
-                <button type="button" className={activeTool === 'text' ? 'active' : ''} onClick={() => chooseTool('text')} aria-pressed={activeTool === 'text'} aria-label="Adicionar texto" title="Adicionar texto"><Type size={21} /></button>
-                <button type="button" className={activeTool === 'rectangle' ? 'active' : ''} onClick={() => chooseTool('rectangle')} aria-pressed={activeTool === 'rectangle'} aria-label="Destacar área" title="Destacar área"><Square size={20} /></button>
-                <button type="button" className={activeTool === 'arrow' ? 'active' : ''} onClick={() => chooseTool('arrow')} aria-pressed={activeTool === 'arrow'} aria-label="Adicionar seta" title="Adicionar seta"><ArrowUpRight size={22} /></button>
-                <i />
-                <button type="button" onClick={() => dispatchAnnotation({ type: 'undo' })} disabled={annotationHistory.index === 0} aria-label="Desfazer anotação" title="Desfazer"><Undo2 size={21} /></button>
-                <button type="button" onClick={() => dispatchAnnotation({ type: 'redo' })} disabled={annotationHistory.index === annotationHistory.snapshots.length - 1} aria-label="Refazer anotação" title="Refazer"><Redo2 size={21} /></button>
-              </div>}
-            </div> : <div className="file-review-delivery-actions"><button type="button" className="file-review-general-comment" onClick={() => chooseTool('general')}><MessageSquareText size={18} /> Comentar entrega</button>{fileUrl && <a href={fileUrl} target="_blank" rel="noreferrer"><Download size={17} /> Abrir original</a>}</div>}
-
-            <div className="file-review-right-controls"><label className="file-review-select file-review-read"><select aria-label="Estado de leitura" defaultValue="unread"><option value="unread">não lido</option><option value="read">lido</option></select></label><button type="button" aria-label="Visualizar comentários"><img src={figmaAsset('design_review.imgGroup1')} alt="" /></button><button type="button" onClick={closeModal} aria-label="Fechar revisão"><img src={figmaAsset('design_review.imgMaterialSymbolsClose')} alt="" /></button></div>
+              ) : (
+                <div className="file-review-delivery-actions">
+                  <button type="button" className="file-review-general-comment" onClick={() => chooseTool('general')}>
+                    <MessageSquareText size={16} /> Comentar entrega
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
@@ -1014,6 +1092,23 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
               <button type="button" onClick={() => setTextEditor(null)} aria-label="Cancelar texto"><X size={17} /></button>
             </form>}
           </div>
+
+          {!projectCompleted && !isApproved && totalFeedbackCount > 0 && (
+            <div className="file-review-floating-pill">
+              <span className="file-review-floating-pill-dot" />
+              <span className="file-review-floating-pill-text">
+                <b>{totalFeedbackCount}</b> {totalFeedbackCount === 1 ? 'anotação feita' : 'anotações feitas'}
+              </span>
+              <button
+                type="button"
+                className="file-review-floating-submit-btn"
+                onClick={() => setChangesConfirmOpen(true)}
+              >
+                <img src={figmaAsset('design_review.imgGardenReloadFill16')} alt="" />
+                <span>Enviar para alteração</span>
+              </button>
+            </div>
+          )}
         </main>
 
         <aside className="file-review-comments" ref={commentsPanelRef}>
@@ -1070,18 +1165,22 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
             {!reviewLoading && visibleComments.length === 0 && <p className="file-review-comments-empty">Nenhum comentário nesta versão.</p>}
           </div>
           {!projectCompleted && !isApproved && (
-            <div style={{ padding: '0 16px 8px' }}>
+            <div className="file-review-sidebar-submit-card">
+              <div className="file-review-sidebar-submit-header">
+                <span className="file-review-submit-count">
+                  {totalFeedbackCount} {totalFeedbackCount === 1 ? 'anotação feita' : 'anotações feitas'}
+                </span>
+                <span className="file-review-submit-tag">Versão {activeVersion}</span>
+              </div>
               <button
                 type="button"
-                className="file-review-change-sidebar-cta"
+                className="file-review-submit-changes-btn"
+                disabled={submittingChanges || totalFeedbackCount === 0}
                 onClick={() => setChangesConfirmOpen(true)}
+                title={totalFeedbackCount === 0 ? 'Adicione anotações na arte antes de enviar' : 'Enviar anotações ao time criativo'}
               >
-                <img src={figmaAsset('design_review.imgGardenReloadFill16')} alt="" style={{ width: 14, height: 14, filter: 'brightness(0) invert(1)' }} />
-                <span>
-                  {visibleComments.length + visibleAnnotations.length > 0
-                    ? `Enviar anotações para alteração (${visibleComments.length + visibleAnnotations.length})`
-                    : 'Solicitar alterações'}
-                </span>
+                <img src={figmaAsset('design_review.imgGardenReloadFill16')} alt="" />
+                <span>Enviar anotações para alteração</span>
               </button>
             </div>
           )}
