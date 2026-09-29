@@ -6,7 +6,6 @@ import {
   Brush,
   ChevronLeft,
   ChevronRight,
-  Clock,
   Download,
   FileText,
   Hand,
@@ -1001,49 +1000,51 @@ export function DesignReviewModal({
                 </select>
               </label>
 
-              <i className="file-review-divider" />
-
               {/* ANNOTATION TOOLBAR DIRECTLY NEXT TO VERSION */}
               {projectCompleted ? (
-                <div className="file-review-review-closed" role="status"><LockKeyhole size={16} /> Revisão encerrada</div>
-              ) : isAlteracao ? (
-                <div className="file-review-review-in-alteracao" role="status">
-                  <Clock size={15} />
-                  <span>Em alteração pelo time criativo</span>
-                </div>
-              ) : supportsCanvas ? (
-                <div className={`file-review-annotation-toolbar${brushOpen ? ' is-expanded' : ''}`} role="toolbar" aria-label="Ferramentas de anotação">
-                  <div className="file-review-primary-tools">
-                    <button type="button" className={activeTool === 'point' ? 'active' : ''} onClick={() => chooseTool('point')} aria-pressed={activeTool === 'point'} aria-label="Comentário pontual" title="Comentário pontual: clique na arte">
-                      <span className="file-review-point-tool"><MessageSquare size={19} /><MousePointer2 size={11} /></span>
-                    </button>
-                    <button type="button" className={activeTool === 'general' ? 'active' : ''} onClick={() => chooseTool('general')} aria-pressed={activeTool === 'general'} aria-label="Comentário geral" title="Comentário geral"><MessageSquareText size={19} /></button>
-                    <button type="button" className={brushOpen ? 'active' : ''} onClick={toggleBrushTools} aria-expanded={brushOpen} aria-label="Ferramentas de marcação" title="Desenhar e marcar"><Brush size={19} /></button>
-                  </div>
-
-                  {brushOpen && (
-                    <div className="file-review-brush-options" aria-label="Opções do pincel">
-                      <div className="file-review-color-options" role="group" aria-label="Cor da anotação">
-                        {annotationColors.map((color) => <button type="button" className={inkColor === color ? 'active' : ''} style={{ '--annotation-color': color } as CSSProperties} onClick={() => setInkColor(color)} aria-label={`Usar cor ${color}`} aria-pressed={inkColor === color} key={color}><i /></button>)}
-                      </div>
-                      <i />
-                      <button type="button" className="file-review-stroke" onClick={cycleStrokeWidth} aria-label={`Espessura ${strokeWidth} pixels`} title="Alterar espessura"><AlignJustify size={18} /><small>{strokeWidth}</small></button>
-                      <button type="button" className={activeTool === 'draw' ? 'active' : ''} onClick={() => chooseTool('draw')} aria-pressed={activeTool === 'draw'} aria-label="Desenho livre" title="Desenho livre"><Brush size={18} /></button>
-                      <button type="button" className={activeTool === 'text' ? 'active' : ''} onClick={() => chooseTool('text')} aria-pressed={activeTool === 'text'} aria-label="Adicionar texto" title="Adicionar texto"><Type size={18} /></button>
-                      <button type="button" className={activeTool === 'rectangle' ? 'active' : ''} onClick={() => chooseTool('rectangle')} aria-pressed={activeTool === 'rectangle'} aria-label="Destacar área" title="Destacar área"><Square size={18} /></button>
-                      <button type="button" className={activeTool === 'arrow' ? 'active' : ''} onClick={() => chooseTool('arrow')} aria-pressed={activeTool === 'arrow'} aria-label="Adicionar seta" title="Adicionar seta"><ArrowUpRight size={19} /></button>
-                      <i />
-                      <button type="button" onClick={() => dispatchAnnotation({ type: 'undo' })} disabled={annotationHistory.index === 0} aria-label="Desfazer anotação" title="Desfazer"><Undo2 size={18} /></button>
-                      <button type="button" onClick={() => dispatchAnnotation({ type: 'redo' })} disabled={annotationHistory.index === annotationHistory.snapshots.length - 1} aria-label="Refazer anotação" title="Refazer"><Redo2 size={18} /></button>
+                <>
+                  <i className="file-review-divider" />
+                  <div className="file-review-review-closed" role="status"><LockKeyhole size={16} /> Revisão encerrada</div>
+                </>
+              ) : isAlteracao ? null : supportsCanvas ? (
+                <>
+                  <i className="file-review-divider" />
+                  <div className={`file-review-annotation-toolbar${brushOpen ? ' is-expanded' : ''}`} role="toolbar" aria-label="Ferramentas de anotação">
+                    <div className="file-review-primary-tools">
+                      <button type="button" className={activeTool === 'point' ? 'active' : ''} onClick={() => chooseTool('point')} aria-pressed={activeTool === 'point'} aria-label="Comentário pontual" title="Comentário pontual: clique na arte">
+                        <span className="file-review-point-tool"><MessageSquare size={19} /><MousePointer2 size={11} /></span>
+                      </button>
+                      <button type="button" className={activeTool === 'general' ? 'active' : ''} onClick={() => chooseTool('general')} aria-pressed={activeTool === 'general'} aria-label="Comentário geral" title="Comentário geral"><MessageSquareText size={19} /></button>
+                      <button type="button" className={brushOpen ? 'active' : ''} onClick={toggleBrushTools} aria-expanded={brushOpen} aria-label="Ferramentas de marcação" title="Desenhar e marcar"><Brush size={19} /></button>
                     </div>
-                  )}
-                </div>
+
+                    {brushOpen && (
+                      <div className="file-review-brush-options" aria-label="Opções do pincel">
+                        <div className="file-review-color-options" role="group" aria-label="Cor da anotação">
+                          {annotationColors.map((color) => <button type="button" className={inkColor === color ? 'active' : ''} style={{ '--annotation-color': color } as CSSProperties} onClick={() => setInkColor(color)} aria-label={`Usar cor ${color}`} aria-pressed={inkColor === color} key={color}><i /></button>)}
+                        </div>
+                        <i />
+                        <button type="button" className="file-review-stroke" onClick={cycleStrokeWidth} aria-label={`Espessura ${strokeWidth} pixels`} title="Alterar espessura"><AlignJustify size={18} /><small>{strokeWidth}</small></button>
+                        <button type="button" className={activeTool === 'draw' ? 'active' : ''} onClick={() => chooseTool('draw')} aria-pressed={activeTool === 'draw'} aria-label="Desenho livre" title="Desenho livre"><Brush size={18} /></button>
+                        <button type="button" className={activeTool === 'text' ? 'active' : ''} onClick={() => chooseTool('text')} aria-pressed={activeTool === 'text'} aria-label="Adicionar texto" title="Adicionar texto"><Type size={18} /></button>
+                        <button type="button" className={activeTool === 'rectangle' ? 'active' : ''} onClick={() => chooseTool('rectangle')} aria-pressed={activeTool === 'rectangle'} aria-label="Destacar área" title="Destacar área"><Square size={18} /></button>
+                        <button type="button" className={activeTool === 'arrow' ? 'active' : ''} onClick={() => chooseTool('arrow')} aria-pressed={activeTool === 'arrow'} aria-label="Adicionar seta" title="Adicionar seta"><ArrowUpRight size={19} /></button>
+                        <i />
+                        <button type="button" onClick={() => dispatchAnnotation({ type: 'undo' })} disabled={annotationHistory.index === 0} aria-label="Desfazer anotação" title="Desfazer"><Undo2 size={18} /></button>
+                        <button type="button" onClick={() => dispatchAnnotation({ type: 'redo' })} disabled={annotationHistory.index === annotationHistory.snapshots.length - 1} aria-label="Refazer anotação" title="Refazer"><Redo2 size={18} /></button>
+                      </div>
+                    )}
+                  </div>
+                </>
               ) : (
-                <div className="file-review-delivery-actions">
-                  <button type="button" className="file-review-general-comment" onClick={() => chooseTool('general')}>
-                    <MessageSquareText size={16} /> Comentar entrega
-                  </button>
-                </div>
+                <>
+                  <i className="file-review-divider" />
+                  <div className="file-review-delivery-actions">
+                    <button type="button" className="file-review-general-comment" onClick={() => chooseTool('general')}>
+                      <MessageSquareText size={16} /> Comentar entrega
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -1223,15 +1224,7 @@ export function DesignReviewModal({
             {!reviewLoading && visibleComments.length === 0 && <p className="file-review-comments-empty">Nenhum comentário nesta versão.</p>}
           </div>
 
-          {isAlteracao ? (
-            <div className="file-review-comment-closed" style={{ background: '#fff9f5', borderColor: '#ffd8bf' }}>
-              <Clock size={18} style={{ color: '#d9651a' }} />
-              <div>
-                <strong style={{ color: '#b34710' }}>Material em alteração</strong>
-                <span style={{ color: '#8c3d14' }}>Aguardando o time criativo enviar a nova versão para aprovação.</span>
-              </div>
-            </div>
-          ) : projectCompleted ? (
+          {isAlteracao ? null : projectCompleted ? (
             <div className="file-review-comment-closed"><LockKeyhole size={18} /><div><strong>Revisão encerrada</strong><span>Todas as tarefas do projeto foram concluídas.</span></div></div>
           ) : (
             <form className={`file-review-comment-form${pendingPoint ? ' is-point-pending' : ''}`} onSubmit={addComment}>
