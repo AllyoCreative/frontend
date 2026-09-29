@@ -783,23 +783,31 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
               <strong title={cleanName}>{cleanName}</strong>
               <span className="file-review-kind">{typeLabel}</span>
               <span className={`file-review-status${isApproved ? ' is-approved' : isAlteracao ? ' is-alteracao' : ''}`}>{isApproved ? 'Aprovado' : isAlteracao ? 'Em alteração' : 'Aguardando aprovação'}</span><i />
-              {projectCompleted ? (
-                <button type="button" className="file-review-change is-closed" disabled><LockKeyhole size={16} />Alterações encerradas</button>
+              {totalFeedbackCount > 0 && !isApproved ? (
+                <button
+                  type="button"
+                  className="file-review-submit-changes-topbar"
+                  disabled={submittingChanges || projectCompleted}
+                  onClick={() => setChangesConfirmOpen(true)}
+                  title="Enviar anotações para alteração"
+                >
+                  <img src={figmaAsset('design_review.imgGardenReloadFill16')} alt="" />
+                  <span>Enviar para alteração</span>
+                </button>
               ) : (
                 <button
                   type="button"
-                  className="file-review-change"
+                  className="file-review-approve"
+                  disabled={approvalSubmitting || projectCompleted}
                   onClick={() => {
-                    chooseTool('point')
-                    notify('Modo de anotação ativado. Clique em qualquer local da arte para adicionar seu apontamento.')
+                    if (isApproved) void revokeApproval()
+                    else setApprovalFeedbackOpen(true)
                   }}
-                  title="Apontar ajustes e anotações na arte"
                 >
-                  <img src={figmaAsset('design_review.imgGardenReloadFill16')} alt="" />
-                  Solicitar alterações
+                  <img src={figmaAsset('design_review.imgGroup')} alt="" />
+                  <span>{isApproved ? 'Aprovado' : projectCompleted ? 'Revisão encerrada' : 'Marcar como aprovado'}</span>
                 </button>
               )}
-              <button type="button" className="file-review-approve" disabled={approvalSubmitting || projectCompleted} onClick={() => { if (isApproved) void revokeApproval(); else setApprovalFeedbackOpen(true) }}><img src={figmaAsset('design_review.imgGroup')} alt="" />{isApproved ? 'Aprovado' : projectCompleted ? 'Revisão encerrada' : 'Marcar como aprovado'}</button>
             </div>
             <div className="file-review-topline-actions">
               {fileUrl && (
@@ -839,6 +847,60 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
                   <img src={figmaAsset('design_review.imgPhSidebarBold')} alt="" />
                 </button>
               )}
+
+              {kind === 'pdf' && pdfNumPages > 1 && (
+                <div className="file-review-pdf-page-controls">
+                  <button
+                    type="button"
+                    disabled={pdfPage <= 1}
+                    onClick={() => setPdfPage((p) => Math.max(1, p - 1))}
+                    aria-label="Página anterior"
+                    title="Página anterior"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <span className="file-review-pdf-page-label">
+                    Pág. <b>{pdfPage}</b> / {pdfNumPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={pdfPage >= pdfNumPages}
+                    onClick={() => setPdfPage((p) => Math.min(pdfNumPages, p + 1))}
+                    aria-label="Próxima página"
+                    title="Próxima página"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
+
+              {(hasRail || (kind === 'pdf' && pdfNumPages > 1)) && (
+                <i className="file-review-divider" />
+              )}
+
+              {sortedVersions.length > 1 ? (
+                <label className="file-review-select file-review-version">
+                  <select
+                    value={currentDelivery.id}
+                    onChange={(e) => {
+                      const next = sortedVersions.find((item) => item.id === Number(e.target.value))
+                      if (next) setCurrentDelivery(next)
+                    }}
+                    aria-label="Versão do material"
+                  >
+                    {sortedVersions.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.version || `Versão ${parseVersionNum(item.version)}`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <span className="file-review-current-version">{currentDelivery.version || `Versão ${activeVersion}`}</span>
+              )}
+
+              <i className="file-review-divider" />
+
               <button
                 type="button"
                 className={effectiveTool === 'pan' ? 'active' : ''}
@@ -849,6 +911,7 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
               >
                 <Hand size={18} />
               </button>
+
               <label className="file-review-select file-review-zoom">
                 <select
                   value={zoom}
@@ -879,55 +942,6 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
                   <option value="200">200%</option>
                 </select>
               </label>
-
-              {kind === 'pdf' && pdfNumPages > 1 && (
-                <div className="file-review-pdf-page-controls">
-                  <button
-                    type="button"
-                    disabled={pdfPage <= 1}
-                    onClick={() => setPdfPage((p) => Math.max(1, p - 1))}
-                    aria-label="Página anterior"
-                    title="Página anterior"
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                  <span className="file-review-pdf-page-label">
-                    Pág. <b>{pdfPage}</b> / {pdfNumPages}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={pdfPage >= pdfNumPages}
-                    onClick={() => setPdfPage((p) => Math.min(pdfNumPages, p + 1))}
-                    aria-label="Próxima página"
-                    title="Próxima página"
-                  >
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-              )}
-
-              <i className="file-review-divider" />
-
-              {sortedVersions.length > 1 ? (
-                <label className="file-review-select file-review-version">
-                  <select
-                    value={currentDelivery.id}
-                    onChange={(e) => {
-                      const next = sortedVersions.find((item) => item.id === Number(e.target.value))
-                      if (next) setCurrentDelivery(next)
-                    }}
-                    aria-label="Versão do material"
-                  >
-                    {sortedVersions.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.version || `Versão ${parseVersionNum(item.version)}`}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : (
-                <span className="file-review-current-version">{currentDelivery.version || `Versão ${activeVersion}`}</span>
-              )}
 
               <i className="file-review-divider" />
 
@@ -1093,22 +1107,7 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
             </form>}
           </div>
 
-          {!projectCompleted && !isApproved && totalFeedbackCount > 0 && (
-            <div className="file-review-floating-pill">
-              <span className="file-review-floating-pill-dot" />
-              <span className="file-review-floating-pill-text">
-                <b>{totalFeedbackCount}</b> {totalFeedbackCount === 1 ? 'anotação feita' : 'anotações feitas'}
-              </span>
-              <button
-                type="button"
-                className="file-review-floating-submit-btn"
-                onClick={() => setChangesConfirmOpen(true)}
-              >
-                <img src={figmaAsset('design_review.imgGardenReloadFill16')} alt="" />
-                <span>Enviar para alteração</span>
-              </button>
-            </div>
-          )}
+
         </main>
 
         <aside className="file-review-comments" ref={commentsPanelRef}>
@@ -1164,26 +1163,7 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
             })}
             {!reviewLoading && visibleComments.length === 0 && <p className="file-review-comments-empty">Nenhum comentário nesta versão.</p>}
           </div>
-          {!projectCompleted && !isApproved && (
-            <div className="file-review-sidebar-submit-card">
-              <div className="file-review-sidebar-submit-header">
-                <span className="file-review-submit-count">
-                  {totalFeedbackCount} {totalFeedbackCount === 1 ? 'anotação feita' : 'anotações feitas'}
-                </span>
-                <span className="file-review-submit-tag">Versão {activeVersion}</span>
-              </div>
-              <button
-                type="button"
-                className="file-review-submit-changes-btn"
-                disabled={submittingChanges || totalFeedbackCount === 0}
-                onClick={() => setChangesConfirmOpen(true)}
-                title={totalFeedbackCount === 0 ? 'Adicione anotações na arte antes de enviar' : 'Enviar anotações ao time criativo'}
-              >
-                <img src={figmaAsset('design_review.imgGardenReloadFill16')} alt="" />
-                <span>Enviar anotações para alteração</span>
-              </button>
-            </div>
-          )}
+
           {projectCompleted ? <div className="file-review-comment-closed"><LockKeyhole size={18} /><div><strong>Revisão encerrada</strong><span>Todas as tarefas do projeto foram concluídas.</span></div></div> : <form className={`file-review-comment-form${pendingPoint ? ' is-point-pending' : ''}`} onSubmit={addComment}>
             <div><strong>{commentFormTitle}</strong>{(pendingPoint || contextAnnotation) && <button type="button" onClick={() => chooseTool('general')}>Alterar para geral</button>}</div>
             {pendingPoint ? <p>Escreva no campo que abriu ao lado do marcador na arte.</p> : <>

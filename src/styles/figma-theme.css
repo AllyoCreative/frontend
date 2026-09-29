@@ -1050,8 +1050,32 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .file-review-select { position: relative; height: 40px; display: block; }
 .file-review-select::after { content: ''; position: absolute; top: 50%; right: 11px; width: 10px; height: 7px; pointer-events: none; background: center / contain no-repeat url('/assets/figma/design_review_imgWeuiArrowOutlined.svg'); transform: translateY(-50%) rotate(90deg); }
 .file-review-select select { width: 100%; height: 100%; padding: 0 32px 0 12px; appearance: none; border: 0; border-radius: 7px; outline: 0; background: #f3f5f3; color: #000; font-size: 13px; font-weight: 500; line-height: 18px; }
-.file-review-zoom { width: 122px; }
-.file-review-zoom select { background: transparent; font-size: 14px; font-weight: 650; }
+.file-review-zoom {
+  width: 72px;
+  height: 38px;
+  flex: none;
+}
+.file-review-zoom select {
+  width: 100%;
+  height: 100%;
+  padding: 0 18px 0 6px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  color: #131f15;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background .15s ease;
+}
+.file-review-zoom select:hover {
+  background: #edf2ed;
+}
+.file-review-select.file-review-zoom::after {
+  right: 6px;
+  width: 8px;
+  height: 5px;
+  opacity: 0.6;
+}
 .file-review-version { width: 132px; }
 .file-review-stepper { height: 40px; display: flex; gap: 1px; }
 .file-review-stepper button { width: 40px; height: 40px; display: grid; place-items: center; padding: 0; border: 0; background: #f3f5f3; }
@@ -2512,5 +2536,40 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .file-review-submit-changes-btn img {
   width: 14px;
   height: 14px;
+  filter: brightness(0) invert(1);
+}
+
+
+/* Dynamic topbar "Enviar para alteração" action button */
+.file-review-submit-changes-topbar {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px 8px 14px;
+  border: 0;
+  border-radius: 100px;
+  background: #ff7a45;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(255, 122, 69, 0.28);
+  transition: background-color .16s ease, transform .15s ease, box-shadow .15s ease;
+}
+.file-review-submit-changes-topbar:hover:not(:disabled) {
+  background: #f06a35;
+  box-shadow: 0 6px 18px rgba(255, 122, 69, 0.38);
+  transform: translateY(-1px);
+}
+.file-review-submit-changes-topbar:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.file-review-submit-changes-topbar img {
+  width: 16px;
+  height: 16px;
   filter: brightness(0) invert(1);
 }
