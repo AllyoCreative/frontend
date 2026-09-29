@@ -2619,3 +2619,20 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
   height: 16px;
   filter: brightness(0) invert(1);
 }
+
+.file-review-review-in-alteracao {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 14px;
+  border-radius: 100px;
+  background: #fff4ed;
+  border: 1px solid #ffd8bf;
+  color: #c44d15;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.file-review-review-in-alteracao svg {
+  color: #ff7a45;
+}

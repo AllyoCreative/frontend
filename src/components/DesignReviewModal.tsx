@@ -6,6 +6,7 @@ import {
   Brush,
   ChevronLeft,
   ChevronRight,
+  Clock,
   Download,
   FileText,
   Hand,
@@ -100,6 +101,8 @@ type DesignReviewModalProps = {
   approvedIds?: number[]
   isApproved?: boolean
   projectCompleted: boolean
+  isAlteracao?: boolean
+  taskStatus?: string
   origin: ReviewOrigin | null
   onApprovalChange: (approved: boolean, feedback?: { rating: number; comment?: string }, targetDeliveryId?: number) => Promise<void>
   onRequestChanges?: (deliveryId: number, notes?: string) => Promise<void>
@@ -137,7 +140,27 @@ function contentKind(delivery: DesignSummary) {
   return 'file' as const
 }
 
-export function DesignReviewModal({ delivery, versions = [delivery], approvedIds, isApproved: propIsApproved, projectCompleted, origin, onApprovalChange, onRequestChanges, onClose, notify }: DesignReviewModalProps) {
+export function DesignReviewModal({
+  delivery,
+  versions = [delivery],
+  approvedIds,
+  isApproved: propIsApproved,
+  projectCompleted,
+  isAlteracao: propIsAlteracao,
+  taskStatus,
+  origin,
+  onApprovalChange,
+  onRequestChanges,
+  onClose,
+  notify,
+}: DesignReviewModalProps) {
+  const isAlteracaoActive = Boolean(
+    propIsAlteracao ||
+    taskStatus === 'Alteração' ||
+    taskStatus === 'alteracao' ||
+    (delivery as any).status === 'Alteração' ||
+    (delivery as any).delivery === 'Em alteração'
+  )
   const [currentDelivery, setCurrentDelivery] = useState<DesignSummary>(delivery)
 
   useEffect(() => {
@@ -219,7 +242,11 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
   const [submittingChanges, setSubmittingChanges] = useState(false)
   const [changeNotes, setChangeNotes] = useState('')
   const [changesError, setChangesError] = useState('')
-  const [isAlteracao, setIsAlteracao] = useState(false)
+  const [isAlteracao, setIsAlteracao] = useState(isAlteracaoActive)
+
+  useEffect(() => {
+    setIsAlteracao(isAlteracaoActive)
+  }, [isAlteracaoActive])
   const [pendingPoint, setPendingPoint] = useState<ReviewPoint | null>(null)
   const [pendingAnnotationId, setPendingAnnotationId] = useState<number | null>(null)
   const [activeTool, setActiveTool] = useState<ReviewTool>(supportsCanvas ? (projectCompleted ? 'pan' : 'point') : 'general')
@@ -249,7 +276,7 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
   const [artReady, setArtReady] = useState(!origin || reducedMotion || !supportsCanvas)
   const [clonePhase, setClonePhase] = useState<'opening' | 'closing' | null>(origin && supportsCanvas && !reducedMotion ? 'opening' : null)
   const [cloneRect, setCloneRect] = useState<ReviewOrigin | null>(origin)
-  const effectiveTool: ReviewTool = projectCompleted && supportsCanvas ? 'pan' : activeTool
+  const effectiveTool: ReviewTool = (projectCompleted || isAlteracao) ? 'pan' : activeTool
   const artStageRef = useRef<HTMLElement>(null)
   const artRef = useRef<HTMLDivElement>(null)
   const cloneRef = useRef<HTMLDivElement>(null)
@@ -312,6 +339,9 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
     let active = true
     api.getDesignReview(currentDelivery.id).then((review) => {
       if (!active) return
+      if ((review as any).taskStatus === 'Alteração' || (review as any).taskStatus === 'alteracao') {
+        setIsAlteracao(true)
+      }
       const mappedComments = ((review.comments as any[]) || []).map((comm) => ({
         ...comm,
         page: comm.page ?? comm.payload?.page ?? 1,
@@ -466,7 +496,7 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
   }
 
   const chooseTool = (tool: ReviewTool) => {
-    if (projectCompleted && tool !== 'pan') return
+    if ((projectCompleted || isAlteracao) && tool !== 'pan') return
     if (!supportsCanvas && tool !== 'general') return
     setActiveTool(tool)
     setDraftAnnotation(null)
@@ -500,6 +530,21 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
     if (event.button !== 0) return
     const point = getPoint(event.clientX, event.clientY)
 
+    if (isAlteracao || projectCompleted) {
+      if (effectiveTool === 'pan') {
+        const stage = artStageRef.current
+        if (!stage) return
+        event.currentTarget.setPointerCapture(event.pointerId)
+        panStartRef.current = {
+          clientX: event.clientX,
+          clientY: event.clientY,
+          scrollLeft: stage.scrollLeft,
+          scrollTop: stage.scrollTop,
+        }
+        setIsPanning(true)
+      }
+      return
+    }
     if (effectiveTool === 'general') return
     if (effectiveTool === 'point') {
       setPendingAnnotationId(null)
@@ -794,30 +839,32 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
               <strong title={cleanName}>{cleanName}</strong>
               <span className="file-review-kind">{typeLabel}</span>
               <span className={`file-review-status${isApproved ? ' is-approved' : isAlteracao ? ' is-alteracao' : ''}`}>{isApproved ? 'Aprovado' : isAlteracao ? 'Em alteração' : 'Aguardando aprovação'}</span><i />
-              {totalFeedbackCount > 0 && !isApproved ? (
-                <button
-                  type="button"
-                  className="file-review-submit-changes-topbar"
-                  disabled={submittingChanges || projectCompleted}
-                  onClick={() => setChangesConfirmOpen(true)}
-                  title="Enviar anotações para alteração"
-                >
-                  <img src={figmaAsset('design_review.imgGardenReloadFill16')} alt="" />
-                  <span>Enviar para alteração</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="file-review-approve"
-                  disabled={approvalSubmitting || projectCompleted}
-                  onClick={() => {
-                    if (isApproved) void revokeApproval()
-                    else setApprovalFeedbackOpen(true)
-                  }}
-                >
-                  <img src={figmaAsset('design_review.imgGroup')} alt="" />
-                  <span>{isApproved ? 'Aprovado' : projectCompleted ? 'Revisão encerrada' : 'Marcar como aprovado'}</span>
-                </button>
+              {!isAlteracao && (
+                totalFeedbackCount > 0 && !isApproved ? (
+                  <button
+                    type="button"
+                    className="file-review-submit-changes-topbar"
+                    disabled={submittingChanges || projectCompleted}
+                    onClick={() => setChangesConfirmOpen(true)}
+                    title="Enviar anotações para alteração"
+                  >
+                    <img src={figmaAsset('design_review.imgGardenReloadFill16')} alt="" />
+                    <span>Enviar para alteração</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="file-review-approve"
+                    disabled={approvalSubmitting || projectCompleted}
+                    onClick={() => {
+                      if (isApproved) void revokeApproval()
+                      else setApprovalFeedbackOpen(true)
+                    }}
+                  >
+                    <img src={figmaAsset('design_review.imgGroup')} alt="" />
+                    <span>{isApproved ? 'Aprovado' : projectCompleted ? 'Revisão encerrada' : 'Marcar como aprovado'}</span>
+                  </button>
+                )
               )}
             </div>
             <div className="file-review-topline-actions">
@@ -959,6 +1006,11 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
               {/* ANNOTATION TOOLBAR DIRECTLY NEXT TO VERSION */}
               {projectCompleted ? (
                 <div className="file-review-review-closed" role="status"><LockKeyhole size={16} /> Revisão encerrada</div>
+              ) : isAlteracao ? (
+                <div className="file-review-review-in-alteracao" role="status">
+                  <Clock size={15} />
+                  <span>Em alteração pelo time criativo</span>
+                </div>
               ) : supportsCanvas ? (
                 <div className={`file-review-annotation-toolbar${brushOpen ? ' is-expanded' : ''}`} role="toolbar" aria-label="Ferramentas de anotação">
                   <div className="file-review-primary-tools">
@@ -1141,7 +1193,7 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
                       <img src={figmaAsset('design_review.imgEllipse24')} alt="" />
                       <strong>{comment.author}</strong>
                     </span>
-                    {!projectCompleted && (
+                    {!projectCompleted && !isAlteracao && (
                       <span>
                         <button type="button" aria-label="Mais opções do comentário"><img src={figmaAsset('design_review.imgTablerDots1')} alt="" /></button>
                         <button type="button" onClick={() => void toggleResolved(comment.id)} aria-label={comment.resolved ? 'Reabrir comentário' : 'Resolver comentário'}><img src={figmaAsset('design_review.imgGroup2')} alt="" /></button>
@@ -1164,14 +1216,25 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
                     </div>
                   )}
                   <p>{parsed.cleanText}</p>
-                  {!projectCompleted && <button type="button" className="file-review-reply"><img src={figmaAsset('design_review.imgMaterialSymbolsReplyRounded')} alt="" />Responder</button>}
+                  {!projectCompleted && !isAlteracao && <button type="button" className="file-review-reply"><img src={figmaAsset('design_review.imgMaterialSymbolsReplyRounded')} alt="" />Responder</button>}
                 </article>
               )
             })}
             {!reviewLoading && visibleComments.length === 0 && <p className="file-review-comments-empty">Nenhum comentário nesta versão.</p>}
           </div>
 
-          {projectCompleted ? <div className="file-review-comment-closed"><LockKeyhole size={18} /><div><strong>Revisão encerrada</strong><span>Todas as tarefas do projeto foram concluídas.</span></div></div> : <form className={`file-review-comment-form${pendingPoint ? ' is-point-pending' : ''}`} onSubmit={addComment}>
+          {isAlteracao ? (
+            <div className="file-review-comment-closed" style={{ background: '#fff9f5', borderColor: '#ffd8bf' }}>
+              <Clock size={18} style={{ color: '#d9651a' }} />
+              <div>
+                <strong style={{ color: '#b34710' }}>Material em alteração</strong>
+                <span style={{ color: '#8c3d14' }}>Aguardando o time criativo enviar a nova versão para aprovação.</span>
+              </div>
+            </div>
+          ) : projectCompleted ? (
+            <div className="file-review-comment-closed"><LockKeyhole size={18} /><div><strong>Revisão encerrada</strong><span>Todas as tarefas do projeto foram concluídas.</span></div></div>
+          ) : (
+            <form className={`file-review-comment-form${pendingPoint ? ' is-point-pending' : ''}`} onSubmit={addComment}>
             <div><strong>{commentFormTitle}</strong>{(pendingPoint || contextAnnotation) && <button type="button" onClick={() => chooseTool('general')}>Alterar para geral</button>}</div>
             {pendingPoint ? <p>Escreva no campo que abriu ao lado do marcador na arte.</p> : <>
               {selectedSnippet && (
@@ -1183,7 +1246,8 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
               <textarea ref={commentInputRef} value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} placeholder={selectedSnippet ? "O que ajustar no trecho selecionado..." : contextAnnotation ? 'Descreva o ajuste relacionado à anotação...' : 'Adicionar comentário geral...'} aria-label="Novo comentário" />
               <button type="submit" disabled={!commentDraft.trim() || commentSubmitting}>{commentSubmitting ? 'Enviando...' : 'Comentar'}</button>
             </>}
-          </form>}
+          </form>
+          )}
         </aside>
       </div>
       {changesConfirmOpen && (

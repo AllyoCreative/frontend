@@ -690,6 +690,9 @@ export function ProjectDetailPage() {
           return parseVersionNum(b.version) - parseVersionNum(a.version) || b.id - a.id
         })
 
+        const relatedTask = targetDelivery.taskId ? projectTasks.find((t) => t.id === targetDelivery.taskId) : null
+        const isTaskInAlteracao = (relatedTask?.status as string) === 'Alteração' || (relatedTask?.delivery as string) === 'Em alteração'
+
         return (
           <DesignReviewModal
             delivery={targetDelivery}
@@ -697,6 +700,8 @@ export function ProjectDetailPage() {
             approvedIds={approved}
             isApproved={approved.includes(reviewing)}
             projectCompleted={projectCompleted}
+            isAlteracao={isTaskInAlteracao}
+            taskStatus={relatedTask?.status}
             origin={reviewOrigin}
             notify={notify}
             onApprovalChange={(nextApproved, feedback, targetId) => handleApprovalChange(targetId || reviewing, nextApproved, feedback)}
