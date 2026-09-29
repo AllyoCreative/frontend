@@ -125,7 +125,7 @@ function FilterDropdown({ label, value, options, onChange, display = false }: {
   </details>
 }
 
-function DeliveryCard({ state }: { state: 'Aprovado' | 'Aguardando aprovação' }) {
+function DeliveryCard({ state }: { state: 'Aprovado' | 'Aguardando aprovação' | 'Em alteração' }) {
   return (
     <div className="projects-delivery">
       <img src={figmaAsset('projects.imgRectangle161124126')} alt="Prévia do design entregue" />

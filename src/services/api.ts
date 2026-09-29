@@ -485,6 +485,13 @@ export const api = {
     })
   },
 
+  async requestChanges(designId: number, data?: { notes?: string }) {
+    return request<{ success: boolean; designId: number; taskId?: string | null; status: string; newVersion: string; newVersionNumber: number; project?: { status: string; progress: number; tasks: number } }>(`/designs/${designId}/request-changes`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    })
+  },
+
   async setDesignApproval(designId: number, approved: boolean, feedback?: { rating: number; comment?: string }) {
     return request<{ success: boolean; id: number; approved: boolean; taskId?: string | null; project?: { status: string; progress: number; tasks: number }; feedback?: { rating: number; comment: string | null } | null }>(`/designs/${designId}/approval`, {
       method: 'POST',

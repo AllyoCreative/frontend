@@ -831,6 +831,7 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .project-task-status--a-iniciar { background: #eff4e5; color: #687d3d; }
 .project-task-status--em-andamento { background: #e7eff7; color: #365d7b; }
 .project-task-status--em-revisao { background: #fff0e8; color: #9b4e2c; }
+.project-task-status--alteracao { background: #fff3e6; color: #d9651a; border: 1px solid #ffd6b3; }
 .project-task-status--concluido { background: #e1f1e8; color: #28714e; }
 .project-task-summary { margin: 0; padding: 0 18px 14px; color: #526159; font-size: 12px; line-height: 18px; }
 .project-task-stack-card > footer { min-height: 46px; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid #edf0ec; background: #fafbf9; }
@@ -2298,3 +2299,29 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .file-review-art-stage:is(.is-draw, .is-arrow, .is-rectangle, .is-pan) .textLayer { pointer-events: none !important; user-select: none !important; }
 
 .file-review-comment-page-badge { display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 4px; background: #eef2ee; color: #004c46; font-size: 10px; font-weight: 700; letter-spacing: .02em; }
+
+.file-review-change-sidebar-cta {
+  margin: 10px 0 6px;
+  padding: 10px 14px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #ff7a45;
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background .14s ease, transform .14s ease;
+}
+.file-review-change-sidebar-cta:hover {
+  background: #e66632;
+  transform: translateY(-1px);
+}
+.file-review-status.is-alteracao {
+  background: #ffe3d3;
+  color: #b34a17;
+}

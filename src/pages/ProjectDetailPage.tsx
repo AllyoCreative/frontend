@@ -383,6 +383,18 @@ export function ProjectDetailPage() {
     }
   }
 
+  const handleRequestChanges = async (designId: number, notes?: string) => {
+    const result = await api.requestChanges(designId, { notes })
+    setApproved((current) => current.filter((item) => item !== designId))
+    if (result.taskId) {
+      setProjectTasks((current) => current.map((task) => task.id === result.taskId ? {
+        ...task,
+        status: 'Alteração',
+        delivery: 'Em alteração',
+      } : task))
+    }
+  }
+
   const handleApprovalChange = async (designId: number, nextApproved: boolean, feedback?: { rating: number; comment?: string }) => {
     const result = await api.setDesignApproval(designId, nextApproved, feedback)
     setApproved((current) => nextApproved ? (current.includes(designId) ? current : [...current, designId]) : current.filter((item) => item !== designId))
@@ -688,6 +700,7 @@ export function ProjectDetailPage() {
             origin={reviewOrigin}
             notify={notify}
             onApprovalChange={(nextApproved, feedback, targetId) => handleApprovalChange(targetId || reviewing, nextApproved, feedback)}
+            onRequestChanges={(targetId, notes) => handleRequestChanges(targetId || reviewing, notes)}
             onClose={closeReview}
           />
         )

@@ -102,6 +102,7 @@ type DesignReviewModalProps = {
   projectCompleted: boolean
   origin: ReviewOrigin | null
   onApprovalChange: (approved: boolean, feedback?: { rating: number; comment?: string }, targetDeliveryId?: number) => Promise<void>
+  onRequestChanges?: (deliveryId: number, notes?: string) => Promise<void>
   onClose: () => void
   notify: (message: string) => void
 }
@@ -136,7 +137,7 @@ function contentKind(delivery: DesignSummary) {
   return 'file' as const
 }
 
-export function DesignReviewModal({ delivery, versions = [delivery], approvedIds, isApproved: propIsApproved, projectCompleted, origin, onApprovalChange, onClose, notify }: DesignReviewModalProps) {
+export function DesignReviewModal({ delivery, versions = [delivery], approvedIds, isApproved: propIsApproved, projectCompleted, origin, onApprovalChange, onRequestChanges, onClose, notify }: DesignReviewModalProps) {
   const [currentDelivery, setCurrentDelivery] = useState<DesignSummary>(delivery)
 
   useEffect(() => {
@@ -198,6 +199,11 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
   const [commentSubmitting, setCommentSubmitting] = useState(false)
   const [fileLoadError, setFileLoadError] = useState(false)
   const [commentDraft, setCommentDraft] = useState('')
+  const [changesConfirmOpen, setChangesConfirmOpen] = useState(false)
+  const [submittingChanges, setSubmittingChanges] = useState(false)
+  const [changeNotes, setChangeNotes] = useState('')
+  const [changesError, setChangesError] = useState('')
+  const [isAlteracao, setIsAlteracao] = useState(false)
   const [pendingPoint, setPendingPoint] = useState<ReviewPoint | null>(null)
   const [pendingAnnotationId, setPendingAnnotationId] = useState<number | null>(null)
   const [activeTool, setActiveTool] = useState<ReviewTool>(supportsCanvas ? (projectCompleted ? 'pan' : 'point') : 'general')
@@ -395,6 +401,28 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
       setApprovalError(error instanceof Error ? error.message : 'Não foi possível enviar a avaliação')
     } finally {
       setApprovalSubmitting(false)
+    }
+  }
+
+  const submitChangesRequest = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (submittingChanges || projectCompleted) return
+    setSubmittingChanges(true)
+    setChangesError('')
+    try {
+      if (onRequestChanges) {
+        await onRequestChanges(currentDelivery.id, changeNotes.trim() || undefined)
+      } else {
+        await api.requestChanges(currentDelivery.id, { notes: changeNotes.trim() || undefined })
+      }
+      setIsAlteracao(true)
+      setChangesConfirmOpen(false)
+      setChangeNotes('')
+      notify(`Anotações enviadas com sucesso! A tarefa mudou para o status "Alteração" e avançou para a Versão ${activeVersion + 1}.`)
+    } catch (err: unknown) {
+      setChangesError(err instanceof Error ? err.message : 'Falha ao solicitar alterações')
+    } finally {
+      setSubmittingChanges(false)
     }
   }
 
@@ -747,10 +775,10 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
               <button type="button">Chat</button><button type="button">Entregas</button><i />
               <strong title={cleanName}>{cleanName}</strong>
               <span className="file-review-kind">{typeLabel}</span>
-              <span className="file-review-status">{isApproved ? 'Aprovado' : 'Aguardando aprovação'}</span><i />
+              <span className={`file-review-status${isApproved ? ' is-approved' : isAlteracao ? ' is-alteracao' : ''}`}>{isApproved ? 'Aprovado' : isAlteracao ? 'Em alteração' : 'Aguardando aprovação'}</span><i />
               {projectCompleted
                 ? <button type="button" className="file-review-change is-closed" disabled><LockKeyhole size={16} />Alterações encerradas</button>
-                : <button type="button" className="file-review-change" onClick={() => { chooseTool('general'); notify('Descreva os ajustes no comentário para enviar ao time') }}><img src={figmaAsset('design_review.imgGardenReloadFill16')} alt="" />Solicitar alterações</button>}
+                : <button type="button" className="file-review-change" onClick={() => setChangesConfirmOpen(true)} title="Enviar anotações e solicitar alterações"><img src={figmaAsset('design_review.imgGardenReloadFill16')} alt="" />Solicitar alterações</button>}
               <button type="button" className="file-review-approve" disabled={approvalSubmitting || projectCompleted} onClick={() => { if (isApproved) void revokeApproval(); else setApprovalFeedbackOpen(true) }}><img src={figmaAsset('design_review.imgGroup')} alt="" />{isApproved ? 'Aprovado' : projectCompleted ? 'Revisão encerrada' : 'Marcar como aprovado'}</button>
             </div>
             <div className="file-review-share-actions"><button type="button" onClick={() => notify('Link de compartilhamento copiado')}><img src={figmaAsset('design_review.imgTablerShare')} alt="" />Compartilhar</button><button type="button" aria-label="Mais opções"><img src={figmaAsset('design_review.imgTablerDots')} alt="" /></button></div>
@@ -1041,6 +1069,22 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
             })}
             {!reviewLoading && visibleComments.length === 0 && <p className="file-review-comments-empty">Nenhum comentário nesta versão.</p>}
           </div>
+          {!projectCompleted && !isApproved && (
+            <div style={{ padding: '0 16px 8px' }}>
+              <button
+                type="button"
+                className="file-review-change-sidebar-cta"
+                onClick={() => setChangesConfirmOpen(true)}
+              >
+                <img src={figmaAsset('design_review.imgGardenReloadFill16')} alt="" style={{ width: 14, height: 14, filter: 'brightness(0) invert(1)' }} />
+                <span>
+                  {visibleComments.length + visibleAnnotations.length > 0
+                    ? `Enviar anotações para alteração (${visibleComments.length + visibleAnnotations.length})`
+                    : 'Solicitar alterações'}
+                </span>
+              </button>
+            </div>
+          )}
           {projectCompleted ? <div className="file-review-comment-closed"><LockKeyhole size={18} /><div><strong>Revisão encerrada</strong><span>Todas as tarefas do projeto foram concluídas.</span></div></div> : <form className={`file-review-comment-form${pendingPoint ? ' is-point-pending' : ''}`} onSubmit={addComment}>
             <div><strong>{commentFormTitle}</strong>{(pendingPoint || contextAnnotation) && <button type="button" onClick={() => chooseTool('general')}>Alterar para geral</button>}</div>
             {pendingPoint ? <p>Escreva no campo que abriu ao lado do marcador na arte.</p> : <>
@@ -1056,6 +1100,55 @@ export function DesignReviewModal({ delivery, versions = [delivery], approvedIds
           </form>}
         </aside>
       </div>
+      {changesConfirmOpen && (
+        <div className="file-review-feedback-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !submittingChanges) setChangesConfirmOpen(false) }}>
+          <form className="file-review-feedback" role="dialog" aria-modal="true" aria-labelledby="changes-feedback-title" onSubmit={submitChangesRequest}>
+            <header>
+              <div>
+                <span style={{ color: '#d9651a' }}>Solicitar alterações</span>
+                <h2 id="changes-feedback-title">Enviar anotações para o criativo?</h2>
+                <p>
+                  {visibleComments.length + visibleAnnotations.length > 0
+                    ? `Você fez ${visibleComments.length + visibleAnnotations.length} apontamentos nesta versão (${currentDelivery.version || `Versão ${activeVersion}`}).`
+                    : `Solicitar revisão para a entrega atual (${currentDelivery.version || `Versão ${activeVersion}`}).`}
+                </p>
+              </div>
+              <button type="button" disabled={submittingChanges} onClick={() => setChangesConfirmOpen(false)} aria-label="Fechar"><X size={20} /></button>
+            </header>
+
+            <div style={{ background: '#fff9f5', border: '1px solid #ffd6b3', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: '#993f10', lineHeight: '18px' }}>
+              <strong>O que acontecerá:</strong>
+              <ul style={{ margin: '6px 0 0 16px', padding: 0 }}>
+                <li>A tarefa mudará para o status <b>Alteração</b>.</li>
+                <li>Subirá automaticamente uma nova versão sem limite (<b>Versão {activeVersion + 1}</b>).</li>
+                <li>O time criativo receberá suas anotações para ajustar os materiais.</li>
+              </ul>
+            </div>
+
+            <label>
+              <span>Instruções adicionais ou resumo dos ajustes <small>Opcional</small></span>
+              <textarea
+                value={changeNotes}
+                maxLength={2000}
+                onChange={(event) => setChangeNotes(event.target.value)}
+                placeholder="Conte detalhadamente o que precisa ser ajustado..."
+              />
+              <small>{changeNotes.length}/2000</small>
+            </label>
+
+            {changesError && <p className="file-review-feedback__error">{changesError}</p>}
+
+            <footer>
+              <button type="button" className="secondary-button" disabled={submittingChanges} onClick={() => setChangesConfirmOpen(false)}>
+                Continuar revisando
+              </button>
+              <button type="submit" className="primary-button" style={{ background: '#ff7a45', borderColor: '#ff7a45' }} disabled={submittingChanges}>
+                {submittingChanges ? 'Enviando anotações...' : 'Confirmar e enviar alterações'}
+              </button>
+            </footer>
+          </form>
+        </div>
+      )}
       {approvalFeedbackOpen && <div className="file-review-feedback-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !approvalSubmitting) setApprovalFeedbackOpen(false) }}>
         <form className="file-review-feedback" role="dialog" aria-modal="true" aria-labelledby="approval-feedback-title" onSubmit={submitApprovalFeedback}>
           <header><div><span>Aprovar tarefa</span><h2 id="approval-feedback-title">Como você avalia esta entrega?</h2><p>Sua nota ajuda o time a entender o que funcionou e a melhorar as próximas entregas.</p></div><button type="button" disabled={approvalSubmitting} onClick={() => setApprovalFeedbackOpen(false)} aria-label="Fechar avaliação"><X size={20} /></button></header>
