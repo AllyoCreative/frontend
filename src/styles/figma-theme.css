@@ -462,10 +462,6 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .home-card__header { min-height: 58px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; border-bottom: 1px solid #d8dcd5; }
 .home-card__header h2 { margin: 0; font-size: 19px; font-weight: 700; line-height: 26px; }
 .home-task-header-metrics { display: flex; align-items: center; gap: 14px; }
-.home-rating-summary { display: flex; align-items: center; gap: 8px; color: #004c46; }
-.home-rating-summary > span { display: grid; gap: 1px; }
-.home-rating-summary strong { color: #131f15; font-size: 14px; line-height: 17px; }
-.home-rating-summary small { color: #778078; font-size: 10px; line-height: 13px; }
 .home-task-count { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: #ff0037; color: #fff; font-size: 14px; font-weight: 800; }
 .home-tasks-card { width: 739px; min-height: 370px; }
 .home-task-list { display: grid; gap: 6px; padding: 12px 10px; }

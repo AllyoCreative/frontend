@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Star } from 'lucide-react'
 import { useApp, type ProjectWithTasks } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
 import { api, type ClientDashboardSummary } from '../services/api'
@@ -44,9 +43,6 @@ export function HomePage() {
   }, [])
 
   const tasks = dashboard?.tasks ?? projectTasks
-  const averageRating = dashboard?.metrics.averageRating ?? null
-  const ratingCount = dashboard?.metrics.ratingCount ?? 0
-
   const firstName = currentUser?.name ? currentUser.name.split(' ')[0] : 'você'
 
   const allowance = account?.workspace.creditAllowance ?? 0
@@ -112,8 +108,7 @@ export function HomePage() {
             <header className="home-card__header">
               <h2>Suas tarefas</h2>
               <div className="home-task-header-metrics">
-                <span className="home-rating-summary"><Star size={16} fill="currentColor" /><span><strong>{averageRating === null ? '—' : averageRating.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</strong><small>{ratingCount ? `${ratingCount} ${ratingCount === 1 ? 'avaliação' : 'avaliações'}` : 'Sem avaliações'}</small></span></span>
-                <span className="home-task-count">{tasks.length}</span>
+                {tasks.length > 0 && <span className="home-task-count">{tasks.length}</span>}
               </div>
             </header>
 
