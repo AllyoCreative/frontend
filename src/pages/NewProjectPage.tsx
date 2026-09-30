@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, FileOutput, FileText, Layers3, Link2, Maximize2, Minus, Paperclip, PenTool, Plus, Search, Upload, X } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
-import { api, type CatalogProduct, type CatalogQuote, type CatalogScope } from '../services/api'
+import { api, type CatalogProduct, type CatalogQuote, type CatalogScope, type ProjectDeliveryItem, type ProjectDeliverySchema } from '../services/api'
 
 type FlowStep = 'catalog' | 'brief' | 'configure' | 'review' | 'success'
 type CatalogFilter = 'all' | 'design' | 'production' | 'ai' | 'fast'
+type DeliveryConfig = Pick<ProjectDeliverySchema, 'taskType' | 'structure' | 'itemLabel'> & { title: string; description: string }
 
 const catalogFilters: Array<{
   id: CatalogFilter
@@ -84,6 +85,32 @@ function displayFileFormat(format: string) {
   return format.replace(/^\./, '').trim()
 }
 
+const normalizeText = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR')
+
+function deliveryConfigFor(product: CatalogProduct): DeliveryConfig | null {
+  const name = normalizeText(product.name)
+  const unit = normalizeText(product.billing.unit)
+  if (/carrossel|carousel/.test(name)) return { taskType: 'carousel', structure: 'cards', itemLabel: 'card', title: 'Conteúdo dos cards', description: 'Organize a mensagem, o texto e a direção visual de cada card na ordem de leitura.' }
+  if (/storyboard|roteiro visual/.test(name)) return { taskType: 'storyboard', structure: 'scenes', itemLabel: 'cena', title: 'Conteúdo das cenas', description: 'Descreva o texto e o que deve acontecer visualmente em cada cena.' }
+  if (/apresentacao de slides|pitch deck/.test(name) || unit === 'slides') return { taskType: 'presentation', structure: 'slides', itemLabel: 'slide', title: 'Conteúdo dos slides', description: 'Estruture a narrativa slide a slide para orientar a criação.' }
+  if (/landing page|hotsite/.test(name) || unit === 'secoes') return { taskType: 'landing', structure: 'sections', itemLabel: 'seção', title: 'Conteúdo das seções', description: 'Defina a mensagem, a direção visual e o CTA de cada seção.' }
+  if (/catalogo|e-book|ebook|livro|revista|newsletter|relatorio/.test(name) && unit === 'paginas') return { taskType: 'document', structure: 'pages', itemLabel: 'página', title: 'Conteúdo das páginas', description: 'Informe a mensagem e as orientações de cada página do material.' }
+  if (unit === 'imagens' || unit === 'ilustracoes') return { taskType: 'image-set', structure: 'images', itemLabel: unit === 'ilustracoes' ? 'ilustração' : 'imagem', title: unit === 'ilustracoes' ? 'Conteúdo das ilustrações' : 'Conteúdo das imagens', description: 'Detalhe a mensagem e a direção visual esperada para cada item.' }
+  return null
+}
+
+function resizeDeliveryItems(config: DeliveryConfig, count: number, current: ProjectDeliveryItem[] = []) {
+  return Array.from({ length: Math.min(100, Math.max(1, count)) }, (_, index) => current[index] || {
+    id: `${config.taskType}-${index + 1}`,
+    position: index + 1,
+    label: `${config.itemLabel.charAt(0).toLocaleUpperCase('pt-BR')}${config.itemLabel.slice(1)} ${String(index + 1).padStart(2, '0')}`,
+    title: '',
+    copy: '',
+    instructions: '',
+    cta: '',
+  })
+}
+
 export function NewProjectPage() {
   const navigate = useNavigate()
   const { addProject, notify } = useApp()
@@ -113,6 +140,8 @@ export function NewProjectPage() {
   const [referenceLinks, setReferenceLinks] = useState<string[]>([])
   const [linkDraft, setLinkDraft] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [deliveryItems, setDeliveryItems] = useState<ProjectDeliveryItem[]>([])
+  const deliveryConfig = useMemo(() => selected ? deliveryConfigFor(selected) : null, [selected])
 
   useEffect(() => {
     let active = true
@@ -188,10 +217,12 @@ export function NewProjectPage() {
   ].filter(Boolean), [selectedApplications, selectedEditableFormat, selectedFinalFormat, selectedSizes])
 
   const selectProduct = (product: CatalogProduct) => {
+    const nextScope = initialScope(product)
+    const nextDeliveryConfig = deliveryConfigFor(product)
     const initialSize = defaultSize(product)
     const initialApplication = defaultApplication(product)
     setSelected(product)
-    setScope(initialScope(product))
+    setScope(nextScope)
     setQuote(null)
     setQuoteError('')
     setObjective(workOptionsFor(product)[0])
@@ -208,19 +239,19 @@ export function NewProjectPage() {
     setCreativePath('follow-references')
     setReferenceFiles([])
     setReferenceLinks([])
+    setDeliveryItems(nextDeliveryConfig ? resizeDeliveryItems(nextDeliveryConfig, nextScope.quantity) : [])
     setStep('brief')
   }
 
   const updateCounter = (key: keyof Pick<CatalogScope, 'quantity' | 'taskRepeats' | 'resizeCount' | 'variationCount' | 'characterCount'>, delta: number) => {
     setQuote(null)
     setQuoteError('')
-    setScope((current) => {
-      const minimum = key === 'quantity' || key === 'taskRepeats' || key === 'characterCount' ? 1 : 0
-      const increment = key === 'quantity' ? Math.max(1, selected?.billing.step || 1) : 1
-      const nextValue = Math.max(minimum, current[key] + delta * increment)
-      const limitedValue = key === 'quantity' && selected?.billing.maxQuantity ? Math.min(selected.billing.maxQuantity, nextValue) : nextValue
-      return { ...current, [key]: limitedValue }
-    })
+    const minimum = key === 'quantity' || key === 'taskRepeats' || key === 'characterCount' ? 1 : 0
+    const increment = key === 'quantity' ? Math.max(1, selected?.billing.step || 1) : 1
+    const nextValue = Math.max(minimum, scope[key] + delta * increment)
+    const limitedValue = key === 'quantity' && selected?.billing.maxQuantity ? Math.min(selected.billing.maxQuantity, nextValue) : nextValue
+    setScope((current) => ({ ...current, [key]: limitedValue }))
+    if (key === 'quantity' && deliveryConfig) setDeliveryItems((current) => resizeDeliveryItems(deliveryConfig, limitedValue, current))
   }
 
   const toggleAddon = (addonCode: string) => {
@@ -285,6 +316,20 @@ export function NewProjectPage() {
         audience: !notApplicable.audience ? audience.trim() : undefined,
         tone: !notApplicable.tone ? tone.trim() : undefined,
         creativePath, referenceLinks, selectedFormats, catalogCode: selected.code, catalogScope: scope,
+        deliverySchema: deliveryConfig ? {
+          version: 1,
+          taskType: deliveryConfig.taskType,
+          structure: deliveryConfig.structure,
+          itemLabel: deliveryConfig.itemLabel,
+          items: deliveryItems.map((item, index) => ({
+            ...item,
+            position: index + 1,
+            title: item.title.trim(),
+            copy: item.copy.trim(),
+            instructions: item.instructions.trim(),
+            cta: item.cta.trim(),
+          })),
+        } : undefined,
       })
       const uploads = await Promise.allSettled(referenceFiles.map(async (file) => {
         const uploaded = await api.uploadFile(file, 'project-files')
@@ -327,8 +372,8 @@ export function NewProjectPage() {
       </main> : selected && <main className="new-project-flow">
         <section className="new-project-flow__main">
           {step === 'brief' && <BriefStep selected={selected} name={name} objective={objective} overview={overview} projectGoal={projectGoal} audience={audience} tone={tone} notApplicable={notApplicable} creativePath={creativePath} referenceFiles={referenceFiles} referenceLinks={referenceLinks} linkDraft={linkDraft} setName={setName} setObjective={setObjective} setOverview={setOverview} setProjectGoal={setProjectGoal} setAudience={setAudience} setTone={setTone} setNotApplicable={setNotApplicable} setCreativePath={setCreativePath} setLinkDraft={setLinkDraft} addReferenceLink={addReferenceLink} addReferenceFiles={addReferenceFiles} removeFile={(index) => setReferenceFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} removeLink={(link) => setReferenceLinks((current) => current.filter((item) => item !== link))} onCancel={() => setStep('catalog')} onNext={() => setStep('configure')} ready={briefReady} />}
-          {step === 'configure' && <ConfigureStep selected={selected} scope={scope} selectedApplications={selectedApplications} selectedSizes={selectedSizes} selectedFinalFormat={selectedFinalFormat} selectedEditableFormat={selectedEditableFormat} quoteError={quoteError} updateCounter={updateCounter} toggleAddon={toggleAddon} toggleApplication={toggleApplication} toggleSize={toggleSize} addCustomSize={addCustomSize} setSelectedFinalFormat={setSelectedFinalFormat} setSelectedEditableFormat={setSelectedEditableFormat} onBack={() => setStep('brief')} onNext={() => setStep('review')} quoteReady={Boolean(quote)} />}
-          {step === 'review' && <ReviewStep selected={selected} name={name} overview={overview} objective={objective} projectGoal={projectGoal} audience={notApplicable.audience ? '' : audience} tone={notApplicable.tone ? '' : tone} creativePath={creativePath} selectedApplications={selectedApplications} selectedSizes={selectedSizes} selectedFinalFormat={selectedFinalFormat} selectedEditableFormat={selectedEditableFormat} referenceFiles={referenceFiles} referenceLinks={referenceLinks} scope={scope} quote={quote} submitting={submitting} onBack={() => setStep('configure')} onEditBrief={() => setStep('brief')} onSubmit={() => void submit()} />}
+          {step === 'configure' && <ConfigureStep selected={selected} scope={scope} selectedApplications={selectedApplications} selectedSizes={selectedSizes} selectedFinalFormat={selectedFinalFormat} selectedEditableFormat={selectedEditableFormat} quoteError={quoteError} deliveryConfig={deliveryConfig} deliveryItems={deliveryItems} setDeliveryItems={setDeliveryItems} updateCounter={updateCounter} toggleAddon={toggleAddon} toggleApplication={toggleApplication} toggleSize={toggleSize} addCustomSize={addCustomSize} setSelectedFinalFormat={setSelectedFinalFormat} setSelectedEditableFormat={setSelectedEditableFormat} onBack={() => setStep('brief')} onNext={() => setStep('review')} quoteReady={Boolean(quote)} />}
+          {step === 'review' && <ReviewStep selected={selected} name={name} overview={overview} objective={objective} projectGoal={projectGoal} audience={notApplicable.audience ? '' : audience} tone={notApplicable.tone ? '' : tone} creativePath={creativePath} selectedApplications={selectedApplications} selectedSizes={selectedSizes} selectedFinalFormat={selectedFinalFormat} selectedEditableFormat={selectedEditableFormat} referenceFiles={referenceFiles} referenceLinks={referenceLinks} scope={scope} quote={quote} deliveryConfig={deliveryConfig} deliveryItems={deliveryItems} submitting={submitting} onBack={() => setStep('configure')} onEditBrief={() => setStep('brief')} onSubmit={() => void submit()} />}
         </section>
         <ProductSummary product={selected} quote={quote} quoteError={quoteError} onChange={() => setStep('catalog')} />
       </main>}
@@ -382,6 +427,7 @@ function BriefStep(props: BriefStepProps) {
 
 interface ConfigureStepProps {
   selected: CatalogProduct; scope: CatalogScope; selectedApplications: string[]; selectedSizes: string[]; selectedFinalFormat: string; selectedEditableFormat: string; quoteError: string
+  deliveryConfig: DeliveryConfig | null; deliveryItems: ProjectDeliveryItem[]; setDeliveryItems: React.Dispatch<React.SetStateAction<ProjectDeliveryItem[]>>
   updateCounter: (key: keyof Pick<CatalogScope, 'quantity' | 'taskRepeats' | 'resizeCount' | 'variationCount' | 'characterCount'>, delta: number) => void
   toggleAddon: (code: string) => void; toggleApplication: (application: string) => void; toggleSize: (size: string) => void; addCustomSize: (size: string) => void
   setSelectedFinalFormat: (format: string) => void; setSelectedEditableFormat: (format: string) => void
@@ -397,6 +443,7 @@ function ConfigureStep(props: ConfigureStepProps) {
   return <>
     <FlowHeading eyebrow="Etapa 2 de 3" title="Configure a entrega" description="A estimativa é atualizada automaticamente conforme o escopo." />
     <div className="new-project-form-section"><SectionTitle title="Escopo" description={`${props.selected.billing.label || ''}${props.selected.billing.unitNote ? ` · ${props.selected.billing.unitNote}` : ''}`} />{props.quoteError && <small className="new-project-error">{props.quoteError}</small>}<div className="new-project-scope__controls"><ScopeCounter label={`Quantidade (${props.selected.billing.unit})`} value={props.scope.quantity} minimum={1} onDecrease={() => props.updateCounter('quantity', -1)} onIncrease={() => props.updateCounter('quantity', 1)} disableIncrease={Boolean(props.selected.billing.maxQuantity && props.scope.quantity >= props.selected.billing.maxQuantity)} /><ScopeCounter label="Tarefas" value={props.scope.taskRepeats} minimum={1} onDecrease={() => props.updateCounter('taskRepeats', -1)} onIncrease={() => props.updateCounter('taskRepeats', 1)} />{props.selected.credits.resizeAllowed && sizes.length === 0 && <ScopeCounter label="Redimensionamentos" value={props.scope.resizeCount} onDecrease={() => props.updateCounter('resizeCount', -1)} onIncrease={() => props.updateCounter('resizeCount', 1)} />}{props.selected.credits.variationAllowed && <ScopeCounter label="Variações" value={props.scope.variationCount} onDecrease={() => props.updateCounter('variationCount', -1)} onIncrease={() => props.updateCounter('variationCount', 1)} />}{props.selected.billing.characterCredits && <ScopeCounter label="Avatares/personagens" value={props.scope.characterCount} minimum={1} onDecrease={() => props.updateCounter('characterCount', -1)} onIncrease={() => props.updateCounter('characterCount', 1)} />}</div></div>
+    {props.deliveryConfig && <StructuredDeliveryEditor config={props.deliveryConfig} items={props.deliveryItems} onChange={props.setDeliveryItems} />}
     {applications.length > 0 && <div className="new-project-form-section"><SectionTitle title="Aplicação da peça" description="Escolha onde ou como o material será usado. Você pode selecionar mais de uma opção." /><DeliveryOptionPicker options={applications} selected={props.selectedApplications} onToggle={props.toggleApplication} kind="application" searchPlaceholder="Buscar aplicação, canal ou tipo de peça" /></div>}
     {sizes.length > 0 && <div className="new-project-form-section"><SectionTitle title="Dimensões e proporções" description="Escolha o tamanho da peça. Cada tamanho adicional é considerado um redimensionamento." /><DeliveryOptionPicker options={sizes} selected={props.selectedSizes} onToggle={props.toggleSize} onAddCustom={props.addCustomSize} kind="size" searchPlaceholder="Buscar tamanho ou proporção" />{props.selected.credits.resizeAllowed && props.selectedSizes.length > 1 && <p className="new-project-selection-note"><Maximize2 size={16} /> {props.selectedSizes.length} tamanhos selecionados · {props.selectedSizes.length - 1} redimensionamento{props.selectedSizes.length > 2 ? 's' : ''}</p>}</div>}
     {(finalFormats.length > 0 || editableFormats.length > 0) && <div className="new-project-form-section new-project-delivery-files"><SectionTitle title="Arquivos de entrega" description="O arquivo final vem pronto para uso. O arquivo aberto é opcional e permite futuras edições." />
@@ -406,6 +453,36 @@ function ConfigureStep(props: ConfigureStepProps) {
     {props.selected.addons.length > 0 && <div className="new-project-form-section"><SectionTitle title="Adicionais" description="Inclua apenas o que fizer sentido para esta entrega." /><div className="new-project-addons"><div>{props.selected.addons.map((addon) => { const checked = props.scope.addons[addon.code] > 0; const addonCredits = addon.rule?.credits ?? addon.credits; return <label key={addon.code} className={checked ? 'selected' : ''}><input type="checkbox" checked={checked} onChange={() => props.toggleAddon(addon.code)} /><span><strong>{addon.name}</strong><small>{addon.rule?.unit ? `${addon.rule.step || 1} ${addon.rule.unit}` : 'Adicional da entrega'}</small></span><b>{addonCredits > 0 ? `+${formatCredits(addonCredits)} cr.` : 'Incluso'}</b></label> })}</div></div></div>}
     <FlowFooter><button type="button" className="secondary-button" onClick={props.onBack}><ArrowLeft size={15} /> Voltar</button><button type="button" className="primary-button" disabled={!props.quoteReady || !deliveryReady} onClick={props.onNext}>Revisar solicitação <ArrowRight size={15} /></button></FlowFooter>
   </>
+}
+
+function StructuredDeliveryEditor({ config, items, onChange }: {
+  config: DeliveryConfig
+  items: ProjectDeliveryItem[]
+  onChange: React.Dispatch<React.SetStateAction<ProjectDeliveryItem[]>>
+}) {
+  const [activeIndex, setActiveIndex] = useState(0)
+  const visibleActiveIndex = Math.min(activeIndex, Math.max(0, items.length - 1))
+  const activeItem = items[visibleActiveIndex]
+  const updateItem = (field: keyof Pick<ProjectDeliveryItem, 'title' | 'copy' | 'instructions' | 'cta'>, value: string) => {
+    onChange((current) => current.map((item, index) => index === visibleActiveIndex ? { ...item, [field]: value } : item))
+  }
+  if (!activeItem) return null
+  const completed = items.filter((item) => item.title.trim() || item.copy.trim() || item.instructions.trim() || item.cta.trim()).length
+  const itemPlural: Record<string, string> = { card: 'cards', cena: 'cenas', slide: 'slides', seção: 'seções', página: 'páginas', imagem: 'imagens', ilustração: 'ilustrações' }
+  return <div className="new-project-form-section new-project-structured-delivery">
+    <SectionTitle title={config.title} description={`${config.description} Opcional: campos vazios serão tratados como “sem texto informado”.`} />
+    <div className="new-project-structured-delivery__status"><span>{items.length} {items.length === 1 ? config.itemLabel : itemPlural[config.itemLabel] || 'itens'}</span><small>{completed} com conteúdo preenchido</small></div>
+    <div className="new-project-structured-delivery__tabs" role="tablist" aria-label={config.title}>
+      {items.map((item, index) => <button type="button" role="tab" aria-selected={index === visibleActiveIndex} className={index === visibleActiveIndex ? 'active' : ''} key={item.id} onClick={() => setActiveIndex(index)}><span>{index + 1}</span>{item.title.trim() || item.label}</button>)}
+    </div>
+    <div className="new-project-structured-delivery__editor" role="tabpanel">
+      <header><span>{activeItem.label}</span><small>{visibleActiveIndex + 1} de {items.length}</small></header>
+      <label className="new-project-field"><span>Título ou chamada</span><small>O texto principal que deve ganhar destaque neste {config.itemLabel}.</small><input value={activeItem.title} onChange={(event) => updateItem('title', event.target.value)} placeholder={`Ex.: mensagem principal do ${config.itemLabel}`} maxLength={500} /></label>
+      <label className="new-project-field"><span>Texto para inserir</span><small>Copy, legenda interna, locução ou conteúdo que deve aparecer neste item.</small><textarea value={activeItem.copy} onChange={(event) => updateItem('copy', event.target.value)} placeholder="Digite o texto completo ou indique que este item não terá texto..." maxLength={6000} /></label>
+      <label className="new-project-field"><span>Direção visual</span><small>Elementos, imagens, enquadramento, movimento ou observações específicas.</small><textarea value={activeItem.instructions} onChange={(event) => updateItem('instructions', event.target.value)} placeholder="Ex.: usar foto do produto em destaque, fundo claro e continuidade com o item anterior..." maxLength={4000} /></label>
+      {(config.taskType === 'carousel' || config.taskType === 'landing') && <label className="new-project-field"><span>CTA</span><small>Opcional. Chamada para ação deste item.</small><input value={activeItem.cta} onChange={(event) => updateItem('cta', event.target.value)} placeholder="Ex.: Saiba mais" maxLength={500} /></label>}
+    </div>
+  </div>
 }
 
 function DeliveryOptionPicker({ options, selected, onToggle, onAddCustom, kind, searchPlaceholder }: {
@@ -466,7 +543,7 @@ function DeliveryFileChoice({ title, description, icon, options, selected, onSel
 interface ReviewStepProps {
   selected: CatalogProduct; name: string; overview: string; objective: string; projectGoal: string; audience: string; tone: string
   creativePath: 'new-direction' | 'follow-references'; selectedApplications: string[]; selectedSizes: string[]; selectedFinalFormat: string; selectedEditableFormat: string; referenceFiles: File[]; referenceLinks: string[]; scope: CatalogScope
-  quote: CatalogQuote | null; submitting: boolean; onBack: () => void; onEditBrief: () => void; onSubmit: () => void
+  quote: CatalogQuote | null; deliveryConfig: DeliveryConfig | null; deliveryItems: ProjectDeliveryItem[]; submitting: boolean; onBack: () => void; onEditBrief: () => void; onSubmit: () => void
 }
 
 function ReviewStep(props: ReviewStepProps) {
@@ -474,7 +551,7 @@ function ReviewStep(props: ReviewStepProps) {
   return <>
     <FlowHeading eyebrow="Etapa 3 de 3" title="Revise antes de enviar" description="Você poderá complementar o briefing na conversa do projeto depois do envio." />
     <div className="new-project-review-block"><header><div><span>Briefing</span><h2>{props.name}</h2></div><button type="button" onClick={props.onEditBrief}>Editar</button></header><p>{props.overview}</p><dl><div><dt>Pedido</dt><dd>{props.objective}</dd></div><div><dt>Objetivo</dt><dd>{props.projectGoal}</dd></div><div><dt>Direção</dt><dd>{props.creativePath === 'new-direction' ? 'Explorar nova direção' : 'Partir das referências'}</dd></div>{props.audience && <div><dt>Público</dt><dd>{props.audience}</dd></div>}{props.tone && <div><dt>Tom</dt><dd>{props.tone}</dd></div>}</dl></div>
-    <div className="new-project-review-block"><header><div><span>Entrega</span><h2>{props.selected.name}</h2></div><button type="button" onClick={props.onBack}>Editar</button></header><dl><div><dt>Quantidade</dt><dd>{props.scope.quantity} {props.selected.billing.unit}</dd></div><div><dt>Tarefas</dt><dd>{props.scope.taskRepeats}</dd></div>{props.selectedApplications.length > 0 && <div><dt>Aplicação</dt><dd>{props.selectedApplications.join(', ')}</dd></div>}{props.selectedSizes.length > 0 && <div><dt>Dimensões</dt><dd>{props.selectedSizes.join(', ')}</dd></div>}<div><dt>Arquivo final</dt><dd>{props.selectedFinalFormat ? displayFileFormat(props.selectedFinalFormat).toUpperCase() : 'Padrão do catálogo'}</dd></div><div><dt>Arquivo aberto</dt><dd>{props.selectedEditableFormat || 'Não solicitado'}</dd></div>{activeAddons.length > 0 && <div><dt>Adicionais</dt><dd>{activeAddons.map((item) => item.name).join(', ')}</dd></div>}<div><dt>Referências</dt><dd>{props.referenceFiles.length + props.referenceLinks.length || 'Nenhuma'}</dd></div></dl></div>
+    <div className="new-project-review-block"><header><div><span>Entrega</span><h2>{props.selected.name}</h2></div><button type="button" onClick={props.onBack}>Editar</button></header><dl><div><dt>Quantidade</dt><dd>{props.scope.quantity} {props.selected.billing.unit}</dd></div><div><dt>Tarefas</dt><dd>{props.scope.taskRepeats}</dd></div>{props.selectedApplications.length > 0 && <div><dt>Aplicação</dt><dd>{props.selectedApplications.join(', ')}</dd></div>}{props.selectedSizes.length > 0 && <div><dt>Dimensões</dt><dd>{props.selectedSizes.join(', ')}</dd></div>}<div><dt>Arquivo final</dt><dd>{props.selectedFinalFormat ? displayFileFormat(props.selectedFinalFormat).toUpperCase() : 'Padrão do catálogo'}</dd></div><div><dt>Arquivo aberto</dt><dd>{props.selectedEditableFormat || 'Não solicitado'}</dd></div>{activeAddons.length > 0 && <div><dt>Adicionais</dt><dd>{activeAddons.map((item) => item.name).join(', ')}</dd></div>}<div><dt>Referências</dt><dd>{props.referenceFiles.length + props.referenceLinks.length || 'Nenhuma'}</dd></div></dl>{props.deliveryConfig && <div className="new-project-review-items"><strong>{props.deliveryConfig.title}</strong>{props.deliveryItems.map((item) => <article key={item.id}><span>{item.label}</span><div><b>{item.title.trim() || 'Sem título informado'}</b><p>{item.copy.trim() || 'Sem texto informado'}</p>{item.instructions.trim() && <small>Direção visual: {item.instructions}</small>}{item.cta.trim() && <small>CTA: {item.cta}</small>}</div></article>)}</div>}</div>
     <div className="new-project-review-total"><div><span>Estimativa da solicitação</span><strong>{props.quote ? `${formatCredits(props.quote.totalCredits)} créditos` : 'Calculando...'}</strong><small>{props.quote ? `Prazo estimado de ${formatCredits(props.quote.slaHours)} horas úteis` : 'Aguarde a atualização do escopo'}</small></div><p>A estimativa pode ser ajustada pelo time caso o briefing exija uma validação adicional. Você será avisado antes de qualquer alteração.</p></div>
     <FlowFooter><button type="button" className="secondary-button" onClick={props.onBack}><ArrowLeft size={15} /> Voltar</button><button type="button" className="primary-button" disabled={!props.quote || props.submitting} onClick={props.onSubmit}>{props.submitting ? 'Enviando...' : 'Enviar projeto'} <ArrowRight size={15} /></button></FlowFooter>
   </>

@@ -280,6 +280,25 @@ export interface ProjectBriefingInput {
   selectedFormats?: string[]
   catalogCode?: string
   catalogScope?: CatalogScope
+  deliverySchema?: ProjectDeliverySchema
+}
+
+export interface ProjectDeliveryItem {
+  id: string
+  position: number
+  label: string
+  title: string
+  copy: string
+  instructions: string
+  cta: string
+}
+
+export interface ProjectDeliverySchema {
+  version: 1
+  taskType: 'carousel' | 'presentation' | 'storyboard' | 'landing' | 'document' | 'image-set' | 'generic'
+  structure: 'cards' | 'slides' | 'scenes' | 'sections' | 'pages' | 'images' | 'items'
+  itemLabel: string
+  items: ProjectDeliveryItem[]
 }
 
 export interface ProjectBriefingSummary {

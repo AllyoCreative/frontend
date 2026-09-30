@@ -11,6 +11,21 @@ export interface TaskBriefing {
   formats: string[]
   creativeDirection: string[]
   projectDeliverables?: string[]
+  deliverySchema?: {
+    version: number
+    taskType: string
+    structure: string
+    itemLabel: string
+    items: Array<{
+      id: string
+      position: number
+      label: string
+      title: string
+      copy: string
+      instructions: string
+      cta: string
+    }>
+  }
 }
 
 export interface ProjectTask {
