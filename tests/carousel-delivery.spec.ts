@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+const extensionlessImageUrl = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080"%3E%3Crect width="1080" height="1080" fill="%23d7ff70"/%3E%3C/svg%3E'
+
 const task = {
   id: 'task-carousel',
   publicId: '234567',
@@ -34,8 +36,8 @@ const designs = [1, 2, 3].map((id) => ({
   color: '#d7ff70',
   approved: false,
   contentType: 'application/octet-stream',
-  fileKey: `workspaces/workspace-1/designs/card-${id}.png`,
-  fileUrl: '/assets/figma/designs_imgImage8.png',
+  fileKey: `workspaces/workspace-1/designs/card-${id}`,
+  fileUrl: extensionlessImageUrl,
 }))
 
 const project = {
@@ -85,6 +87,8 @@ test('carrossel aparece como uma entrega navegável também nos arquivos', async
   await expect.poll(async () => (await page.locator('.project-design-tile--collection').boundingBox())?.width || 0).toBeLessThan(320)
   await expect(page.locator('.project-delivery-collection-sheet img')).toHaveCount(3)
   await expect(page.getByText('3 cards')).toBeVisible()
+  await page.locator('.project-design-tile--collection > button').hover()
+  await expect(page.locator('.project-design-open')).toHaveCSS('z-index', '20')
   await page.getByRole('button', { name: 'Abrir Carrossel Carrossel de lançamento' }).click()
 
   await expect(page.getByRole('group', { name: 'Navegação do carrossel' })).toContainText('Card 1')

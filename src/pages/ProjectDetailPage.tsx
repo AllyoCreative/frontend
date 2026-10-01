@@ -219,13 +219,13 @@ function collectionTypeLabel(type: string | null) {
   return ({ carousel: 'Carrossel', presentation: 'Apresentação', storyboard: 'Storyboard', 'image-set': 'Coleção de imagens' } as Record<string, string>)[type || ''] || 'Coleção'
 }
 
-function CollectionPreview({ materials }: { materials: DeliveryMaterial[] }) {
+function CollectionPreview({ materials, imageCollection = false }: { materials: DeliveryMaterial[]; imageCollection?: boolean }) {
   return <span className="project-delivery-collection-preview" aria-hidden="true">
     <span className="project-delivery-collection-stack">
       {materials.slice(0, 3).map((material, index) => {
         const url = material.latest.thumbnailUrl || material.latest.fileUrl
         return <span className="project-delivery-collection-sheet" style={{ '--sheet-index': index } as React.CSSProperties} key={material.key}>
-          {url && deliveryKind(material.latest) === 'image' ? <img src={url} alt="" /> : <ImageIcon size={34} />}
+          {url && (imageCollection || deliveryKind(material.latest) === 'image') ? <img src={url} alt="" /> : <ImageIcon size={34} />}
         </span>
       })}
     </span>
@@ -728,7 +728,7 @@ export function ProjectDetailPage() {
                   <b className={isApproved ? 'is-approved' : ''}>{isApproved ? 'Aprovado' : 'Aguardando aprovação'}</b>
                 </header>
                 <button onClick={(event) => openReview(reviewTarget.id, event.currentTarget)} aria-label={`Abrir ${isCollection ? `${collectionTypeLabel(group.collectionType)} ${group.title}` : cleanDecodedText(design.name)}`}>
-                  {isCollection ? <CollectionPreview materials={group.materials} /> : <DeliveryPreview delivery={design} />}
+                  {isCollection ? <CollectionPreview materials={group.materials} imageCollection={['carousel', 'storyboard', 'image-set'].includes(group.collectionType || '')} /> : <DeliveryPreview delivery={design} />}
                   <span className="project-design-open"><ExternalLink size={15} /> {isCollection ? 'Revisar sequência' : 'Revisar'}</span>
                 </button>
               </article>

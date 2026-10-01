@@ -921,7 +921,7 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .project-design-tile > button { position: relative; width: 100%; height: 260px; display: block; overflow: hidden; padding: 0; border: 0; background: #f4f5f4; }
 .project-design-tile > button > img { width: 100%; height: 100%; display: block; object-fit: cover; }
 .project-design-tile--collection > button { background: linear-gradient(145deg,#e8efe9,#f8faf7); }
-.project-delivery-collection-preview { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 22px; color: #273129; }
+.project-delivery-collection-preview { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 22px; color: #273129; pointer-events: none; }
 .project-delivery-collection-preview > strong { margin-top: 5px; font-size: 15px; line-height: 21px; }
 .project-delivery-collection-preview > small { color: #6f7972; font-size: 11px; font-weight: 600; }
 .project-delivery-collection-stack { position: relative; width: 132px; height: 160px; display: block; }
@@ -936,7 +936,7 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .project-delivery-copy > small, .project-delivery-file > small { color: #778078; font-size: 11px; font-weight: 600; }
 .project-delivery-copy > p { display: -webkit-box; margin: 8px 0 0; overflow: hidden; color: #273129; font: 500 14px/22px 'Plus Jakarta Sans',sans-serif; white-space: pre-wrap; -webkit-box-orient: vertical; -webkit-line-clamp: 6; }
 .project-delivery-file strong { font-size: 16px; }.project-delivery-file--pdf { background: #fbefed; color: #a1473e; }.project-delivery-file--video { background: #edf3f1; color: #004c46; }
-.project-design-tile > button > .project-design-open { position: absolute; top: 50%; left: 50%; min-height: 40px; display: flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 100px; background: rgba(13,30,29,.9); color: #fff; font-size: 13px; font-weight: 650; opacity: 0; transform: translate(-50%, -40%); transition: .18s ease; }
+.project-design-tile > button > .project-design-open { position: absolute; z-index: 20; top: 50%; left: 50%; min-height: 40px; display: flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 100px; background: rgba(13,30,29,.9); color: #fff; font-size: 13px; font-weight: 650; opacity: 0; transform: translate(-50%, -40%); transition: .18s ease; }
 .project-design-tile > button:hover > .project-design-open, .project-design-tile > button:focus-visible > .project-design-open { opacity: 1; transform: translate(-50%, -50%); }
 .project-file-placeholder { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #778078; font-size: 12px; }
 .project-files-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 360px)); justify-content: start; gap: 12px; }

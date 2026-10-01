@@ -202,7 +202,9 @@ export function DesignReviewModal({
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   const activeVersion = parseVersionNum(currentDelivery.version)
 
-  const kind = contentKind(currentDelivery)
+  const detectedKind = contentKind(currentDelivery)
+  const collectionExpectsImages = collectionItems.length > 0 && ['carrossel', 'storyboard', 'coleção de imagens'].includes(collectionName)
+  const kind = collectionExpectsImages && detectedKind === 'file' && Boolean(currentDelivery.fileUrl || currentDelivery.thumbnailUrl) ? 'image' : detectedKind
   const supportsCanvas = kind === 'image' || kind === 'pdf'
   const [hoveredCommentId, setHoveredCommentId] = useState<number | null>(null)
 
