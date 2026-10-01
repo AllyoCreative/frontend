@@ -903,6 +903,11 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .project-assets-header p { margin: 4px 0 0; color: #68726c; font-size: 13px; line-height: 19px; }
 .project-assets-upload { flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
 .project-assets-upload:disabled { cursor: wait; opacity: .58; }
+.project-assets-section-heading { min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 22px 0 10px; }
+.project-assets-section-heading:first-of-type { margin-top: 0; }
+.project-assets-section-heading h3 { margin: 0; color: #273129; font-size: 15px; line-height: 21px; }
+.project-assets-section-heading p { margin: 2px 0 0; color: #778078; font-size: 11px; line-height: 17px; }
+.project-assets-section-heading > span { min-width: 28px; height: 28px; display: grid; place-items: center; padding: 0 8px; border-radius: 999px; background: #e8eee9; color: #405048; font-size: 11px; font-weight: 750; }
 .project-visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); border: 0; white-space: nowrap; }
 .project-designs-grid { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
 .project-design-tile { min-height: 308px; overflow: hidden; border-radius: 10px; background: #fff; }
@@ -915,6 +920,16 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .project-design-tile > header b.is-approved { background: #d5e7d3; color: #004c46; }
 .project-design-tile > button { position: relative; width: 100%; height: 260px; display: block; overflow: hidden; padding: 0; border: 0; background: #f4f5f4; }
 .project-design-tile > button > img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.project-design-tile--collection > button { background: linear-gradient(145deg,#e8efe9,#f8faf7); }
+.project-delivery-collection-preview { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 22px; color: #273129; }
+.project-delivery-collection-preview > strong { margin-top: 5px; font-size: 15px; line-height: 21px; }
+.project-delivery-collection-preview > small { color: #6f7972; font-size: 11px; font-weight: 600; }
+.project-delivery-collection-stack { position: relative; width: 132px; height: 160px; display: block; }
+.project-delivery-collection-sheet { --sheet-index: 0; position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; border: 4px solid #fff; border-radius: 8px; background: #dae4dc; color: #6b796f; box-shadow: 0 10px 24px rgba(24,48,35,.16); transform: translate(calc((var(--sheet-index) - 1) * 11px),calc(var(--sheet-index) * -4px)) rotate(calc((var(--sheet-index) - 1) * 3deg)); }
+.project-delivery-collection-sheet:nth-child(1) { z-index: 3; }
+.project-delivery-collection-sheet:nth-child(2) { z-index: 2; opacity: .88; }
+.project-delivery-collection-sheet:nth-child(3) { z-index: 1; opacity: .7; }
+.project-delivery-collection-sheet img { width: 100%; height: 100%; display: block; object-fit: cover; }
 .project-delivery-copy, .project-delivery-file { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 26px; background: #f7f4ed; color: #273129; text-align: center; }
 .project-delivery-copy { align-items: flex-start; justify-content: flex-start; background: #fbfaf6; text-align: left; }
 .project-delivery-copy > svg { color: #8b6f37; }
@@ -2465,6 +2480,13 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
   gap: 10px;
   flex-wrap: nowrap;
 }
+.file-review-collection-nav { height: 40px; display: flex; align-items: center; gap: 5px; padding: 3px 4px; border: 1px solid #dfe5df; border-radius: 9px; background: #f7f9f7; }
+.file-review-collection-nav > button { width: 32px; height: 32px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 6px; background: #fff; color: #274039; }
+.file-review-collection-nav > button:disabled { color: #b2bab4; cursor: not-allowed; }
+.file-review-collection-nav > span { width: 126px; min-width: 0; display: grid; gap: 1px; padding: 0 4px; }
+.file-review-collection-nav strong, .file-review-collection-nav small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.file-review-collection-nav strong { color: #26352d; font-size: 11px; line-height: 15px; }
+.file-review-collection-nav small { color: #7a847d; font-size: 9px; line-height: 13px; }
 .file-review-left-controls > button {
   width: 38px;
   height: 38px;

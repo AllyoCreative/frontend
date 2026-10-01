@@ -3,7 +3,7 @@ import { NavLink, useParams } from 'react-router-dom'
 import { ChevronDown, ChevronUp, Circle, Download, ExternalLink, FileText, Image as ImageIcon, Layers3, MessageSquareText, Pencil, Play, Plus, Upload } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
-import { DesignReviewModal, type ReviewOrigin } from '../components/DesignReviewModal'
+import { DesignReviewModal, type ReviewCollectionItem, type ReviewOrigin } from '../components/DesignReviewModal'
 import { api, type DesignSummary, type ProjectBriefingSummary, type ProjectFileSummary } from '../services/api'
 import { socket, type SocketEventPayload } from '../services/socket'
 import type { Project, ProjectTask, TaskBriefing } from '../types'
@@ -34,9 +34,8 @@ const getBaseMaterialName = (rawName?: string | null): string => {
   const ext = dotIndex > 0 ? name.slice(dotIndex) : ''
   const stem = dotIndex > 0 ? name.slice(0, dotIndex) : name
   const cleanStem = stem
-    .replace(/[\s\-_]+(?:\d+\s*[\-_]\s*)*v?(ers[aã]o)?\s*\d+$/i, '')
-    .replace(/\s*[\(\[]v?\d+[\)\]]$/i, '')
-    .replace(/[\s\-_]+v?\d+$/i, '')
+    .replace(/[\s\-_]+(?:\d+\s*[\-_]\s*)*(?:v|vers[aã]o)\s*\d+$/i, '')
+    .replace(/\s*[\(\[](?:v|vers[aã]o)\s*\d+[\)\]]$/i, '')
     .trim()
   return cleanStem + ext
 }
@@ -188,6 +187,19 @@ interface ChatMessage {
 
 type DeliveryKind = 'image' | 'pdf' | 'copy' | 'video' | 'file'
 
+type DeliveryMaterial = {
+  key: string
+  latest: DesignSummary
+  versions: DesignSummary[]
+}
+
+type DeliveryGalleryGroup = {
+  key: string
+  title: string
+  collectionType: string | null
+  materials: DeliveryMaterial[]
+}
+
 function deliveryKind(delivery: DesignSummary): DeliveryKind {
   const type = delivery.contentType?.toLowerCase() || ''
   const name = `${delivery.name} ${delivery.fileUrl || ''}`.toLowerCase()
@@ -200,6 +212,25 @@ function deliveryKind(delivery: DesignSummary): DeliveryKind {
 
 function deliveryTypeLabel(kind: DeliveryKind) {
   return { image: 'Imagem', pdf: 'PDF', copy: 'Copy', video: 'Vídeo', file: 'Arquivo' }[kind]
+}
+
+function collectionTypeLabel(type: string | null) {
+  return ({ carousel: 'Carrossel', presentation: 'Apresentação', storyboard: 'Storyboard', 'image-set': 'Coleção de imagens' } as Record<string, string>)[type || ''] || 'Coleção'
+}
+
+function CollectionPreview({ materials }: { materials: DeliveryMaterial[] }) {
+  return <span className="project-delivery-collection-preview" aria-hidden="true">
+    <span className="project-delivery-collection-stack">
+      {materials.slice(0, 3).map((material, index) => {
+        const url = material.latest.thumbnailUrl || material.latest.fileUrl
+        return <span className="project-delivery-collection-sheet" style={{ '--sheet-index': index } as React.CSSProperties} key={material.key}>
+          {url && deliveryKind(material.latest) === 'image' ? <img src={url} alt="" /> : <ImageIcon size={34} />}
+        </span>
+      })}
+    </span>
+    <strong>{materials.length} {materials.length === 1 ? 'card' : 'cards'}</strong>
+    <small>Abra uma vez e revise em sequência</small>
+  </span>
 }
 
 function DeliveryPreview({ delivery }: { delivery: DesignSummary }) {
@@ -231,7 +262,7 @@ export function ProjectDetailPage() {
 
   const parseVersionNum = (v?: string) => Number((v || '').replace(/\D/g, '')) || 1
 
-  const groupedDesigns = useMemo(() => {
+  const deliveryGroups = useMemo<DeliveryGalleryGroup[]>(() => {
     const groups: Record<string, DesignSummary[]> = {}
     for (const design of designList) {
       const baseMaterial = getBaseMaterialName(design.name) || cleanDecodedText(design.name).toLowerCase().trim()
@@ -239,14 +270,46 @@ export function ProjectDetailPage() {
       if (!groups[key]) groups[key] = []
       groups[key].push(design)
     }
-    return Object.values(groups).map((versions: DesignSummary[]) => {
+    const materials = Object.entries(groups).map(([key, versions]) => {
       versions.sort((a: DesignSummary, b: DesignSummary) => parseVersionNum(b.version) - parseVersionNum(a.version) || b.id - a.id)
       return {
+        key,
         latest: versions[0],
         all: versions,
       }
     })
-  }, [designList])
+    const collectionTaskTypes = new Set(['carousel', 'presentation', 'storyboard', 'image-set'])
+    const collections = new Map<string, DeliveryGalleryGroup>()
+    const result: DeliveryGalleryGroup[] = []
+
+    materials.forEach((material) => {
+      const task = material.latest.taskId ? projectTasks.find((item) => item.id === material.latest.taskId) : undefined
+      const inferredTaskType = task && /carrossel|carousel/i.test(`${task.title} ${task.briefing?.deliverables?.join(' ') || ''}`) ? 'carousel' : null
+      const taskType = task?.briefing?.deliverySchema?.taskType || inferredTaskType
+      if (task && taskType && collectionTaskTypes.has(taskType)) {
+        const existing = collections.get(task.id)
+        const normalized: DeliveryMaterial = { key: material.key, latest: material.latest, versions: material.all }
+        if (existing) existing.materials.push(normalized)
+        else {
+          const collection = { key: `collection-${task.id}`, title: task.title, collectionType: taskType, materials: [normalized] }
+          collections.set(task.id, collection)
+          result.push(collection)
+        }
+        return
+      }
+      result.push({
+        key: material.key,
+        title: cleanDecodedText(material.latest.name),
+        collectionType: null,
+        materials: [{ key: material.key, latest: material.latest, versions: material.all }],
+      })
+    })
+
+    for (const collection of collections.values()) {
+      collection.materials.sort((left, right) => left.latest.id - right.latest.id)
+    }
+    return result
+  }, [designList, projectTasks])
   const [reviewOrigin, setReviewOrigin] = useState<ReviewOrigin | null>(null)
   const projectFileInputRef = useRef<HTMLInputElement>(null)
 
@@ -395,9 +458,12 @@ export function ProjectDetailPage() {
     }
   }
 
-  const handleApprovalChange = async (designId: number, nextApproved: boolean, feedback?: { rating: number; comment?: string }) => {
-    const result = await api.setDesignApproval(designId, nextApproved, feedback)
-    setApproved((current) => nextApproved ? (current.includes(designId) ? current : [...current, designId]) : current.filter((item) => item !== designId))
+  const handleApprovalChange = async (designId: number, nextApproved: boolean, feedback?: { rating: number; comment?: string }, scope: 'asset' | 'task' = 'asset') => {
+    const result = await api.setDesignApproval(designId, nextApproved, feedback, scope)
+    const affectedIds = result.approvedDesignIds?.length ? result.approvedDesignIds : [designId]
+    setApproved((current) => nextApproved
+      ? Array.from(new Set([...current, ...affectedIds]))
+      : current.filter((item) => !affectedIds.includes(item)))
     if (result.taskId) {
       setProjectTasks((current) => current.map((task) => task.id === result.taskId ? {
         ...task,
@@ -631,7 +697,7 @@ export function ProjectDetailPage() {
           <header className="project-assets-header">
             <div>
               <h2>{tab === 'arquivos' ? 'Arquivos do projeto' : 'Entregas para revisão'}</h2>
-              <p>{tab === 'arquivos' ? 'Documentos e imagens ficam salvos no armazenamento seguro do projeto.' : 'Imagens, PDFs, textos e outros materiais enviados pela equipe para sua avaliação.'}</p>
+              <p>{tab === 'arquivos' ? 'Entregas revisáveis e anexos organizados em um só lugar.' : 'Imagens, PDFs, textos e outros materiais enviados pela equipe para sua avaliação.'}</p>
             </div>
             {tab === 'arquivos' && <button className="secondary-button project-assets-upload" disabled={uploadingFile} onClick={() => projectFileInputRef.current?.click()}>
               <Upload size={16} /> {uploadingFile ? 'Enviando...' : 'Enviar arquivo'}
@@ -640,27 +706,35 @@ export function ProjectDetailPage() {
 
           {loadingAssets && <div className="project-gallery-empty">Carregando arquivos...</div>}
 
-          {!loadingAssets && (tab === 'entregas' || tab === 'designs') && (groupedDesigns.length > 0 ? <div className="project-designs-grid">
-            {groupedDesigns.map(({ latest: design, all: versions }) => {
-              const isApproved = approved.includes(design.id)
+          {!loadingAssets && (tab === 'entregas' || tab === 'designs' || tab === 'arquivos') && deliveryGroups.length > 0 && tab === 'arquivos' && <div className="project-assets-section-heading"><div><h3>Entregas revisáveis</h3><p>Carrosséis e demais materiais enviados pelo time.</p></div><span>{deliveryGroups.length}</span></div>}
+
+          {!loadingAssets && (tab === 'entregas' || tab === 'designs' || tab === 'arquivos') && (deliveryGroups.length > 0 ? <div className="project-designs-grid">
+            {deliveryGroups.map((group) => {
+              const design = group.materials[0].latest
+              const versions = group.materials[0].versions
+              const isCollection = Boolean(group.collectionType)
+              const isApproved = isCollection ? group.materials.every((item) => approved.includes(item.latest.id)) : approved.includes(design.id)
+              const reviewTarget = group.materials.find((item) => !approved.includes(item.latest.id))?.latest || design
               const kind = deliveryKind(design)
-              return <article key={design.id} className="project-design-tile">
+              return <article key={group.key} className={`project-design-tile${isCollection ? ' project-design-tile--collection' : ''}`}>
                 <header>
                   <span>
-                    <small>{deliveryTypeLabel(kind)}</small>
-                    {cleanDecodedText(design.name)}
-                    <span className="project-design-version">{design.version || 'v1'}</span>
-                    {versions.length > 1 && <span className="project-design-history">({versions.length} versões)</span>}
+                    <small>{isCollection ? collectionTypeLabel(group.collectionType) : deliveryTypeLabel(kind)}</small>
+                    {group.title}
+                    {!isCollection && <span className="project-design-version">{design.version || 'v1'}</span>}
+                    {!isCollection && versions.length > 1 && <span className="project-design-history">({versions.length} versões)</span>}
                   </span>
                   <b className={isApproved ? 'is-approved' : ''}>{isApproved ? 'Aprovado' : 'Aguardando aprovação'}</b>
                 </header>
-                <button onClick={(event) => openReview(design.id, event.currentTarget)} aria-label={`Abrir ${cleanDecodedText(design.name)}`}>
-                  <DeliveryPreview delivery={design} />
-                  <span className="project-design-open"><ExternalLink size={15} /> Revisar</span>
+                <button onClick={(event) => openReview(reviewTarget.id, event.currentTarget)} aria-label={`Abrir ${isCollection ? `${collectionTypeLabel(group.collectionType)} ${group.title}` : cleanDecodedText(design.name)}`}>
+                  {isCollection ? <CollectionPreview materials={group.materials} /> : <DeliveryPreview delivery={design} />}
+                  <span className="project-design-open"><ExternalLink size={15} /> {isCollection ? 'Revisar sequência' : 'Revisar'}</span>
                 </button>
               </article>
             })}
-          </div> : <div className="project-gallery-empty"><ImageIcon size={24} /> Nenhuma entrega foi enviada para revisão ainda.</div>)}
+          </div> : tab !== 'arquivos' ? <div className="project-gallery-empty"><ImageIcon size={24} /> Nenhuma entrega foi enviada para revisão ainda.</div> : null)}
+
+          {!loadingAssets && tab === 'arquivos' && projectFiles.length > 0 && <div className="project-assets-section-heading"><div><h3>Outros arquivos</h3><p>Referências, documentos e anexos do projeto.</p></div><span>{projectFiles.length}</span></div>}
 
           {!loadingAssets && tab === 'arquivos' && (projectFiles.length > 0 ? <div className="project-files-grid">
             {projectFiles.map((file) => <article key={file.id} className="project-file-card">
@@ -673,7 +747,7 @@ export function ProjectDetailPage() {
               </div>
               <a href={file.fileUrl} target="_blank" rel="noreferrer" aria-label={`Abrir ${cleanDecodedText(file.name)}`}><Download size={17} /></a>
             </article>)}
-          </div> : <div className="project-gallery-empty">Nenhum arquivo enviado neste projeto.</div>)}
+          </div> : deliveryGroups.length === 0 ? <div className="project-gallery-empty">Nenhum arquivo enviado neste projeto.</div> : null)}
         </section>
       )}
 
@@ -692,11 +766,20 @@ export function ProjectDetailPage() {
 
         const relatedTask = targetDelivery.taskId ? projectTasks.find((t) => t.id === targetDelivery.taskId) : null
         const isTaskInAlteracao = (relatedTask?.status as string) === 'Alteração' || (relatedTask?.delivery as string) === 'Em alteração'
+        const targetGroup = deliveryGroups.find((group) => group.materials.some((material) => material.versions.some((version) => version.id === reviewing)))
+        const collectionItems: ReviewCollectionItem[] = targetGroup?.collectionType ? targetGroup.materials.map((material, index) => ({
+          label: relatedTask?.briefing?.deliverySchema?.items?.[index]?.label || `Card ${index + 1}`,
+          delivery: material.latest,
+          versions: material.versions,
+        })) : []
 
         return (
           <DesignReviewModal
             delivery={targetDelivery}
             versions={siblingVersions}
+            collectionTitle={targetGroup?.collectionType ? targetGroup.title : undefined}
+            collectionLabel={targetGroup?.collectionType ? collectionTypeLabel(targetGroup.collectionType) : undefined}
+            collectionItems={collectionItems}
             approvedIds={approved}
             isApproved={approved.includes(reviewing)}
             projectCompleted={projectCompleted}
@@ -704,7 +787,7 @@ export function ProjectDetailPage() {
             taskStatus={relatedTask?.status}
             origin={reviewOrigin}
             notify={notify}
-            onApprovalChange={(nextApproved, feedback, targetId) => handleApprovalChange(targetId || reviewing, nextApproved, feedback)}
+            onApprovalChange={(nextApproved, feedback, targetId, scope) => handleApprovalChange(targetId || reviewing, nextApproved, feedback, scope)}
             onRequestChanges={(targetId, notes) => handleRequestChanges(targetId || reviewing, notes)}
             onClose={closeReview}
           />

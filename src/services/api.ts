@@ -511,10 +511,10 @@ export const api = {
     })
   },
 
-  async setDesignApproval(designId: number, approved: boolean, feedback?: { rating: number; comment?: string }) {
-    return request<{ success: boolean; id: number; approved: boolean; taskId?: string | null; project?: { status: string; progress: number; tasks: number }; feedback?: { rating: number; comment: string | null } | null }>(`/designs/${designId}/approval`, {
+  async setDesignApproval(designId: number, approved: boolean, feedback?: { rating: number; comment?: string }, scope: 'asset' | 'task' = 'asset') {
+    return request<{ success: boolean; id: number; approved: boolean; approvedDesignIds?: number[]; taskId?: string | null; project?: { status: string; progress: number; tasks: number }; feedback?: { rating: number; comment: string | null } | null }>(`/designs/${designId}/approval`, {
       method: 'POST',
-      body: JSON.stringify({ approved, ...feedback }),
+      body: JSON.stringify({ approved, ...feedback, ...(scope === 'task' ? { scope } : {}) }),
     })
   },
 

@@ -38,6 +38,12 @@ export function parseQuotedSnippet(rawText: string): { snippet: string | null; c
 
 export type ReviewOrigin = { left: number; top: number; width: number; height: number }
 
+export type ReviewCollectionItem = {
+  label: string
+  delivery: DesignSummary
+  versions: DesignSummary[]
+}
+
 type ReviewPoint = { x: number; y: number }
 type ReviewTool = 'point' | 'general' | 'pan' | 'draw' | 'arrow' | 'text' | 'rectangle'
 
@@ -97,13 +103,16 @@ type AnnotationAction =
 type DesignReviewModalProps = {
   delivery: DesignSummary
   versions?: DesignSummary[]
+  collectionTitle?: string
+  collectionLabel?: string
+  collectionItems?: ReviewCollectionItem[]
   approvedIds?: number[]
   isApproved?: boolean
   projectCompleted: boolean
   isAlteracao?: boolean
   taskStatus?: string
   origin: ReviewOrigin | null
-  onApprovalChange: (approved: boolean, feedback?: { rating: number; comment?: string }, targetDeliveryId?: number) => Promise<void>
+  onApprovalChange: (approved: boolean, feedback?: { rating: number; comment?: string }, targetDeliveryId?: number, scope?: 'asset' | 'task') => Promise<void>
   onRequestChanges?: (deliveryId: number, notes?: string) => Promise<void>
   onClose: () => void
   notify: (message: string) => void
@@ -142,6 +151,9 @@ function contentKind(delivery: DesignSummary) {
 export function DesignReviewModal({
   delivery,
   versions = [delivery],
+  collectionTitle,
+  collectionLabel = 'Coleção',
+  collectionItems = [],
   approvedIds,
   isApproved: propIsApproved,
   projectCompleted,
@@ -167,12 +179,18 @@ export function DesignReviewModal({
   }, [delivery])
 
   const parseVersionNum = (v?: string) => Number((v || '').replace(/\D/g, '')) || 1
+  const collectionIndex = useMemo(() => collectionItems.findIndex((item) => item.versions.some((version) => version.id === currentDelivery.id)), [collectionItems, currentDelivery.id])
+  const activeCollectionItem = collectionIndex >= 0 ? collectionItems[collectionIndex] : null
+  const isCollection = collectionItems.length > 1
+  const collectionName = collectionLabel.toLocaleLowerCase('pt-BR')
   const sortedVersions = useMemo(() => {
-    const list = [...versions]
+    const list = [...(activeCollectionItem?.versions || versions)]
     return list.sort((a, b) => parseVersionNum(b.version) - parseVersionNum(a.version) || b.id - a.id)
-  }, [versions])
+  }, [activeCollectionItem, versions])
 
   const isApproved = approvedIds ? approvedIds.includes(currentDelivery.id) : (currentDelivery.id === delivery.id ? Boolean(propIsApproved) : currentDelivery.approved)
+  const collectionApproved = isCollection && collectionItems.every((item) => approvedIds ? approvedIds.includes(item.delivery.id) : item.delivery.approved)
+  const approvedCollectionCount = isCollection ? collectionItems.filter((item) => approvedIds ? approvedIds.includes(item.delivery.id) : item.delivery.approved).length : 0
 
   const cleanName = (() => {
     try {
@@ -336,6 +354,10 @@ export function DesignReviewModal({
 
   useEffect(() => {
     let active = true
+    setReviewLoading(true)
+    setComments([])
+    setSelectedCommentId(null)
+    setFileLoadError(false)
     api.getDesignReview(currentDelivery.id).then((review) => {
       if (!active) return
       if ((review as any).taskStatus === 'Alteração' || (review as any).taskStatus === 'alteracao') {
@@ -439,15 +461,33 @@ export function DesignReviewModal({
     }
   }, [approvalFeedbackOpen, brushOpen, closeModal, draftAnnotation, pendingPoint, textEditor])
 
+  useEffect(() => {
+    if (!isCollection) return
+    const navigateCollection = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      if (target?.matches('input, textarea, select, [contenteditable="true"]')) return
+      if (event.key === 'ArrowLeft' && collectionIndex > 0) {
+        event.preventDefault()
+        setCurrentDelivery(collectionItems[collectionIndex - 1].delivery)
+      }
+      if (event.key === 'ArrowRight' && collectionIndex < collectionItems.length - 1) {
+        event.preventDefault()
+        setCurrentDelivery(collectionItems[collectionIndex + 1].delivery)
+      }
+    }
+    window.addEventListener('keydown', navigateCollection)
+    return () => window.removeEventListener('keydown', navigateCollection)
+  }, [collectionIndex, collectionItems, isCollection])
+
   const submitApprovalFeedback = async (event: React.FormEvent) => {
     event.preventDefault()
     if (!approvalRating || approvalSubmitting) return
     setApprovalSubmitting(true)
     setApprovalError('')
     try {
-      await onApprovalChange(true, { rating: approvalRating, comment: approvalComment.trim() || undefined })
+      await onApprovalChange(true, { rating: approvalRating, comment: approvalComment.trim() || undefined }, currentDelivery.id, isCollection ? 'task' : 'asset')
       setApprovalFeedbackOpen(false)
-      notify('Tarefa aprovada e avaliação enviada. Obrigado pelo feedback!')
+      notify(`${isCollection ? 'Conjunto aprovado' : 'Tarefa aprovada'} e avaliação enviada. Obrigado pelo feedback!`)
     } catch (error: unknown) {
       setApprovalError(error instanceof Error ? error.message : 'Não foi possível enviar a avaliação')
     } finally {
@@ -485,7 +525,7 @@ export function DesignReviewModal({
     if (approvalSubmitting) return
     setApprovalSubmitting(true)
     try {
-      await onApprovalChange(false)
+      await onApprovalChange(false, undefined, currentDelivery.id, isCollection ? 'task' : 'asset')
       notify('Aprovação removida')
     } catch (error: unknown) {
       notify(error instanceof Error ? error.message : 'Não foi possível remover a aprovação')
@@ -835,9 +875,9 @@ export function DesignReviewModal({
           <div className="file-review-topline">
             <div className="file-review-breadcrumbs">
               <button type="button">Chat</button><button type="button">Entregas</button><i />
-              <strong title={cleanName}>{cleanName}</strong>
-              <span className="file-review-kind">{typeLabel}</span>
-              <span className={`file-review-status${isApproved ? ' is-approved' : isAlteracao ? ' is-alteracao' : ''}`}>{isApproved ? 'Aprovado' : isAlteracao ? 'Em alteração' : 'Aguardando aprovação'}</span><i />
+              <strong title={isCollection ? `${collectionTitle} · ${cleanName}` : cleanName}>{isCollection ? collectionTitle : cleanName}</strong>
+              <span className="file-review-kind">{isCollection ? `${activeCollectionItem?.label || 'Item'} · ${collectionIndex + 1}/${collectionItems.length}` : typeLabel}</span>
+              <span className={`file-review-status${(isCollection ? collectionApproved : isApproved) ? ' is-approved' : isAlteracao ? ' is-alteracao' : ''}`}>{(isCollection ? collectionApproved : isApproved) ? 'Aprovado' : isAlteracao ? 'Em alteração' : 'Aguardando aprovação'}</span><i />
               {!isAlteracao && (
                 totalFeedbackCount > 0 && !isApproved ? (
                   <button
@@ -856,12 +896,12 @@ export function DesignReviewModal({
                     className="file-review-approve"
                     disabled={approvalSubmitting || projectCompleted}
                     onClick={() => {
-                      if (isApproved) void revokeApproval()
+                      if (isCollection ? collectionApproved : isApproved) void revokeApproval()
                       else setApprovalFeedbackOpen(true)
                     }}
                   >
                     <img src={figmaAsset('design_review.imgGroup')} alt="" />
-                    <span>{isApproved ? 'Aprovado' : projectCompleted ? 'Revisão encerrada' : 'Marcar como aprovado'}</span>
+                    <span>{(isCollection ? collectionApproved : isApproved) ? 'Aprovado' : projectCompleted ? 'Revisão encerrada' : isCollection ? `Aprovar ${collectionName}` : 'Marcar como aprovado'}</span>
                   </button>
                 )
               )}
@@ -893,6 +933,26 @@ export function DesignReviewModal({
           </div>
           <div className="file-review-controls">
             <div className="file-review-left-controls">
+              {isCollection && activeCollectionItem && (
+                <div className="file-review-collection-nav" role="group" aria-label={`Navegação ${collectionName === 'carrossel' ? 'do' : 'da'} ${collectionName}`}>
+                  <button
+                    type="button"
+                    disabled={collectionIndex <= 0}
+                    onClick={() => setCurrentDelivery(collectionItems[collectionIndex - 1].delivery)}
+                    aria-label="Card anterior"
+                  ><ChevronLeft size={17} /></button>
+                  <span title={cleanName}><strong>{activeCollectionItem.label}</strong><small>{collectionIndex + 1} de {collectionItems.length} · {approvedCollectionCount} aprovados</small></span>
+                  <button
+                    type="button"
+                    disabled={collectionIndex >= collectionItems.length - 1}
+                    onClick={() => setCurrentDelivery(collectionItems[collectionIndex + 1].delivery)}
+                    aria-label="Próximo card"
+                  ><ChevronRight size={17} /></button>
+                </div>
+              )}
+
+              {isCollection && <i className="file-review-divider" />}
+
               {hasRail && (
                 <button
                   type="button"
@@ -1294,7 +1354,7 @@ export function DesignReviewModal({
       )}
       {approvalFeedbackOpen && <div className="file-review-feedback-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !approvalSubmitting) setApprovalFeedbackOpen(false) }}>
         <form className="file-review-feedback" role="dialog" aria-modal="true" aria-labelledby="approval-feedback-title" onSubmit={submitApprovalFeedback}>
-          <header><div><span>Aprovar tarefa</span><h2 id="approval-feedback-title">Como você avalia esta entrega?</h2><p>Sua nota ajuda o time a entender o que funcionou e a melhorar as próximas entregas.</p></div><button type="button" disabled={approvalSubmitting} onClick={() => setApprovalFeedbackOpen(false)} aria-label="Fechar avaliação"><X size={20} /></button></header>
+          <header><div><span>{isCollection ? `Aprovar ${collectionName}` : 'Aprovar tarefa'}</span><h2 id="approval-feedback-title">Como você avalia esta entrega?</h2><p>{isCollection ? `A aprovação vale para os ${collectionItems.length} itens deste conjunto.` : 'Sua nota ajuda o time a entender o que funcionou e a melhorar as próximas entregas.'}</p></div><button type="button" disabled={approvalSubmitting} onClick={() => setApprovalFeedbackOpen(false)} aria-label="Fechar avaliação"><X size={20} /></button></header>
           <fieldset><legend>Nota da entrega <b>Obrigatório</b></legend><div className="file-review-feedback__stars" onMouseLeave={() => setHoveredRating(0)}>{[1, 2, 3, 4, 5].map((rating) => <button type="button" key={rating} className={rating <= (hoveredRating || approvalRating) ? 'active' : ''} onMouseEnter={() => setHoveredRating(rating)} onFocus={() => setHoveredRating(rating)} onBlur={() => setHoveredRating(0)} onClick={() => { setApprovalRating(rating); setApprovalError('') }} aria-label={`${rating} ${rating === 1 ? 'estrela' : 'estrelas'}`} aria-pressed={approvalRating === rating}><Star size={30} fill="currentColor" /></button>)}</div><p>{approvalRating ? ['', 'Muito abaixo do esperado', 'Abaixo do esperado', 'Atendeu ao esperado', 'Muito boa', 'Excelente entrega'][approvalRating] : 'Selecione de 1 a 5 estrelas'}</p></fieldset>
           <label><span>Comentário <small>Opcional</small></span><textarea value={approvalComment} maxLength={2000} onChange={(event) => setApprovalComment(event.target.value)} placeholder="Conte o que mais gostou ou o que podemos melhorar nas próximas entregas..." /><small>{approvalComment.length}/2000</small></label>
           {approvalError && <p className="file-review-feedback__error">{approvalError}</p>}
