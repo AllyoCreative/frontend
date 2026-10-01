@@ -932,9 +932,11 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .project-delivery-collection-sheet img { width: 100%; height: 100%; display: block; object-fit: cover; }
 .project-delivery-copy, .project-delivery-file { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 26px; background: #f7f4ed; color: #273129; text-align: center; }
 .project-delivery-copy { align-items: flex-start; justify-content: flex-start; background: #fbfaf6; text-align: left; }
-.project-delivery-copy > svg { color: #8b6f37; }
+.project-delivery-copy__meta { display: flex; align-items: center; gap: 8px; color: #8b6f37; }
+.project-delivery-copy__meta small { color: #68726c; font-size: 11px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
 .project-delivery-copy > small, .project-delivery-file > small { color: #778078; font-size: 11px; font-weight: 600; }
 .project-delivery-copy > p { display: -webkit-box; margin: 8px 0 0; overflow: hidden; color: #273129; font: 500 14px/22px 'Plus Jakarta Sans',sans-serif; white-space: pre-wrap; -webkit-box-orient: vertical; -webkit-line-clamp: 6; }
+.project-delivery-copy > .project-delivery-copy__hint { margin-top: auto; padding-top: 8px; }
 .project-delivery-file strong { font-size: 16px; }.project-delivery-file--pdf { background: #fbefed; color: #a1473e; }.project-delivery-file--video { background: #edf3f1; color: #004c46; }
 .project-design-tile > button > .project-design-open { position: absolute; z-index: 20; top: 50%; left: 50%; min-height: 40px; display: flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 100px; background: rgba(13,30,29,.9); color: #fff; font-size: 13px; font-weight: 650; opacity: 0; transform: translate(-50%, -40%); transition: .18s ease; }
 .project-design-tile > button:hover > .project-design-open, .project-design-tile > button:focus-visible > .project-design-open { opacity: 1; transform: translate(-50%, -50%); }
@@ -1169,9 +1171,10 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .file-review-document, .file-review-video { width: 100%; height: 100%; display: block; border: 0; border-radius: 8px; background: #fff; box-shadow: 0 12px 36px rgba(13,30,29,.13); }
 .file-review-video { object-fit: contain; background: #101413; }
 .file-review-copy { width: 100%; min-height: 100%; padding: 70px 76px; border: 1px solid #e2e3dc; border-radius: 8px; background: #fff; color: #17211c; box-shadow: 0 12px 36px rgba(13,30,29,.1); }
-.file-review-copy > span { color: #68726c; font-size: 11px; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; }
+.file-review-copy__header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 14px; border-bottom: 1px solid #e8eae6; color: #68726c; font-size: 11px; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; }
+.file-review-copy__header small { font-size: 11px; font-weight: 650; letter-spacing: 0; text-transform: none; }
 .file-review-copy h1 { margin: 13px 0 32px; font-size: 30px; line-height: 39px; letter-spacing: -.025em; }
-.file-review-copy > div { color: #273129; font-size: 17px; font-weight: 500; line-height: 30px; white-space: pre-wrap; }
+.file-review-copy > .file-review-copy__content { color: #273129; font-size: 17px; font-weight: 500; line-height: 30px; white-space: pre-wrap; }
 .file-review-file-fallback { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 36px; border: 1px solid #dce1dc; border-radius: 9px; background: #fff; color: #53605a; text-align: center; box-shadow: 0 12px 36px rgba(13,30,29,.08); }
 .file-review-file-fallback h2 { margin: 4px 0 0; color: #131f15; font-size: 20px; line-height: 28px; }.file-review-file-fallback p { margin: 0; font-size: 13px; }.file-review-file-fallback a { min-height: 40px; display: inline-flex; align-items: center; gap: 7px; margin-top: 8px; padding: 0 15px; border-radius: 999px; background: #004c46; color: #fff; font-size: 13px; font-weight: 700; }
 .file-review-annotation-layer { position: absolute; z-index: 2; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
@@ -1346,7 +1349,7 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
   .file-review-inline-comment { position: fixed; right: 10px; bottom: 290px; left: 10px !important; top: auto !important; width: auto; transform: none !important; }
   .file-review-copy { padding: 34px 26px; }
   .file-review-copy h1 { margin-bottom: 22px; font-size: 24px; line-height: 32px; }
-  .file-review-copy > div { font-size: 15px; line-height: 25px; }
+  .file-review-copy > .file-review-copy__content { font-size: 15px; line-height: 25px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

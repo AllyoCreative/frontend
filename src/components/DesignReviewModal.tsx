@@ -767,6 +767,8 @@ export function DesignReviewModal({
 
   const fileUrl = currentDelivery.fileUrl || currentDelivery.thumbnailUrl || null
   const typeLabel = kind === 'copy' ? 'Copy' : kind === 'pdf' ? 'PDF' : kind === 'video' ? 'Vídeo' : kind === 'image' ? 'Imagem' : 'Arquivo'
+  const copyText = currentDelivery.textContent?.trim() || 'O conteúdo desta entrega ainda não foi informado.'
+  const copyWordCount = currentDelivery.textContent?.trim() ? currentDelivery.textContent.trim().split(/\s+/).length : 0
   const loadImageDimensions = (event: React.SyntheticEvent<HTMLImageElement>) => {
     const image = event.currentTarget
     if (!image.naturalWidth || !image.naturalHeight) return
@@ -825,9 +827,12 @@ export function DesignReviewModal({
       className="file-review-copy"
       style={{ position: 'relative', userSelect: 'text' }}
     >
-      <span>Texto para aprovação</span>
+      <header className="file-review-copy__header">
+        <span>Copy para aprovação</span>
+        <small>{currentDelivery.version || 'v1'}{copyWordCount ? ` · ${copyWordCount} ${copyWordCount === 1 ? 'palavra' : 'palavras'}` : ''}</small>
+      </header>
       <h1>{cleanName}</h1>
-      <div style={{ userSelect: 'text' }}>{currentDelivery.textContent || 'O conteúdo desta entrega ainda não foi informado.'}</div>
+      <div className="file-review-copy__content" style={{ userSelect: 'text' }}>{copyText}</div>
 
       {activeTextSelection && (
         <div

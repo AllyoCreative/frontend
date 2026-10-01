@@ -240,7 +240,15 @@ function DeliveryPreview({ delivery }: { delivery: DesignSummary }) {
   const [previewFailed, setPreviewFailed] = useState(false)
   if (kind === 'image' && previewUrl && !previewFailed) return <img src={previewUrl} alt={delivery.name} onError={() => setPreviewFailed(true)} />
   if (kind === 'image') return <span className="project-delivery-file"><ImageIcon size={38} /><strong>Imagem</strong><small>Não foi possível carregar a prévia. Abra a entrega para tentar novamente.</small></span>
-  if (kind === 'copy') return <span className="project-delivery-copy"><MessageSquareText size={25} /><small>Conteúdo para leitura</small><p>{delivery.textContent || 'Abra para revisar o texto desta entrega.'}</p></span>
+  if (kind === 'copy') {
+    const content = delivery.textContent?.trim() || ''
+    const wordCount = content ? content.split(/\s+/).length : 0
+    return <span className="project-delivery-copy">
+      <span className="project-delivery-copy__meta"><MessageSquareText size={22} /><small>Copy para aprovação</small></span>
+      <p>{content || 'Abra para revisar o texto desta entrega.'}</p>
+      <small className="project-delivery-copy__hint">{wordCount ? `${wordCount} ${wordCount === 1 ? 'palavra' : 'palavras'} · ` : ''}Abra para comentar trechos</small>
+    </span>
+  }
   if (kind === 'pdf') return <span className="project-delivery-file project-delivery-file--pdf"><FileText size={38} /><strong>PDF</strong><small>Abra para visualizar o documento</small></span>
   if (kind === 'video') return <span className="project-delivery-file project-delivery-file--video"><Play size={38} /><strong>Vídeo</strong><small>Abra para reproduzir</small></span>
   return <span className="project-delivery-file"><FileText size={38} /><strong>Arquivo</strong><small>Prévia indisponível</small></span>
@@ -308,6 +316,12 @@ export function ProjectDetailPage() {
 
     for (const collection of collections.values()) {
       collection.materials.sort((left, right) => left.latest.id - right.latest.id)
+      const taskId = collection.materials[0]?.latest.taskId
+      const task = taskId ? projectTasks.find((item) => item.id === taskId) : undefined
+      const expectedItemCount = task?.briefing?.deliverySchema?.items?.length || 0
+      if (expectedItemCount > 0 && collection.materials.length > expectedItemCount) {
+        collection.materials = collection.materials.slice(-expectedItemCount)
+      }
     }
     return result
   }, [designList, projectTasks])
