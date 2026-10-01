@@ -202,11 +202,12 @@ type DeliveryGalleryGroup = {
 
 function deliveryKind(delivery: DesignSummary): DeliveryKind {
   const type = delivery.contentType?.toLowerCase() || ''
-  const name = `${delivery.name} ${delivery.fileUrl || ''}`.toLowerCase()
+  const source = `${delivery.name} ${delivery.fileKey || ''} ${delivery.fileUrl || ''} ${delivery.thumbnailUrl || ''}`.toLowerCase()
   if (delivery.textContent || type.startsWith('text/')) return 'copy'
-  if (type === 'application/pdf' || name.endsWith('.pdf')) return 'pdf'
+  if (type === 'application/pdf' || /\.pdf(?:$|[?&\s])/.test(source)) return 'pdf'
   if (type.startsWith('video/')) return 'video'
-  if (type.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(name)) return 'image'
+  if (type.startsWith('image/') || Boolean(delivery.thumbnailUrl) || /\.(png|jpe?g|webp|gif|svg)(?:$|[?&\s])/i.test(source)) return 'image'
+  if (/\.(mp4|webm|mov)(?:$|[?&\s])/i.test(source)) return 'video'
   return 'file'
 }
 

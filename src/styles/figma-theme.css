@@ -909,7 +909,7 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .project-assets-section-heading p { margin: 2px 0 0; color: #778078; font-size: 11px; line-height: 17px; }
 .project-assets-section-heading > span { min-width: 28px; height: 28px; display: grid; place-items: center; padding: 0 8px; border-radius: 999px; background: #e8eee9; color: #405048; font-size: 11px; font-weight: 750; }
 .project-visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); border: 0; white-space: nowrap; }
-.project-designs-grid { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.project-designs-grid { width: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 280px)); justify-content: start; gap: 14px; }
 .project-design-tile { min-height: 308px; overflow: hidden; border-radius: 10px; background: #fff; }
 .project-design-tile > header { min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; }
 .project-design-tile > header span { min-width: 0; overflow: hidden; color: #273129; font-size: 13px; font-weight: 650; line-height: 18px; white-space: nowrap; text-overflow: ellipsis; }
@@ -939,7 +939,7 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .project-design-tile > button > .project-design-open { position: absolute; top: 50%; left: 50%; min-height: 40px; display: flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 100px; background: rgba(13,30,29,.9); color: #fff; font-size: 13px; font-weight: 650; opacity: 0; transform: translate(-50%, -40%); transition: .18s ease; }
 .project-design-tile > button:hover > .project-design-open, .project-design-tile > button:focus-visible > .project-design-open { opacity: 1; transform: translate(-50%, -50%); }
 .project-file-placeholder { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #778078; font-size: 12px; }
-.project-files-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.project-files-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 360px)); justify-content: start; gap: 12px; }
 .project-file-card { min-width: 0; display: grid; grid-template-columns: 58px minmax(0, 1fr) 38px; align-items: center; gap: 12px; padding: 11px; border: 1px solid #d8dcd5; border-radius: 12px; background: #fff; }
 .project-file-preview { width: 58px; height: 58px; display: grid; place-items: center; overflow: hidden; border-radius: 9px; background: #f0f3ee; color: #68726c; }
 .project-file-preview img { width: 100%; height: 100%; object-fit: cover; }
@@ -1698,7 +1698,7 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
   .project-started-metrics { height: auto; grid-template-columns: repeat(2, minmax(120px, 1fr)); gap: 22px 30px; }
   .project-messages-feed { height: auto; }
   .project-chat-stage { width: 100%; }
-  .project-designs-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .project-designs-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 280px)); }
   .projects-topbar { height: auto; min-height: 39px; flex-wrap: wrap; gap: 18px; }
   .projects-display-controls { margin-left: auto; }
   .projects-filterbar { height: auto; flex-wrap: wrap; padding-bottom: 4px; overflow: visible; }
@@ -1833,7 +1833,7 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
   .project-message-tools { flex: 1 1 auto; min-height: 44px; gap: 6px; overflow-x: auto; scrollbar-width: thin; }
   .project-message-tools button { width: 44px; height: 44px; flex: none; }
   .project-message-send { min-height: 44px; }
-  .project-designs-grid { grid-template-columns: 1fr; }
+  .project-designs-grid, .project-files-grid { grid-template-columns: 1fr; }
   .design-grid { grid-template-columns: 1fr; }
   .auth-card { min-height: 100%; padding: 0; }
   .auth-card .logo { width: 108px; height: auto; margin: 0; }

@@ -140,11 +140,11 @@ function annotationLabel(annotation?: ReviewAnnotation) {
 
 function contentKind(delivery: DesignSummary) {
   const type = delivery.contentType?.toLowerCase() || ''
-  const name = `${delivery.name} ${delivery.fileUrl || ''}`.toLowerCase()
+  const source = `${delivery.name} ${delivery.fileKey || ''} ${delivery.fileUrl || ''} ${delivery.thumbnailUrl || ''}`.toLowerCase()
   if (delivery.textContent || type.startsWith('text/')) return 'copy' as const
-  if (type === 'application/pdf' || name.endsWith('.pdf')) return 'pdf' as const
-  if (type.startsWith('video/')) return 'video' as const
-  if (type.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(name)) return 'image' as const
+  if (type === 'application/pdf' || /\.pdf(?:$|[?&\s])/.test(source)) return 'pdf' as const
+  if (type.startsWith('video/') || /\.(mp4|webm|mov)(?:$|[?&\s])/i.test(source)) return 'video' as const
+  if (type.startsWith('image/') || Boolean(delivery.thumbnailUrl) || /\.(png|jpe?g|webp|gif|svg)(?:$|[?&\s])/i.test(source)) return 'image' as const
   return 'file' as const
 }
 

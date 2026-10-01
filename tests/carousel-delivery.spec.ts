@@ -29,11 +29,12 @@ const designs = [1, 2, 3].map((id) => ({
   id,
   projectId: 'project-carousel',
   taskId: task.id,
-  name: `card-${id}.png`,
+  name: `Card ${String(id).padStart(2, '0')}`,
   version: 'v1',
   color: '#d7ff70',
   approved: false,
-  contentType: 'image/png',
+  contentType: 'application/octet-stream',
+  fileKey: `workspaces/workspace-1/designs/card-${id}.png`,
   fileUrl: '/assets/figma/designs_imgImage8.png',
 }))
 
@@ -81,13 +82,15 @@ test('carrossel aparece como uma entrega navegável também nos arquivos', async
   await page.goto('/projetos/project-carousel/arquivos')
 
   await expect(page.locator('.project-design-tile--collection')).toHaveCount(1)
+  await expect.poll(async () => (await page.locator('.project-design-tile--collection').boundingBox())?.width || 0).toBeLessThan(320)
+  await expect(page.locator('.project-delivery-collection-sheet img')).toHaveCount(3)
   await expect(page.getByText('3 cards')).toBeVisible()
   await page.getByRole('button', { name: 'Abrir Carrossel Carrossel de lançamento' }).click()
 
   await expect(page.getByRole('group', { name: 'Navegação do carrossel' })).toContainText('Card 1')
   await page.getByRole('button', { name: 'Próximo card' }).click()
   await expect(page.getByRole('group', { name: 'Navegação do carrossel' })).toContainText('Card 2')
-  await expect(page.locator('.file-review-art[title="card-2.png"]')).toBeVisible()
+  await expect(page.locator('.file-review-art[title="Card 02"] img')).toBeVisible()
 
   await page.getByRole('button', { name: 'Aprovar carrossel' }).click()
   await page.getByRole('button', { name: '5 estrelas' }).click()
