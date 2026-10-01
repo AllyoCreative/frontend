@@ -1175,6 +1175,9 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .file-review-copy__header small { font-size: 11px; font-weight: 650; letter-spacing: 0; text-transform: none; }
 .file-review-copy h1 { margin: 13px 0 32px; font-size: 30px; line-height: 39px; letter-spacing: -.025em; }
 .file-review-copy > .file-review-copy__content { color: #273129; font-size: 17px; font-weight: 500; line-height: 30px; white-space: pre-wrap; }
+.file-review-copy__field + .file-review-copy__field { margin-top: 24px; }
+.file-review-copy__field small { display: block; margin-bottom: 5px; color: #778078; font-size: 11px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.file-review-copy__field p { margin: 0; }
 .file-review-file-fallback { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 36px; border: 1px solid #dce1dc; border-radius: 9px; background: #fff; color: #53605a; text-align: center; box-shadow: 0 12px 36px rgba(13,30,29,.08); }
 .file-review-file-fallback h2 { margin: 4px 0 0; color: #131f15; font-size: 20px; line-height: 28px; }.file-review-file-fallback p { margin: 0; font-size: 13px; }.file-review-file-fallback a { min-height: 40px; display: inline-flex; align-items: center; gap: 7px; margin-top: 8px; padding: 0 15px; border-radius: 999px; background: #004c46; color: #fff; font-size: 13px; font-weight: 700; }
 .file-review-annotation-layer { position: absolute; z-index: 2; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }

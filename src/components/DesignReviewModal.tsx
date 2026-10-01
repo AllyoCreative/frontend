@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { figmaAsset } from '../assets/figma'
 import { api, type DesignSummary } from '../services/api'
+import { parseCopyContent } from '../utils/copyContent'
 import { PdfReviewCanvas, PdfPageThumb, type PDFDocumentProxy } from './PdfReviewCanvas'
 
 export function parseQuotedSnippet(rawText: string): { snippet: string | null; cleanText: string } {
@@ -767,8 +768,9 @@ export function DesignReviewModal({
 
   const fileUrl = currentDelivery.fileUrl || currentDelivery.thumbnailUrl || null
   const typeLabel = kind === 'copy' ? 'Copy' : kind === 'pdf' ? 'PDF' : kind === 'video' ? 'Vídeo' : kind === 'image' ? 'Imagem' : 'Arquivo'
-  const copyText = currentDelivery.textContent?.trim() || 'O conteúdo desta entrega ainda não foi informado.'
-  const copyWordCount = currentDelivery.textContent?.trim() ? currentDelivery.textContent.trim().split(/\s+/).length : 0
+  const copyContent = parseCopyContent(currentDelivery.textContent)
+  const copyText = copyContent.plainText || 'O conteúdo desta entrega ainda não foi informado.'
+  const copyWordCount = copyContent.wordCount
   const loadImageDimensions = (event: React.SyntheticEvent<HTMLImageElement>) => {
     const image = event.currentTarget
     if (!image.naturalWidth || !image.naturalHeight) return
@@ -832,7 +834,14 @@ export function DesignReviewModal({
         <small>{currentDelivery.version || 'v1'}{copyWordCount ? ` · ${copyWordCount} ${copyWordCount === 1 ? 'palavra' : 'palavras'}` : ''}</small>
       </header>
       <h1>{cleanName}</h1>
-      <div className="file-review-copy__content" style={{ userSelect: 'text' }}>{copyText}</div>
+      <div className="file-review-copy__content" style={{ userSelect: 'text' }}>
+        {copyContent.fields.length > 0 ? copyContent.fields.map((field) => (
+          <section className="file-review-copy__field" key={field.key}>
+            <small>{field.label}</small>
+            <p>{field.text}</p>
+          </section>
+        )) : copyText}
+      </div>
 
       {activeTextSelection && (
         <div
