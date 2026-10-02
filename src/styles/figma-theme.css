@@ -2239,11 +2239,17 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 
 
 .new-project-reference-actions { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 8px; }
-.new-project-reference-actions > label { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 15px; border: 0; border-radius: 8px; background: #004c46; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
+.new-project-reference-actions > label,
+.new-project-add-files-btn { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 15px; border: 0; border-radius: 8px; background: #004c46; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; transition: background .15s ease, transform .1s ease; }
+.new-project-add-files-btn:hover { background: #003a35; }
+.new-project-add-files-btn:active { transform: scale(0.98); }
 .new-project-reference-actions > div { min-width: 0; display: grid; grid-template-columns: 18px minmax(0,1fr) auto; align-items: center; gap: 8px; padding: 0 6px 0 12px; border-radius: 7px; background: #f4f5f4; color: #778078; }
 .new-project-reference-actions input { min-width: 0; height: 44px; padding: 0; border: 0; outline: 0; background: transparent; color: #131f15; font-size: 13px; }
-.new-project-reference-actions > div button { min-height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: #fff; color: #004c46; font-size: 12px; font-weight: 700; }
-.new-project-reference-container { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.new-project-reference-actions > div button { min-height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: #fff; color: #004c46; font-size: 12px; font-weight: 700; cursor: pointer; }
+.new-project-reference-container { display: flex; flex-direction: column; gap: 14px; margin-top: 12px; }
+.new-project-reference-group { display: flex; flex-direction: column; gap: 8px; }
+.new-project-reference-group__title { font-size: 11px; font-weight: 700; color: #4b5e52; text-transform: uppercase; letter-spacing: 0.04em; }
+.new-project-reference-section.is-dragging { border: 2px dashed #004c46 !important; background: #f0f7f1 !important; border-radius: 10px; padding: 12px; }
 .new-project-reference-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
 .new-project-file-card {
   display: flex;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, ExternalLink, FileOutput, FileText, Layers3, Link2, Maximize2, Minus, PaintBucket, Paperclip, PenTool, Pencil, Plus, Search, Sparkles, Upload, X } from 'lucide-react'
 import { useApp } from '../AppContext'
@@ -300,15 +300,18 @@ export function NewProjectPage() {
     }
   }
 
-  const addReferenceFiles = (files: FileList | null) => {
+  const addReferenceFiles = (files: FileList | File[] | null) => {
     if (!files) return
+    const incoming = Array.from(files)
+    if (incoming.length === 0) return
     setReferenceFiles((current) => {
       const next = [...current]
-      Array.from(files).forEach((file) => {
+      incoming.forEach((file) => {
         if (!next.some((item) => item.name === file.name && item.size === file.size)) next.push(file)
       })
       return next.slice(0, 10)
     })
+    notify(`${incoming.length} arquivo(s) adicionado(s) às referências`)
   }
 
   const submit = async () => {
@@ -410,12 +413,14 @@ interface BriefStepProps {
   setName: (value: string) => void; setObjective: (value: string) => void; setOverview: (value: string) => void
   setProjectGoal: (value: string) => void; setAudience: (value: string) => void; setTone: (value: string) => void
   setNotApplicable: React.Dispatch<React.SetStateAction<{ audience: boolean; tone: boolean }>>; setCreativePath: (value: 'new-direction' | 'new-concept' | 'follow-references') => void
-  setLinkDraft: (value: string) => void; addReferenceLink: () => void; addReferenceFiles: (files: FileList | null) => void; removeFile: (index: number) => void; removeLink: (link: string) => void
+  setLinkDraft: (value: string) => void; addReferenceLink: () => void; addReferenceFiles: (files: FileList | File[] | null) => void; removeFile: (index: number) => void; removeLink: (link: string) => void
   onPreviewFile: (file: File) => void
   onCancel: () => void; onNext: () => void; ready: boolean
 }
 
 function BriefStep(props: BriefStepProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isDragging, setIsDragging] = useState(false)
   const toggleNotApplicable = (key: 'audience' | 'tone') => {
     props.setNotApplicable((current) => ({ ...current, [key]: !current[key] }))
     if (key === 'audience') props.setAudience('')
@@ -534,13 +539,43 @@ function BriefStep(props: BriefStepProps) {
         </div>
       </div>
     )}
-    <div className="new-project-form-section">
+    <div
+      className={`new-project-form-section new-project-reference-section ${isDragging ? 'is-dragging' : ''}`}
+      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true) }}
+      onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true) }}
+      onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false) }}
+      onDrop={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsDragging(false)
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          props.addReferenceFiles(Array.from(e.dataTransfer.files))
+        }
+      }}
+    >
       <SectionTitle title="Referências" description="Opcional. Anexe materiais ou compartilhe links; eles serão salvos no projeto." />
       <div className="new-project-reference-actions">
-        <label>
+        <button
+          type="button"
+          className="new-project-add-files-btn"
+          onClick={() => fileInputRef.current?.click()}
+        >
           <Upload size={16} /> Adicionar arquivos
-          <input type="file" multiple hidden onChange={(event) => { props.addReferenceFiles(event.target.files); event.target.value = '' }} />
-        </label>
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          style={{ display: 'none' }}
+          onChange={(event) => {
+            const raw = event.target.files
+            if (raw && raw.length > 0) {
+              const fileList = Array.from(raw)
+              props.addReferenceFiles(fileList)
+            }
+            event.target.value = ''
+          }}
+        />
         <div>
           <Link2 size={16} />
           <input
@@ -560,41 +595,51 @@ function BriefStep(props: BriefStepProps) {
       {(props.referenceFiles.length > 0 || props.referenceLinks.length > 0) && (
         <div className="new-project-reference-container">
           {props.referenceFiles.length > 0 && (
-            <div className="new-project-reference-grid">
-              {props.referenceFiles.map((file, index) => (
-                <ReferenceFileCard
-                  key={`${file.name}-${file.size}-${index}`}
-                  file={file}
-                  onRemove={() => props.removeFile(index)}
-                  onPreview={(f) => props.onPreviewFile(f)}
-                />
-              ))}
+            <div className="new-project-reference-group">
+              <span className="new-project-reference-group__title">
+                Arquivos anexados ({props.referenceFiles.length})
+              </span>
+              <div className="new-project-reference-grid">
+                {props.referenceFiles.map((file, index) => (
+                  <ReferenceFileCard
+                    key={`${file.name}-${file.size}-${index}`}
+                    file={file}
+                    onRemove={() => props.removeFile(index)}
+                    onPreview={(f) => props.onPreviewFile(f)}
+                  />
+                ))}
+              </div>
             </div>
           )}
           {props.referenceLinks.length > 0 && (
-            <div className="new-project-link-list">
-              {props.referenceLinks.map((link) => (
-                <div key={link} className="new-project-link-card">
-                  <Link2 size={15} className="new-project-link-card__icon" />
-                  <a href={link} target="_blank" rel="noreferrer" className="new-project-link-card__url" title={link}>
-                    {link}
-                  </a>
-                  <div className="new-project-link-card__actions">
-                    <a href={link} target="_blank" rel="noreferrer" className="new-project-link-card__btn" title="Abrir link em nova aba">
-                      <ExternalLink size={14} />
+            <div className="new-project-reference-group">
+              <span className="new-project-reference-group__title">
+                Links adicionados ({props.referenceLinks.length})
+              </span>
+              <div className="new-project-link-list">
+                {props.referenceLinks.map((link) => (
+                  <div key={link} className="new-project-link-card">
+                    <Link2 size={15} className="new-project-link-card__icon" />
+                    <a href={link} target="_blank" rel="noreferrer" className="new-project-link-card__url" title={link}>
+                      {link}
                     </a>
-                    <button
-                      type="button"
-                      className="new-project-link-card__btn new-project-link-card__btn--delete"
-                      onClick={() => props.removeLink(link)}
-                      title="Remover link"
-                      aria-label="Remover link"
-                    >
-                      <X size={14} />
-                    </button>
+                    <div className="new-project-link-card__actions">
+                      <a href={link} target="_blank" rel="noreferrer" className="new-project-link-card__btn" title="Abrir link em nova aba">
+                        <ExternalLink size={14} />
+                      </a>
+                      <button
+                        type="button"
+                        className="new-project-link-card__btn new-project-link-card__btn--delete"
+                        onClick={() => props.removeLink(link)}
+                        title="Remover link"
+                        aria-label="Remover link"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
         </div>
