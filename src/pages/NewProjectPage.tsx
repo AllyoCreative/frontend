@@ -7,6 +7,10 @@ import { isConceptVisualEligible } from '../config/creativePathConfig'
 import { api, type CatalogProduct, type CatalogQuote, type CatalogScope, type ProjectDeliveryItem, type ProjectDeliverySchema } from '../services/api'
 import { FilePreviewModal, type PreviewableFile } from '../components/FilePreviewModal'
 import { ReferenceFileCard } from '../components/ReferenceFileCard'
+import { AddFormatsModal } from '../components/formats/AddFormatsModal'
+import { FormatConfigurator } from '../components/formats/FormatConfigurator'
+import { ChannelBadgeIcon } from '../components/formats/ChannelIcons'
+import type { ChannelFormatOption, ConfiguredFormatItem } from '../components/formats/formatTypes'
 
 type FlowStep = 'catalog' | 'brief' | 'configure' | 'review' | 'success'
 type CatalogFilter = 'all' | 'design' | 'production' | 'ai' | 'fast'
@@ -146,6 +150,71 @@ export function NewProjectPage() {
   const [deliveryItems, setDeliveryItems] = useState<ProjectDeliveryItem[]>([])
   const deliveryConfig = useMemo(() => selected ? deliveryConfigFor(selected) : null, [selected])
 
+  // Modular format configuration state
+  const [configuredFormats, setConfiguredFormats] = useState<ConfiguredFormatItem[]>([
+    {
+      id: 'fmt-1',
+      channel: 'Instagram',
+      formatName: 'Post',
+      dimension: '1080 × 1350px',
+      proportionLabel: 'Retrato',
+      isPrincipal: true,
+      exclusiveDirection: '',
+      software: 'Photoshop',
+      extension: '.PNG',
+    },
+  ])
+  const [activeFormatId, setActiveFormatId] = useState<string | null>('fmt-1')
+  const [isAddFormatsModalOpen, setIsAddFormatsModalOpen] = useState(false)
+
+  const handleAddFormat = (option: ChannelFormatOption) => {
+    const newId = `fmt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+    const isFirst = configuredFormats.length === 0
+    const newItem: ConfiguredFormatItem = {
+      id: newId,
+      channel: option.channel,
+      formatName: option.name,
+      dimension: option.defaultProportion.dimension,
+      proportionLabel: option.defaultProportion.label,
+      isPrincipal: isFirst,
+      exclusiveDirection: '',
+      software: configuredFormats[0]?.software || selectedEditableFormat || 'Photoshop',
+      extension: configuredFormats[0]?.extension || selectedFinalFormat || '.PNG',
+    }
+    const nextList = [...configuredFormats, newItem]
+    setConfiguredFormats(nextList)
+    setActiveFormatId(newId)
+    setScope((current) => ({
+      ...current,
+      quantity: nextList.length,
+      resizeCount: Math.max(0, nextList.length - 1),
+    }))
+  }
+
+  const handleRemoveFormat = (idToRemove: string) => {
+    const nextList = configuredFormats.filter((item) => item.id !== idToRemove)
+    if (nextList.length > 0 && !nextList.some((item) => item.isPrincipal)) {
+      nextList[0].isPrincipal = true
+    }
+    setConfiguredFormats(nextList)
+    if (activeFormatId === idToRemove) {
+      setActiveFormatId(nextList[0]?.id || null)
+    }
+    setScope((current) => ({
+      ...current,
+      quantity: Math.max(1, nextList.length),
+      resizeCount: Math.max(0, nextList.length - 1),
+    }))
+  }
+
+  const handleUpdateFormat = (idToUpdate: string, updates: Partial<ConfiguredFormatItem>) => {
+    setConfiguredFormats((current) =>
+      current.map((item) => (item.id === idToUpdate ? { ...item, ...updates } : item))
+    )
+    if (updates.extension) setSelectedFinalFormat(updates.extension)
+    if (updates.software) setSelectedEditableFormat(updates.software)
+  }
+
   useEffect(() => {
     let active = true
     api.getCatalog().then((catalog) => {
@@ -243,6 +312,27 @@ export function NewProjectPage() {
     setReferenceFiles([])
     setReferenceLinks([])
     setDeliveryItems(nextDeliveryConfig ? resizeDeliveryItems(nextDeliveryConfig, nextScope.quantity) : [])
+
+    const isMultiFormat = product.code === '168' || (product.formats.available.length > 0 && !nextDeliveryConfig)
+    if (isMultiFormat) {
+      const defaultFmt: ConfiguredFormatItem = {
+        id: `fmt-${Date.now()}-1`,
+        channel: 'Instagram',
+        formatName: 'Post',
+        dimension: '1080 × 1350px',
+        proportionLabel: 'Retrato',
+        isPrincipal: true,
+        exclusiveDirection: '',
+        software: 'Photoshop',
+        extension: defaultFinalFormat(product) || '.PNG',
+      }
+      setConfiguredFormats([defaultFmt])
+      setActiveFormatId(defaultFmt.id)
+    } else {
+      setConfiguredFormats([])
+      setActiveFormatId(null)
+    }
+
     setStep('brief')
   }
 
@@ -317,6 +407,12 @@ export function NewProjectPage() {
   const submit = async () => {
     if (!selected || !briefReady || !quote || submitting) return
     setSubmitting(true)
+    const finalSelectedFormats = configuredFormats.length > 0
+      ? configuredFormats.map((f) =>
+          `${f.channel}: ${f.formatName} — ${f.dimension || 'Dimensão a definir'}${f.isPrincipal ? ' (Peça Principal)' : ''}${f.exclusiveDirection ? ` [Obs: ${f.exclusiveDirection}]` : ''}`
+        )
+      : selectedFormats
+
     try {
       const created = await addProject({
         name: name.trim(), service: selected.name, status: 'Em andamento', deadline: 'A definir', progress: 8,
@@ -324,7 +420,7 @@ export function NewProjectPage() {
         accent: categoryAccent[selected.category] || '#d7ff70', team: [], description: overview.trim(), objective, overview: overview.trim(), projectGoal,
         audience: !notApplicable.audience ? audience.trim() : undefined,
         tone: !notApplicable.tone ? tone.trim() : undefined,
-        creativePath, referenceLinks, selectedFormats, catalogCode: selected.code, catalogScope: scope,
+        creativePath, referenceLinks, selectedFormats: finalSelectedFormats, catalogCode: selected.code, catalogScope: scope,
         deliverySchema: deliveryConfig ? {
           version: 1,
           taskType: deliveryConfig.taskType,
@@ -381,8 +477,65 @@ export function NewProjectPage() {
       </main> : selected && <main className="new-project-flow">
         <section className="new-project-flow__main">
           {step === 'brief' && <BriefStep selected={selected} name={name} objective={objective} overview={overview} projectGoal={projectGoal} audience={audience} tone={tone} notApplicable={notApplicable} creativePath={creativePath} referenceFiles={referenceFiles} referenceLinks={referenceLinks} linkDraft={linkDraft} setName={setName} setObjective={setObjective} setOverview={setOverview} setProjectGoal={setProjectGoal} setAudience={setAudience} setTone={setTone} setNotApplicable={setNotApplicable} setCreativePath={setCreativePath} setLinkDraft={setLinkDraft} addReferenceLink={addReferenceLink} addReferenceFiles={addReferenceFiles} removeFile={(index) => setReferenceFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} removeLink={(link) => setReferenceLinks((current) => current.filter((item) => item !== link))} onPreviewFile={(file) => setPreviewFile({ name: file.name, file, sizeBytes: file.size, contentType: file.type })} onCancel={() => setStep('catalog')} onNext={() => setStep('configure')} ready={briefReady} />}
-          {step === 'configure' && <ConfigureStep selected={selected} scope={scope} selectedApplications={selectedApplications} selectedSizes={selectedSizes} selectedFinalFormat={selectedFinalFormat} selectedEditableFormat={selectedEditableFormat} quoteError={quoteError} deliveryConfig={deliveryConfig} deliveryItems={deliveryItems} setDeliveryItems={setDeliveryItems} updateCounter={updateCounter} toggleAddon={toggleAddon} toggleApplication={toggleApplication} toggleSize={toggleSize} addCustomSize={addCustomSize} setSelectedFinalFormat={setSelectedFinalFormat} setSelectedEditableFormat={setSelectedEditableFormat} onBack={() => setStep('brief')} onNext={() => setStep('review')} quoteReady={Boolean(quote)} />}
-          {step === 'review' && <ReviewStep selected={selected} name={name} overview={overview} objective={objective} projectGoal={projectGoal} audience={notApplicable.audience ? '' : audience} tone={notApplicable.tone ? '' : tone} creativePath={creativePath} selectedApplications={selectedApplications} selectedSizes={selectedSizes} selectedFinalFormat={selectedFinalFormat} selectedEditableFormat={selectedEditableFormat} referenceFiles={referenceFiles} referenceLinks={referenceLinks} scope={scope} quote={quote} deliveryConfig={deliveryConfig} deliveryItems={deliveryItems} submitting={submitting} onBack={() => setStep('configure')} onEditBrief={() => setStep('brief')} onSubmit={() => void submit()} onPreviewFile={(file) => setPreviewFile({ name: file.name, file, sizeBytes: file.size, contentType: file.type })} />}
+          {step === 'configure' && (
+            <ConfigureStep
+              selected={selected}
+              scope={scope}
+              selectedApplications={selectedApplications}
+              selectedSizes={selectedSizes}
+              selectedFinalFormat={selectedFinalFormat}
+              selectedEditableFormat={selectedEditableFormat}
+              quoteError={quoteError}
+              deliveryConfig={deliveryConfig}
+              deliveryItems={deliveryItems}
+              setDeliveryItems={setDeliveryItems}
+              updateCounter={updateCounter}
+              toggleAddon={toggleAddon}
+              toggleApplication={toggleApplication}
+              toggleSize={toggleSize}
+              addCustomSize={addCustomSize}
+              setSelectedFinalFormat={setSelectedFinalFormat}
+              setSelectedEditableFormat={setSelectedEditableFormat}
+              onBack={() => setStep('brief')}
+              onNext={() => setStep('review')}
+              quoteReady={Boolean(quote)}
+              configuredFormats={configuredFormats}
+              activeFormatId={activeFormatId}
+              onSelectFormat={setActiveFormatId}
+              onRemoveFormat={handleRemoveFormat}
+              onOpenAddModal={() => setIsAddFormatsModalOpen(true)}
+              onUpdateFormat={handleUpdateFormat}
+              quote={quote}
+            />
+          )}
+          {step === 'review' && (
+            <ReviewStep
+              selected={selected}
+              name={name}
+              overview={overview}
+              objective={objective}
+              projectGoal={projectGoal}
+              audience={notApplicable.audience ? '' : audience}
+              tone={notApplicable.tone ? '' : tone}
+              creativePath={creativePath}
+              selectedApplications={selectedApplications}
+              selectedSizes={selectedSizes}
+              selectedFinalFormat={selectedFinalFormat}
+              selectedEditableFormat={selectedEditableFormat}
+              referenceFiles={referenceFiles}
+              referenceLinks={referenceLinks}
+              scope={scope}
+              quote={quote}
+              deliveryConfig={deliveryConfig}
+              deliveryItems={deliveryItems}
+              submitting={submitting}
+              onBack={() => setStep('configure')}
+              onEditBrief={() => setStep('brief')}
+              onSubmit={() => void submit()}
+              onPreviewFile={(file) => setPreviewFile({ name: file.name, file, sizeBytes: file.size, contentType: file.type })}
+              configuredFormats={configuredFormats}
+            />
+          )}
         </section>
         <ProductSummary product={selected} quote={quote} quoteError={quoteError} onChange={() => setStep('catalog')} />
       </main>}
@@ -396,6 +549,14 @@ export function NewProjectPage() {
           const fileSize = previewFile.file!.size
           setReferenceFiles((current) => current.filter((item) => !(item.name === fileName && item.size === fileSize)))
         } : undefined}
+      />
+    )}
+    {isAddFormatsModalOpen && (
+      <AddFormatsModal
+        isOpen={isAddFormatsModalOpen}
+        onClose={() => setIsAddFormatsModalOpen(false)}
+        onAddFormat={handleAddFormat}
+        configuredFormats={configuredFormats}
       />
     )}
   </div>
@@ -656,14 +817,81 @@ interface ConfigureStepProps {
   toggleAddon: (code: string) => void; toggleApplication: (application: string) => void; toggleSize: (size: string) => void; addCustomSize: (size: string) => void
   setSelectedFinalFormat: (format: string) => void; setSelectedEditableFormat: (format: string) => void
   onBack: () => void; onNext: () => void; quoteReady: boolean
+  configuredFormats: ConfiguredFormatItem[]
+  activeFormatId: string | null
+  onSelectFormat: (id: string) => void
+  onRemoveFormat: (id: string) => void
+  onOpenAddModal: () => void
+  onUpdateFormat: (id: string, updates: Partial<ConfiguredFormatItem>) => void
+  quote: CatalogQuote | null
 }
 
 function ConfigureStep(props: ConfigureStepProps) {
+  const isMultiFormat = props.selected.code === '168' || (props.selected.formats.available.length > 0 && !props.deliveryConfig)
   const applications = uniqueOptions(props.selected.formats.available)
   const sizes = uniqueOptions(props.selected.formats.sizesAndRatios)
   const finalFormats = uniqueOptions(props.selected.formats.final)
   const editableFormats = uniqueOptions(props.selected.formats.editable)
-  const deliveryReady = sizes.length === 0 || props.selectedSizes.length > 0
+  const deliveryReady = isMultiFormat
+    ? props.configuredFormats.length > 0
+    : (sizes.length === 0 || props.selectedSizes.length > 0)
+
+  if (isMultiFormat) {
+    return (
+      <>
+        <FlowHeading
+          eyebrow="Etapa 2 de 3"
+          title="Configure a entrega"
+          description="Selecione os formatos que deseja criar e configure os adicionais da sua entrega."
+        />
+
+        <FormatConfigurator
+          configuredFormats={props.configuredFormats}
+          activeFormatId={props.activeFormatId}
+          onSelectFormat={props.onSelectFormat}
+          onRemoveFormat={props.onRemoveFormat}
+          onOpenAddModal={props.onOpenAddModal}
+          onUpdateFormat={props.onUpdateFormat}
+          addons={props.scope.addons}
+          onToggleAddon={props.toggleAddon}
+          selectedFinalFormat={props.selectedFinalFormat}
+          onSelectFinalFormat={props.setSelectedFinalFormat}
+          selectedEditableFormat={props.selectedEditableFormat}
+          onSelectEditableFormat={props.setSelectedEditableFormat}
+          availableFinalFormats={finalFormats}
+          availableEditableFormats={editableFormats}
+        />
+
+        <FlowFooter>
+          <button type="button" className="secondary-button" onClick={props.onBack}>
+            <ArrowLeft size={16} /> Voltar
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14.5, color: '#555550' }}>
+            <span>
+              Total previsto:{' '}
+              <strong style={{ color: '#171717', fontSize: 15 }}>
+                {props.quote ? `${formatCredits(props.quote.totalCredits)} créditos` : 'Calculando...'}
+              </strong>
+            </span>
+            {props.quote && (
+              <small style={{ fontSize: 14, color: '#777771' }}>
+                · {formatCredits(props.quote.slaHours)} horas úteis
+              </small>
+            )}
+          </div>
+          <button
+            type="button"
+            className="primary-button"
+            disabled={!props.quoteReady || !deliveryReady}
+            onClick={props.onNext}
+          >
+            Revisar solicitação <ArrowRight size={16} />
+          </button>
+        </FlowFooter>
+      </>
+    )
+  }
+
   return <>
     <FlowHeading eyebrow="Etapa 2 de 3" title="Configure a entrega" description="A estimativa é atualizada automaticamente conforme o escopo." />
     <div className="new-project-form-section"><SectionTitle title="Escopo" description={`${props.selected.billing.label || ''}${props.selected.billing.unitNote ? ` · ${props.selected.billing.unitNote}` : ''}`} />{props.quoteError && <small className="new-project-error">{props.quoteError}</small>}<div className="new-project-scope__controls"><ScopeCounter label={`Quantidade (${props.selected.billing.unit})`} value={props.scope.quantity} minimum={1} onDecrease={() => props.updateCounter('quantity', -1)} onIncrease={() => props.updateCounter('quantity', 1)} disableIncrease={Boolean(props.selected.billing.maxQuantity && props.scope.quantity >= props.selected.billing.maxQuantity)} /><ScopeCounter label="Tarefas" value={props.scope.taskRepeats} minimum={1} onDecrease={() => props.updateCounter('taskRepeats', -1)} onIncrease={() => props.updateCounter('taskRepeats', 1)} />{props.selected.credits.resizeAllowed && sizes.length === 0 && <ScopeCounter label="Redimensionamentos" value={props.scope.resizeCount} onDecrease={() => props.updateCounter('resizeCount', -1)} onIncrease={() => props.updateCounter('resizeCount', 1)} />}{props.selected.credits.variationAllowed && <ScopeCounter label="Variações" value={props.scope.variationCount} onDecrease={() => props.updateCounter('variationCount', -1)} onIncrease={() => props.updateCounter('variationCount', 1)} />}{props.selected.billing.characterCredits && <ScopeCounter label="Avatares/personagens" value={props.scope.characterCount} minimum={1} onDecrease={() => props.updateCounter('characterCount', -1)} onIncrease={() => props.updateCounter('characterCount', 1)} />}</div></div>
@@ -769,6 +997,7 @@ interface ReviewStepProps {
   creativePath: 'new-direction' | 'new-concept' | 'follow-references'; selectedApplications: string[]; selectedSizes: string[]; selectedFinalFormat: string; selectedEditableFormat: string; referenceFiles: File[]; referenceLinks: string[]; scope: CatalogScope
   quote: CatalogQuote | null; deliveryConfig: DeliveryConfig | null; deliveryItems: ProjectDeliveryItem[]; submitting: boolean; onBack: () => void; onEditBrief: () => void; onSubmit: () => void
   onPreviewFile?: (file: File) => void
+  configuredFormats?: ConfiguredFormatItem[]
 }
 
 function ReviewStep(props: ReviewStepProps) {
@@ -788,29 +1017,29 @@ function ReviewStep(props: ReviewStepProps) {
         {(props.referenceFiles.length > 0 || props.referenceLinks.length > 0) && (
           <div style={{ gridColumn: '1 / -1' }}>
             <dt>Referências anexadas ({props.referenceFiles.length + props.referenceLinks.length})</dt>
-            <dd style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+            <dd style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
               {props.referenceLinks.map((link) => (
                 <a
                   key={link}
                   href={link}
                   target="_blank"
                   rel="noreferrer"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 6, background: '#f0f4ef', fontSize: 11.5, color: '#004c46', textDecoration: 'none', fontWeight: 600, border: '1px solid #dfe6de' }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 13px', borderRadius: 8, background: '#f0f4ef', fontSize: 14, color: '#004c46', textDecoration: 'none', fontWeight: 600, border: '1px solid #dfe6de' }}
                   title={link}
                 >
-                  <Link2 size={12} /> {link}
+                  <Link2 size={15} /> {link}
                 </a>
               ))}
               {props.referenceFiles.map((file) => (
                 <span
                   key={`${file.name}-${file.size}`}
                   onClick={() => props.onPreviewFile?.(file)}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 6, background: '#f0f4ef', fontSize: 11.5, color: '#004c46', cursor: 'pointer', fontWeight: 600, border: '1px solid #dfe6de' }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 13px', borderRadius: 8, background: '#f0f4ef', fontSize: 14, color: '#004c46', cursor: 'pointer', fontWeight: 600, border: '1px solid #dfe6de' }}
                   title={`Visualizar ${file.name}`}
                   role="button"
                   tabIndex={0}
                 >
-                  <FileText size={12} /> {file.name} ({Math.max(1, Math.round(file.size / 1024))} KB)
+                  <FileText size={15} /> {file.name} ({Math.max(1, Math.round(file.size / 1024))} KB)
                 </span>
               ))}
             </dd>
@@ -818,7 +1047,48 @@ function ReviewStep(props: ReviewStepProps) {
         )}
       </dl>
     </div>
-    <div className="new-project-review-block"><header><div><span>Entrega</span><h2>{props.selected.name}</h2></div><button type="button" onClick={props.onBack}>Editar</button></header><dl><div><dt>Quantidade</dt><dd>{props.scope.quantity} {props.selected.billing.unit}</dd></div><div><dt>Tarefas</dt><dd>{props.scope.taskRepeats}</dd></div>{Boolean(props.quote?.breakdown?.conceptVisual) && <div><dt>Conceito visual</dt><dd>Novo conceito visual (+3 créditos)</dd></div>}{props.selectedApplications.length > 0 && <div><dt>Aplicação</dt><dd>{props.selectedApplications.join(', ')}</dd></div>}{props.selectedSizes.length > 0 && <div><dt>Dimensões</dt><dd>{props.selectedSizes.join(', ')}</dd></div>}<div><dt>Arquivo final</dt><dd>{props.selectedFinalFormat ? displayFileFormat(props.selectedFinalFormat).toUpperCase() : 'Padrão do catálogo'}</dd></div><div><dt>Arquivo aberto</dt><dd>{props.selectedEditableFormat || 'Não solicitado'}</dd></div>{activeAddons.length > 0 && <div><dt>Adicionais</dt><dd>{activeAddons.map((item) => item.name).join(', ')}</dd></div>}<div><dt>Referências</dt><dd>{props.referenceFiles.length + props.referenceLinks.length || 'Nenhuma'}</dd></div></dl>{props.deliveryConfig && <div className="new-project-review-items"><strong>{props.deliveryConfig.title}</strong>{props.deliveryItems.map((item) => <article key={item.id}><span>{item.label}</span><div><b>{item.title.trim() || 'Sem título informado'}</b><p>{item.copy.trim() || 'Sem texto informado'}</p>{item.instructions.trim() && <small>Direção visual: {item.instructions}</small>}{item.cta.trim() && <small>CTA: {item.cta}</small>}</div></article>)}</div>}</div>
+    <div className="new-project-review-block">
+      <header><div><span>Entrega</span><h2>{props.selected.name}</h2></div><button type="button" onClick={props.onBack}>Editar</button></header>
+      <dl>
+        <div><dt>Quantidade</dt><dd>{props.scope.quantity} {props.selected.billing.unit}</dd></div>
+        <div><dt>Tarefas</dt><dd>{props.scope.taskRepeats}</dd></div>
+        {Boolean(props.quote?.breakdown?.conceptVisual) && <div><dt>Conceito visual</dt><dd>Novo conceito visual (+3 créditos)</dd></div>}
+        
+        {props.configuredFormats && props.configuredFormats.length > 0 ? (
+          <div style={{ gridColumn: '1 / -1' }}>
+            <dt>Formatos configurados ({props.configuredFormats.length})</dt>
+            <dd style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12, marginTop: 10 }}>
+              {props.configuredFormats.map((fmt) => (
+                <div key={fmt.id} style={{ padding: '12px 14px', borderRadius: 10, background: '#ffffff', border: '1.5px solid #e7e7e2', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <ChannelBadgeIcon channel={fmt.channel} size={18} />
+                    <strong style={{ fontSize: 15, color: '#171717' }}>{fmt.channel} — {fmt.formatName}</strong>
+                    {fmt.isPrincipal && <span className="format-sidebar-item__badge-principal">Principal</span>}
+                  </div>
+                  <span style={{ fontSize: 14, color: '#666660' }}>{fmt.dimension || 'Dimensão a definir'}</span>
+                  {fmt.exclusiveDirection && (
+                    <p style={{ margin: 0, fontSize: 14, color: '#004c46', background: '#f4f8f3', padding: '7px 9px', borderRadius: 6, lineHeight: 1.45 }}>
+                      <strong>Direcionamento:</strong> {fmt.exclusiveDirection}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </dd>
+          </div>
+        ) : (
+          <>
+            {props.selectedApplications.length > 0 && <div><dt>Aplicação</dt><dd>{props.selectedApplications.join(', ')}</dd></div>}
+            {props.selectedSizes.length > 0 && <div><dt>Dimensões</dt><dd>{props.selectedSizes.join(', ')}</dd></div>}
+          </>
+        )}
+
+        <div><dt>Arquivo final</dt><dd>{props.selectedFinalFormat ? displayFileFormat(props.selectedFinalFormat).toUpperCase() : 'Padrão do catálogo'}</dd></div>
+        <div><dt>Arquivo aberto</dt><dd>{props.selectedEditableFormat || 'Não solicitado'}</dd></div>
+        {activeAddons.length > 0 && <div><dt>Adicionais</dt><dd>{activeAddons.map((item) => item.name).join(', ')}</dd></div>}
+        <div><dt>Referências</dt><dd>{props.referenceFiles.length + props.referenceLinks.length || 'Nenhuma'}</dd></div>
+      </dl>
+      {props.deliveryConfig && <div className="new-project-review-items"><strong>{props.deliveryConfig.title}</strong>{props.deliveryItems.map((item) => <article key={item.id}><span>{item.label}</span><div><b>{item.title.trim() || 'Sem título informado'}</b><p>{item.copy.trim() || 'Sem texto informado'}</p>{item.instructions.trim() && <small>Direção visual: {item.instructions}</small>}{item.cta.trim() && <small>CTA: {item.cta}</small>}</div></article>)}</div>}
+    </div>
     <div className="new-project-review-total"><div><span>Estimativa da solicitação</span><strong>{props.quote ? `${formatCredits(props.quote.totalCredits)} créditos` : 'Calculando...'}</strong><small>{props.quote ? `Prazo estimado de ${formatCredits(props.quote.slaHours)} horas úteis` : 'Aguarde a atualização do escopo'}</small></div><p>A estimativa pode ser ajustada pelo time caso o briefing exija uma validação adicional. Você será avisado antes de qualquer alteração.</p></div>
     <FlowFooter><button type="button" className="secondary-button" onClick={props.onBack}><ArrowLeft size={15} /> Voltar</button><button type="button" className="primary-button" disabled={!props.quote || props.submitting} onClick={props.onSubmit}>{props.submitting ? 'Enviando...' : 'Enviar projeto'} <ArrowRight size={15} /></button></FlowFooter>
   </>

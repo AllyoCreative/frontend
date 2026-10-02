@@ -10,6 +10,7 @@ import '@fontsource/plus-jakarta-sans/800.css'
 import '@fontsource-variable/inter-tight'
 import './styles/global.css'
 import './styles/figma-theme.css'
+import './styles/format-configurator.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
