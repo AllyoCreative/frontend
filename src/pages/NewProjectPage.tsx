@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, FileOutput, FileText, Layers3, Link2, Maximize2, Minus, PaintBucket, Paperclip, PenTool, Pencil, Plus, Search, Sparkles, Upload, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, ExternalLink, FileOutput, FileText, Layers3, Link2, Maximize2, Minus, PaintBucket, Paperclip, PenTool, Pencil, Plus, Search, Sparkles, Upload, X } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
 import { isConceptVisualEligible } from '../config/creativePathConfig'
 import { api, type CatalogProduct, type CatalogQuote, type CatalogScope, type ProjectDeliveryItem, type ProjectDeliverySchema } from '../services/api'
+import { FilePreviewModal, type PreviewableFile } from '../components/FilePreviewModal'
+import { ReferenceFileCard } from '../components/ReferenceFileCard'
 
 type FlowStep = 'catalog' | 'brief' | 'configure' | 'review' | 'success'
 type CatalogFilter = 'all' | 'design' | 'production' | 'ai' | 'fast'
@@ -37,7 +39,6 @@ const categoryAccent: Record<string, string> = {
 }
 
 const formatCredits = (value: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(value)
-const formatFileSize = (bytes: number) => bytes < 1_048_576 ? `${Math.ceil(bytes / 1024)} KB` : `${(bytes / 1_048_576).toFixed(1)} MB`
 
 function initialScope(product: CatalogProduct): CatalogScope {
   return {
@@ -140,6 +141,7 @@ export function NewProjectPage() {
   const [referenceFiles, setReferenceFiles] = useState<File[]>([])
   const [referenceLinks, setReferenceLinks] = useState<string[]>([])
   const [linkDraft, setLinkDraft] = useState('')
+  const [previewFile, setPreviewFile] = useState<PreviewableFile | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [deliveryItems, setDeliveryItems] = useState<ProjectDeliveryItem[]>([])
   const deliveryConfig = useMemo(() => selected ? deliveryConfigFor(selected) : null, [selected])
@@ -283,15 +285,18 @@ export function NewProjectPage() {
   }
 
   const addReferenceLink = () => {
-    const next = linkDraft.trim()
+    let next = linkDraft.trim()
     if (!next) return
+    if (!/^https?:\/\//i.test(next)) {
+      next = `https://${next}`
+    }
     try {
       const parsed = new URL(next)
       if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('invalid')
       if (!referenceLinks.includes(parsed.toString())) setReferenceLinks((current) => [...current, parsed.toString()])
       setLinkDraft('')
     } catch {
-      notify('Insira um link válido começando com http:// ou https://')
+      notify('Insira um link válido (ex.: drive.google.com ou https://exemplo.com)')
     }
   }
 
@@ -372,12 +377,23 @@ export function NewProjectPage() {
         <div className="new-project-services">{visible.map((product) => <button type="button" key={product.code} className="new-project-service" onClick={() => selectProduct(product)} aria-label={`${product.name}: ${product.description}`}><span className={`new-project-service__preview${product.imageUrl ? ' has-image' : ''}`} style={{ backgroundColor: categoryAccent[product.category] || '#d9d9d9' }}>{product.imageUrl && <img src={product.imageUrl} alt="" loading="lazy" onError={(event) => { event.currentTarget.style.display = 'none' }} />}</span><span className="new-project-service__body"><h2>{product.name}</h2><small>{formatCredits(product.credits.original)} cr. · {formatCredits(product.slaHours)}h úteis</small></span></button>)}</div>
       </main> : selected && <main className="new-project-flow">
         <section className="new-project-flow__main">
-          {step === 'brief' && <BriefStep selected={selected} name={name} objective={objective} overview={overview} projectGoal={projectGoal} audience={audience} tone={tone} notApplicable={notApplicable} creativePath={creativePath} referenceFiles={referenceFiles} referenceLinks={referenceLinks} linkDraft={linkDraft} setName={setName} setObjective={setObjective} setOverview={setOverview} setProjectGoal={setProjectGoal} setAudience={setAudience} setTone={setTone} setNotApplicable={setNotApplicable} setCreativePath={setCreativePath} setLinkDraft={setLinkDraft} addReferenceLink={addReferenceLink} addReferenceFiles={addReferenceFiles} removeFile={(index) => setReferenceFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} removeLink={(link) => setReferenceLinks((current) => current.filter((item) => item !== link))} onCancel={() => setStep('catalog')} onNext={() => setStep('configure')} ready={briefReady} />}
+          {step === 'brief' && <BriefStep selected={selected} name={name} objective={objective} overview={overview} projectGoal={projectGoal} audience={audience} tone={tone} notApplicable={notApplicable} creativePath={creativePath} referenceFiles={referenceFiles} referenceLinks={referenceLinks} linkDraft={linkDraft} setName={setName} setObjective={setObjective} setOverview={setOverview} setProjectGoal={setProjectGoal} setAudience={setAudience} setTone={setTone} setNotApplicable={setNotApplicable} setCreativePath={setCreativePath} setLinkDraft={setLinkDraft} addReferenceLink={addReferenceLink} addReferenceFiles={addReferenceFiles} removeFile={(index) => setReferenceFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} removeLink={(link) => setReferenceLinks((current) => current.filter((item) => item !== link))} onPreviewFile={(file) => setPreviewFile({ name: file.name, file, sizeBytes: file.size, contentType: file.type })} onCancel={() => setStep('catalog')} onNext={() => setStep('configure')} ready={briefReady} />}
           {step === 'configure' && <ConfigureStep selected={selected} scope={scope} selectedApplications={selectedApplications} selectedSizes={selectedSizes} selectedFinalFormat={selectedFinalFormat} selectedEditableFormat={selectedEditableFormat} quoteError={quoteError} deliveryConfig={deliveryConfig} deliveryItems={deliveryItems} setDeliveryItems={setDeliveryItems} updateCounter={updateCounter} toggleAddon={toggleAddon} toggleApplication={toggleApplication} toggleSize={toggleSize} addCustomSize={addCustomSize} setSelectedFinalFormat={setSelectedFinalFormat} setSelectedEditableFormat={setSelectedEditableFormat} onBack={() => setStep('brief')} onNext={() => setStep('review')} quoteReady={Boolean(quote)} />}
-          {step === 'review' && <ReviewStep selected={selected} name={name} overview={overview} objective={objective} projectGoal={projectGoal} audience={notApplicable.audience ? '' : audience} tone={notApplicable.tone ? '' : tone} creativePath={creativePath} selectedApplications={selectedApplications} selectedSizes={selectedSizes} selectedFinalFormat={selectedFinalFormat} selectedEditableFormat={selectedEditableFormat} referenceFiles={referenceFiles} referenceLinks={referenceLinks} scope={scope} quote={quote} deliveryConfig={deliveryConfig} deliveryItems={deliveryItems} submitting={submitting} onBack={() => setStep('configure')} onEditBrief={() => setStep('brief')} onSubmit={() => void submit()} />}
+          {step === 'review' && <ReviewStep selected={selected} name={name} overview={overview} objective={objective} projectGoal={projectGoal} audience={notApplicable.audience ? '' : audience} tone={notApplicable.tone ? '' : tone} creativePath={creativePath} selectedApplications={selectedApplications} selectedSizes={selectedSizes} selectedFinalFormat={selectedFinalFormat} selectedEditableFormat={selectedEditableFormat} referenceFiles={referenceFiles} referenceLinks={referenceLinks} scope={scope} quote={quote} deliveryConfig={deliveryConfig} deliveryItems={deliveryItems} submitting={submitting} onBack={() => setStep('configure')} onEditBrief={() => setStep('brief')} onSubmit={() => void submit()} onPreviewFile={(file) => setPreviewFile({ name: file.name, file, sizeBytes: file.size, contentType: file.type })} />}
         </section>
         <ProductSummary product={selected} quote={quote} quoteError={quoteError} onChange={() => setStep('catalog')} />
       </main>}
+      {previewFile && (
+        <FilePreviewModal
+          file={previewFile}
+          onClose={() => setPreviewFile(null)}
+          onRemove={previewFile.file ? () => {
+            const fileName = previewFile.file!.name
+            const fileSize = previewFile.file!.size
+            setReferenceFiles((current) => current.filter((item) => !(item.name === fileName && item.size === fileSize)))
+          } : undefined}
+        />
+      )}
     </section>
   </div>
 }
@@ -395,6 +411,7 @@ interface BriefStepProps {
   setProjectGoal: (value: string) => void; setAudience: (value: string) => void; setTone: (value: string) => void
   setNotApplicable: React.Dispatch<React.SetStateAction<{ audience: boolean; tone: boolean }>>; setCreativePath: (value: 'new-direction' | 'new-concept' | 'follow-references') => void
   setLinkDraft: (value: string) => void; addReferenceLink: () => void; addReferenceFiles: (files: FileList | null) => void; removeFile: (index: number) => void; removeLink: (link: string) => void
+  onPreviewFile: (file: File) => void
   onCancel: () => void; onNext: () => void; ready: boolean
 }
 
@@ -519,8 +536,69 @@ function BriefStep(props: BriefStepProps) {
     )}
     <div className="new-project-form-section">
       <SectionTitle title="Referências" description="Opcional. Anexe materiais ou compartilhe links; eles serão salvos no projeto." />
-      <div className="new-project-reference-actions"><label><Upload size={16} /> Adicionar arquivos<input type="file" multiple hidden onChange={(event) => { props.addReferenceFiles(event.target.files); event.target.value = '' }} /></label><div><Link2 size={16} /><input value={props.linkDraft} onChange={(event) => props.setLinkDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); props.addReferenceLink() } }} placeholder="Cole um link de referência" /><button type="button" onClick={props.addReferenceLink}>Adicionar</button></div></div>
-      {(props.referenceFiles.length > 0 || props.referenceLinks.length > 0) && <div className="new-project-reference-list">{props.referenceFiles.map((file, index) => <span key={`${file.name}-${file.size}`}><FileText size={15} /><b>{file.name}</b><small>{formatFileSize(file.size)}</small><button type="button" onClick={() => props.removeFile(index)} aria-label={`Remover ${file.name}`}><X size={14} /></button></span>)}{props.referenceLinks.map((link) => <span key={link}><Link2 size={15} /><b>{link}</b><button type="button" onClick={() => props.removeLink(link)} aria-label="Remover link"><X size={14} /></button></span>)}</div>}
+      <div className="new-project-reference-actions">
+        <label>
+          <Upload size={16} /> Adicionar arquivos
+          <input type="file" multiple hidden onChange={(event) => { props.addReferenceFiles(event.target.files); event.target.value = '' }} />
+        </label>
+        <div>
+          <Link2 size={16} />
+          <input
+            value={props.linkDraft}
+            onChange={(event) => props.setLinkDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                props.addReferenceLink()
+              }
+            }}
+            placeholder="Cole um link de referência (ex: drive.google.com/...)"
+          />
+          <button type="button" onClick={props.addReferenceLink}>Adicionar</button>
+        </div>
+      </div>
+      {(props.referenceFiles.length > 0 || props.referenceLinks.length > 0) && (
+        <div className="new-project-reference-container">
+          {props.referenceFiles.length > 0 && (
+            <div className="new-project-reference-grid">
+              {props.referenceFiles.map((file, index) => (
+                <ReferenceFileCard
+                  key={`${file.name}-${file.size}-${index}`}
+                  file={file}
+                  onRemove={() => props.removeFile(index)}
+                  onPreview={(f) => props.onPreviewFile(f)}
+                />
+              ))}
+            </div>
+          )}
+          {props.referenceLinks.length > 0 && (
+            <div className="new-project-link-list">
+              {props.referenceLinks.map((link) => (
+                <div key={link} className="new-project-link-card">
+                  <Link2 size={15} className="new-project-link-card__icon" />
+                  <a href={link} target="_blank" rel="noreferrer" className="new-project-link-card__url" title={link}>
+                    {link}
+                  </a>
+                  <div className="new-project-link-card__actions">
+                    <a href={link} target="_blank" rel="noreferrer" className="new-project-link-card__btn" title="Abrir link em nova aba">
+                      <ExternalLink size={14} />
+                    </a>
+                    <button
+                      type="button"
+                      className="new-project-link-card__btn new-project-link-card__btn--delete"
+                      onClick={() => props.removeLink(link)}
+                      title="Remover link"
+                      aria-label="Remover link"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
     <FlowFooter><button type="button" className="secondary-button" onClick={props.onCancel}><ArrowLeft size={15} /> Voltar ao catálogo</button><button type="button" className="primary-button" disabled={!props.ready} onClick={props.onNext}>Configurar entrega <ArrowRight size={15} /></button></FlowFooter>
   </>
@@ -645,6 +723,7 @@ interface ReviewStepProps {
   selected: CatalogProduct; name: string; overview: string; objective: string; projectGoal: string; audience: string; tone: string
   creativePath: 'new-direction' | 'new-concept' | 'follow-references'; selectedApplications: string[]; selectedSizes: string[]; selectedFinalFormat: string; selectedEditableFormat: string; referenceFiles: File[]; referenceLinks: string[]; scope: CatalogScope
   quote: CatalogQuote | null; deliveryConfig: DeliveryConfig | null; deliveryItems: ProjectDeliveryItem[]; submitting: boolean; onBack: () => void; onEditBrief: () => void; onSubmit: () => void
+  onPreviewFile?: (file: File) => void
 }
 
 function ReviewStep(props: ReviewStepProps) {
@@ -652,7 +731,48 @@ function ReviewStep(props: ReviewStepProps) {
   const isEligible = isConceptVisualEligible(props.selected)
   return <>
     <FlowHeading eyebrow="Etapa 3 de 3" title="Revise antes de enviar" description="Você poderá complementar o briefing na conversa do projeto depois do envio." />
-    <div className="new-project-review-block"><header><div><span>Briefing</span><h2>{props.name}</h2></div><button type="button" onClick={props.onEditBrief}>Editar</button></header><p>{props.overview}</p><dl><div><dt>Caminho criativo</dt><dd>{isEligible ? ((props.creativePath === 'new-concept' || props.creativePath === 'new-direction') ? 'Quero um novo conceito visual (+3 créditos)' : 'Seguir exatamente minhas referências') : (props.creativePath === 'new-direction' ? 'Explorar nova direção' : 'Partir das referências')}</dd></div>{!isEligible && <div><dt>Pedido</dt><dd>{props.objective}</dd></div>}<div><dt>Objetivo</dt><dd>{props.projectGoal}</dd></div>{props.audience && <div><dt>Público</dt><dd>{props.audience}</dd></div>}{props.tone && <div><dt>Tom</dt><dd>{props.tone}</dd></div>}</dl></div>
+    <div className="new-project-review-block">
+      <header><div><span>Briefing</span><h2>{props.name}</h2></div><button type="button" onClick={props.onEditBrief}>Editar</button></header>
+      <p>{props.overview}</p>
+      <dl>
+        <div><dt>Caminho criativo</dt><dd>{isEligible ? ((props.creativePath === 'new-concept' || props.creativePath === 'new-direction') ? 'Quero um novo conceito visual (+3 créditos)' : 'Seguir exatamente minhas referências') : (props.creativePath === 'new-direction' ? 'Explorar nova direção' : 'Partir das referências')}</dd></div>
+        {!isEligible && <div><dt>Pedido</dt><dd>{props.objective}</dd></div>}
+        <div><dt>Objetivo</dt><dd>{props.projectGoal}</dd></div>
+        {props.audience && <div><dt>Público</dt><dd>{props.audience}</dd></div>}
+        {props.tone && <div><dt>Tom</dt><dd>{props.tone}</dd></div>}
+        {(props.referenceFiles.length > 0 || props.referenceLinks.length > 0) && (
+          <div style={{ gridColumn: '1 / -1' }}>
+            <dt>Referências anexadas ({props.referenceFiles.length + props.referenceLinks.length})</dt>
+            <dd style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+              {props.referenceLinks.map((link) => (
+                <a
+                  key={link}
+                  href={link}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 6, background: '#f0f4ef', fontSize: 11.5, color: '#004c46', textDecoration: 'none', fontWeight: 600, border: '1px solid #dfe6de' }}
+                  title={link}
+                >
+                  <Link2 size={12} /> {link}
+                </a>
+              ))}
+              {props.referenceFiles.map((file) => (
+                <span
+                  key={`${file.name}-${file.size}`}
+                  onClick={() => props.onPreviewFile?.(file)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 6, background: '#f0f4ef', fontSize: 11.5, color: '#004c46', cursor: 'pointer', fontWeight: 600, border: '1px solid #dfe6de' }}
+                  title={`Visualizar ${file.name}`}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <FileText size={12} /> {file.name} ({Math.max(1, Math.round(file.size / 1024))} KB)
+                </span>
+              ))}
+            </dd>
+          </div>
+        )}
+      </dl>
+    </div>
     <div className="new-project-review-block"><header><div><span>Entrega</span><h2>{props.selected.name}</h2></div><button type="button" onClick={props.onBack}>Editar</button></header><dl><div><dt>Quantidade</dt><dd>{props.scope.quantity} {props.selected.billing.unit}</dd></div><div><dt>Tarefas</dt><dd>{props.scope.taskRepeats}</dd></div>{Boolean(props.quote?.breakdown?.conceptVisual) && <div><dt>Conceito visual</dt><dd>Novo conceito visual (+3 créditos)</dd></div>}{props.selectedApplications.length > 0 && <div><dt>Aplicação</dt><dd>{props.selectedApplications.join(', ')}</dd></div>}{props.selectedSizes.length > 0 && <div><dt>Dimensões</dt><dd>{props.selectedSizes.join(', ')}</dd></div>}<div><dt>Arquivo final</dt><dd>{props.selectedFinalFormat ? displayFileFormat(props.selectedFinalFormat).toUpperCase() : 'Padrão do catálogo'}</dd></div><div><dt>Arquivo aberto</dt><dd>{props.selectedEditableFormat || 'Não solicitado'}</dd></div>{activeAddons.length > 0 && <div><dt>Adicionais</dt><dd>{activeAddons.map((item) => item.name).join(', ')}</dd></div>}<div><dt>Referências</dt><dd>{props.referenceFiles.length + props.referenceLinks.length || 'Nenhuma'}</dd></div></dl>{props.deliveryConfig && <div className="new-project-review-items"><strong>{props.deliveryConfig.title}</strong>{props.deliveryItems.map((item) => <article key={item.id}><span>{item.label}</span><div><b>{item.title.trim() || 'Sem título informado'}</b><p>{item.copy.trim() || 'Sem texto informado'}</p>{item.instructions.trim() && <small>Direção visual: {item.instructions}</small>}{item.cta.trim() && <small>CTA: {item.cta}</small>}</div></article>)}</div>}</div>
     <div className="new-project-review-total"><div><span>Estimativa da solicitação</span><strong>{props.quote ? `${formatCredits(props.quote.totalCredits)} créditos` : 'Calculando...'}</strong><small>{props.quote ? `Prazo estimado de ${formatCredits(props.quote.slaHours)} horas úteis` : 'Aguarde a atualização do escopo'}</small></div><p>A estimativa pode ser ajustada pelo time caso o briefing exija uma validação adicional. Você será avisado antes de qualquer alteração.</p></div>
     <FlowFooter><button type="button" className="secondary-button" onClick={props.onBack}><ArrowLeft size={15} /> Voltar</button><button type="button" className="primary-button" disabled={!props.quote || props.submitting} onClick={props.onSubmit}>{props.submitting ? 'Enviando...' : 'Enviar projeto'} <ArrowRight size={15} /></button></FlowFooter>

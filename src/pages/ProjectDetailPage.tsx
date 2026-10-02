@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useParams } from 'react-router-dom'
-import { ChevronDown, ChevronUp, Circle, Download, ExternalLink, FileText, Image as ImageIcon, Layers3, Lock, MessageSquareText, Pencil, Play, Plus, Upload } from 'lucide-react'
+import { ChevronDown, ChevronUp, Circle, Download, ExternalLink, Eye, FileText, Image as ImageIcon, Layers3, Lock, MessageSquareText, Pencil, Play, Plus, Upload } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
 import { DesignReviewModal, type ReviewCollectionItem, type ReviewOrigin } from '../components/DesignReviewModal'
-import { api, type DesignSummary, type ProjectBriefingSummary, type ProjectFileSummary } from '../services/api'
+import { FilePreviewModal, type PreviewableFile } from '../components/FilePreviewModal'
+import { api, resolveStorageUrl, type DesignSummary, type ProjectBriefingSummary, type ProjectFileSummary } from '../services/api'
 import { socket, type SocketEventPayload } from '../services/socket'
 import type { Project, ProjectTask, TaskBriefing } from '../types'
 import { parseCopyContent } from '../utils/copyContent'
@@ -141,7 +142,19 @@ function OverviewTimeline({ project, tasks, designs }: { project: Project; tasks
   )
 }
 
-function ProjectBriefing({ project, briefing, files, onDuplicate }: { project: Project; briefing: ProjectBriefingSummary | null; files: ProjectFileSummary[]; onDuplicate: () => void }) {
+function ProjectBriefing({
+  project,
+  briefing,
+  files,
+  onDuplicate,
+  onPreviewFile,
+}: {
+  project: Project
+  briefing: ProjectBriefingSummary | null
+  files: ProjectFileSummary[]
+  onDuplicate: () => void
+  onPreviewFile?: (file: ProjectFileSummary) => void
+}) {
   if (!briefing) return <article className="project-briefing-card project-briefing-card--empty"><header><div><h2>Briefing do projeto</h2><p>O briefing ainda não foi disponibilizado.</p></div></header></article>
   const links = briefing.creativeDirection.filter((item) => item.startsWith('Referência: ')).map((item) => item.replace('Referência: ', ''))
   const directions = briefing.creativeDirection.filter((item) => !item.startsWith('Referência: '))
@@ -170,7 +183,76 @@ function ProjectBriefing({ project, briefing, files, onDuplicate }: { project: P
         <ol>{briefing.formats.map((item) => <li key={item}>{item}</li>)}</ol>
       </section>
       {directions.length > 0 && <section><h3>Direção criativa</h3><ol>{directions.map((item) => <li key={item}>{item}</li>)}</ol></section>}
-      {(links.length > 0 || briefingFiles.length > 0) && <section className="project-briefing-references"><h3>Referências</h3><div>{links.map((link) => <a href={link} target="_blank" rel="noreferrer" key={link}><ExternalLink size={14} />{link}</a>)}{briefingFiles.map((file) => <a href={file.fileUrl} target="_blank" rel="noreferrer" key={file.id}><FileText size={14} />{file.name}</a>)}</div></section>}
+      {(links.length > 0 || briefingFiles.length > 0) && (
+        <section className="project-briefing-references">
+          <h3>Referências</h3>
+          {links.length > 0 && (
+            <div className="project-briefing-links">
+              {links.map((link) => (
+                <a href={link} target="_blank" rel="noreferrer" key={link} className="project-briefing-link-pill" title={link}>
+                  <ExternalLink size={13} />
+                  <span>{link}</span>
+                </a>
+              ))}
+            </div>
+          )}
+          {briefingFiles.length > 0 && (
+            <div className="project-briefing-files-grid">
+              {briefingFiles.map((file) => {
+                const isImage = file.contentType.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(file.name)
+                const ext = file.name.split('.').pop()?.toUpperCase() || 'ARQ'
+                const resolvedUrl = resolveStorageUrl(file.fileUrl)
+                return (
+                  <div key={file.id} className="project-briefing-file-item">
+                    <div
+                      className="project-briefing-file-thumb"
+                      onClick={() => onPreviewFile?.(file)}
+                      role="button"
+                      tabIndex={0}
+                      title={`Visualizar ${file.name}`}
+                    >
+                      {isImage ? (
+                        <img src={resolvedUrl} alt={file.name} />
+                      ) : (
+                        <span className="project-briefing-file-badge">{ext}</span>
+                      )}
+                      <div className="project-briefing-file-thumb-overlay">
+                        <Eye size={14} />
+                      </div>
+                    </div>
+                    <div className="project-briefing-file-info" onClick={() => onPreviewFile?.(file)} role="button" tabIndex={0}>
+                      <span className="project-briefing-file-name" title={file.name}>{cleanDecodedText(file.name)}</span>
+                      <small>{Math.max(1, Math.round(file.sizeBytes / 1024))} KB</small>
+                    </div>
+                    <div className="project-briefing-file-actions">
+                      <button
+                        type="button"
+                        className="project-briefing-file-btn"
+                        onClick={() => onPreviewFile?.(file)}
+                        title="Abrir visualização"
+                        aria-label={`Visualizar ${file.name}`}
+                      >
+                        <Eye size={14} />
+                      </button>
+                      <a
+                        href={resolvedUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        download={file.name}
+                        className="project-briefing-file-btn"
+                        title="Baixar arquivo"
+                        aria-label={`Baixar ${file.name}`}
+                      >
+                        <Download size={14} />
+                      </a>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </section>
+      )}
     </article>
   )
 }
@@ -224,7 +306,7 @@ function CollectionPreview({ materials, imageCollection = false }: { materials: 
   return <span className="project-delivery-collection-preview" aria-hidden="true">
     <span className="project-delivery-collection-stack">
       {materials.slice(0, 3).map((material, index) => {
-        const url = material.latest.thumbnailUrl || material.latest.fileUrl
+        const url = resolveStorageUrl(material.latest.thumbnailUrl || material.latest.fileUrl)
         return <span className="project-delivery-collection-sheet" style={{ '--sheet-index': index } as React.CSSProperties} key={material.key}>
           {url && (imageCollection || deliveryKind(material.latest) === 'image') ? <img src={url} alt="" /> : <ImageIcon size={34} />}
         </span>
@@ -237,7 +319,7 @@ function CollectionPreview({ materials, imageCollection = false }: { materials: 
 
 function DeliveryPreview({ delivery }: { delivery: DesignSummary }) {
   const kind = deliveryKind(delivery)
-  const previewUrl = delivery.thumbnailUrl || delivery.fileUrl
+  const previewUrl = resolveStorageUrl(delivery.thumbnailUrl || delivery.fileUrl)
   const [previewFailed, setPreviewFailed] = useState(false)
   if (kind === 'image' && previewUrl && !previewFailed) return <img src={previewUrl} alt={delivery.name} onError={() => setPreviewFailed(true)} />
   if (kind === 'image') return <span className="project-delivery-file"><ImageIcon size={38} /><strong>Imagem</strong><small>Não foi possível carregar a prévia. Abra a entrega para tentar novamente.</small></span>
@@ -268,6 +350,7 @@ export function ProjectDetailPage() {
   const [draft, setDraft] = useState('')
   const [approved, setApproved] = useState<number[]>([])
   const [reviewing, setReviewing] = useState<number | null>(null)
+  const [filePreview, setFilePreview] = useState<PreviewableFile | null>(null)
 
   const parseVersionNum = (v?: string) => Number((v || '').replace(/\D/g, '')) || 1
 
@@ -645,7 +728,18 @@ export function ProjectDetailPage() {
           </article>
 
           <OverviewTimeline project={displayedProject} tasks={projectTasks} designs={designList} />
-          <ProjectBriefing project={project} briefing={briefing} files={projectFiles} onDuplicate={() => notify('Briefing pronto para ser reutilizado em um novo projeto')} />
+          <ProjectBriefing
+            project={project}
+            briefing={briefing}
+            files={projectFiles}
+            onDuplicate={() => notify('Briefing pronto para ser reutilizado em um novo projeto')}
+            onPreviewFile={(file) => setFilePreview({
+              name: cleanDecodedText(file.name),
+              url: resolveStorageUrl(file.fileUrl),
+              sizeBytes: file.sizeBytes,
+              contentType: file.contentType,
+            })}
+          />
         </section>
       )}
 
@@ -758,16 +852,70 @@ export function ProjectDetailPage() {
           {!loadingAssets && tab === 'arquivos' && projectFiles.length > 0 && <div className="project-assets-section-heading"><div><h3>Outros arquivos</h3><p>Referências, documentos e anexos do projeto.</p></div><span>{projectFiles.length}</span></div>}
 
           {!loadingAssets && tab === 'arquivos' && (projectFiles.length > 0 ? <div className="project-files-grid">
-            {projectFiles.map((file) => <article key={file.id} className="project-file-card">
-              <div className="project-file-preview">
-                {file.contentType.startsWith('image/') ? <img src={file.fileUrl} alt="" /> : <FileText size={36} />}
-              </div>
-              <div className="project-file-info">
-                <span title={cleanDecodedText(file.name)}>{cleanDecodedText(file.name)}</span>
-                <small>{Math.max(1, Math.round(file.sizeBytes / 1024))} KB</small>
-              </div>
-              <a href={file.fileUrl} target="_blank" rel="noreferrer" aria-label={`Abrir ${cleanDecodedText(file.name)}`}><Download size={17} /></a>
-            </article>)}
+            {projectFiles.map((file) => {
+              const resolvedUrl = resolveStorageUrl(file.fileUrl)
+              return (
+                <article key={file.id} className="project-file-card">
+                  <div
+                    className="project-file-preview"
+                    onClick={() => setFilePreview({
+                      name: cleanDecodedText(file.name),
+                      url: resolvedUrl,
+                      sizeBytes: file.sizeBytes,
+                      contentType: file.contentType,
+                    })}
+                    style={{ cursor: 'pointer' }}
+                    title={`Visualizar ${cleanDecodedText(file.name)}`}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    {file.contentType.startsWith('image/') ? <img src={resolvedUrl} alt="" /> : <FileText size={36} />}
+                  </div>
+                  <div
+                    className="project-file-info"
+                    onClick={() => setFilePreview({
+                      name: cleanDecodedText(file.name),
+                      url: resolvedUrl,
+                      sizeBytes: file.sizeBytes,
+                      contentType: file.contentType,
+                    })}
+                    style={{ cursor: 'pointer' }}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <span title={cleanDecodedText(file.name)}>{cleanDecodedText(file.name)}</span>
+                    <small>{Math.max(1, Math.round(file.sizeBytes / 1024))} KB</small>
+                  </div>
+                  <div className="project-file-actions">
+                    <button
+                      type="button"
+                      className="project-file-action-btn"
+                      onClick={() => setFilePreview({
+                        name: cleanDecodedText(file.name),
+                        url: resolvedUrl,
+                        sizeBytes: file.sizeBytes,
+                        contentType: file.contentType,
+                      })}
+                      title="Abrir visualização"
+                      aria-label={`Visualizar ${cleanDecodedText(file.name)}`}
+                    >
+                      <Eye size={15} />
+                    </button>
+                    <a
+                      href={resolvedUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`Baixar ${cleanDecodedText(file.name)}`}
+                      download={cleanDecodedText(file.name)}
+                      className="project-file-action-btn"
+                      title="Baixar arquivo"
+                    >
+                      <Download size={15} />
+                    </a>
+                  </div>
+                </article>
+              )
+            })}
           </div> : deliveryGroups.length === 0 ? <div className="project-gallery-empty">Nenhum arquivo enviado neste projeto.</div> : null)}
         </section>
       )}
@@ -814,6 +962,13 @@ export function ProjectDetailPage() {
           />
         )
       })()}
+
+      {filePreview && (
+        <FilePreviewModal
+          file={filePreview}
+          onClose={() => setFilePreview(null)}
+        />
+      )}
     </div>
   )
 }

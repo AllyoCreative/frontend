@@ -360,7 +360,18 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return response.json()
 }
 
+export function resolveStorageUrl(url?: string | null): string {
+  if (!url) return ''
+  if (url.startsWith('/')) {
+    return `${API_BASE.replace(/\/api$/, '')}${url}`
+  }
+  return url
+}
+
 export const api = {
+  // Storage helper
+  resolveStorageUrl,
+
   // Auth
   async sendOtp(identity: string) {
     return request<{ success: boolean; message: string; debugCode?: string }>('/auth/otp/send', {
@@ -553,12 +564,24 @@ export const api = {
       }),
     })
 
-    const upload = await fetch(ticket.uploadUrl, {
+    const uploadUrl = ticket.uploadUrl.startsWith('/')
+      ? `${API_BASE.replace(/\/api$/, '')}${ticket.uploadUrl}`
+      : ticket.uploadUrl
+
+    const headers: Record<string, string> = {
+      'Content-Type': file.type || 'application/octet-stream',
+    }
+    const token = getAuthToken()
+    if (token && uploadUrl.includes('/api/storage/local-upload')) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+
+    const upload = await fetch(uploadUrl, {
       method: 'PUT',
-      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      headers,
       body: file,
     })
-    if (!upload.ok) throw new Error(`Falha ao enviar arquivo para o R2 (HTTP ${upload.status})`)
+    if (!upload.ok) throw new Error(`Falha ao enviar arquivo para o armazenamento (HTTP ${upload.status})`)
 
     return request<UploadedFile>('/storage/confirm', {
       method: 'POST',
