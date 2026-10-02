@@ -411,23 +411,26 @@ function BriefStep(props: BriefStepProps) {
       <label className="new-project-field"><span>Nome do projeto <b>Obrigatório</b></span><input value={props.name} onChange={(event) => props.setName(event.target.value)} placeholder="Ex.: Campanha de lançamento — outubro" autoFocus /></label>
       <label className="new-project-field"><span>O que você quer criar? <b>Obrigatório</b></span><small>Explique o contexto, a mensagem principal e o resultado esperado.</small><textarea value={props.overview} onChange={(event) => props.setOverview(event.target.value)} placeholder="Conte um pouco sobre a necessidade, o momento da marca e o que esta entrega precisa resolver..." /></label>
     </div>
-    <div className="new-project-form-section"><SectionTitle title="Como podemos ajudar?" description="Escolha o ponto de partida mais próximo da sua necessidade." /><div className="new-project-choice-list" role="radiogroup">{workOptionsFor(props.selected).map((option) => <label key={option} className={props.objective === option ? 'selected' : ''}><input type="radio" name="objective" checked={props.objective === option} onChange={() => props.setObjective(option)} /><span>{option}</span><CheckCircle2 size={18} /></label>)}</div></div>
-    <div className="new-project-form-section"><SectionTitle title="Objetivo principal" description="Isso orienta as decisões criativas e a revisão da entrega." /><div className="new-project-goal-chips">{goals.map((goal) => <button type="button" key={goal} className={props.projectGoal === goal ? 'active' : ''} onClick={() => props.setProjectGoal(goal)}>{goal}</button>)}</div></div>
-    <div className="new-project-form-section new-project-context-grid">
-      <label className="new-project-field"><span>Público</span><small>Com quem estamos falando?</small><textarea value={props.audience} onChange={(event) => props.setAudience(event.target.value)} disabled={props.notApplicable.audience} placeholder="Perfil, contexto e comportamentos relevantes..." /><button type="button" className="new-project-inline-action" onClick={() => toggleNotApplicable('audience')}>{props.notApplicable.audience ? 'Adicionar público' : 'Não se aplica'}</button></label>
-      <label className="new-project-field"><span>Tom e atmosfera</span><small>Como a comunicação deve ser percebida?</small><textarea value={props.tone} onChange={(event) => props.setTone(event.target.value)} disabled={props.notApplicable.tone} placeholder="Ex.: próximo, direto, calmo, premium..." /><button type="button" className="new-project-inline-action" onClick={() => toggleNotApplicable('tone')}>{props.notApplicable.tone ? 'Adicionar direcionamento' : 'Não se aplica'}</button></label>
-    </div>
     {isEligible ? (
       <div className="new-project-form-section">
-        <h3 className="new-project-creative-path-title">Escolha o caminho criativo do seu pedido</h3>
+        <SectionTitle title="Escolha o caminho criativo do seu pedido" description="Defina se o time deve desenvolver um novo conceito visual ou seguir referências enviadas." />
         <div className="new-project-creative-paths" role="radiogroup" aria-label="Escolha o caminho criativo do seu pedido">
           <div
             role="radio"
             aria-checked={props.creativePath === 'new-concept' || props.creativePath === 'new-direction'}
             tabIndex={0}
             className={`new-project-creative-card ${(props.creativePath === 'new-concept' || props.creativePath === 'new-direction') ? 'active' : ''}`}
-            onClick={() => props.setCreativePath('new-concept')}
-            onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); props.setCreativePath('new-concept') } }}
+            onClick={() => {
+              props.setCreativePath('new-concept')
+              props.setObjective(`Criar ${props.selected.name.toLocaleLowerCase('pt-BR')}`)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault()
+                props.setCreativePath('new-concept')
+                props.setObjective(`Criar ${props.selected.name.toLocaleLowerCase('pt-BR')}`)
+              }
+            }}
           >
             <div className="new-project-creative-card__icon-box">
               <PaintBucket size={22} />
@@ -451,8 +454,17 @@ function BriefStep(props: BriefStepProps) {
             aria-checked={props.creativePath === 'follow-references'}
             tabIndex={0}
             className={`new-project-creative-card ${props.creativePath === 'follow-references' ? 'active' : ''}`}
-            onClick={() => props.setCreativePath('follow-references')}
-            onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); props.setCreativePath('follow-references') } }}
+            onClick={() => {
+              props.setCreativePath('follow-references')
+              props.setObjective('Reformular ou evoluir a partir de referências')
+            }}
+            onKeyDown={(e) => {
+              if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault()
+                props.setCreativePath('follow-references')
+                props.setObjective('Reformular ou evoluir a partir de referências')
+              }
+            }}
           >
             <div className="new-project-creative-card__icon-box">
               <Pencil size={20} />
@@ -472,6 +484,25 @@ function BriefStep(props: BriefStepProps) {
         </div>
       </div>
     ) : (
+      <div className="new-project-form-section">
+        <SectionTitle title="Como podemos ajudar?" description="Escolha o ponto de partida mais próximo da sua necessidade." />
+        <div className="new-project-choice-list" role="radiogroup">
+          {workOptionsFor(props.selected).map((option) => (
+            <label key={option} className={props.objective === option ? 'selected' : ''}>
+              <input type="radio" name="objective" checked={props.objective === option} onChange={() => props.setObjective(option)} />
+              <span>{option}</span>
+              <CheckCircle2 size={18} />
+            </label>
+          ))}
+        </div>
+      </div>
+    )}
+    <div className="new-project-form-section"><SectionTitle title="Objetivo principal" description="Isso orienta as decisões criativas e a revisão da entrega." /><div className="new-project-goal-chips">{goals.map((goal) => <button type="button" key={goal} className={props.projectGoal === goal ? 'active' : ''} onClick={() => props.setProjectGoal(goal)}>{goal}</button>)}</div></div>
+    <div className="new-project-form-section new-project-context-grid">
+      <label className="new-project-field"><span>Público</span><small>Com quem estamos falando?</small><textarea value={props.audience} onChange={(event) => props.setAudience(event.target.value)} disabled={props.notApplicable.audience} placeholder="Perfil, contexto e comportamentos relevantes..." /><button type="button" className="new-project-inline-action" onClick={() => toggleNotApplicable('audience')}>{props.notApplicable.audience ? 'Adicionar público' : 'Não se aplica'}</button></label>
+      <label className="new-project-field"><span>Tom e atmosfera</span><small>Como a comunicação deve ser percebida?</small><textarea value={props.tone} onChange={(event) => props.setTone(event.target.value)} disabled={props.notApplicable.tone} placeholder="Ex.: próximo, direto, calmo, premium..." /><button type="button" className="new-project-inline-action" onClick={() => toggleNotApplicable('tone')}>{props.notApplicable.tone ? 'Adicionar direcionamento' : 'Não se aplica'}</button></label>
+    </div>
+    {!isEligible && (
       <div className="new-project-form-section">
         <SectionTitle title="Direção criativa" description="Defina quanto de exploração o time deve aplicar." />
         <div className="new-project-paths">
@@ -621,7 +652,7 @@ function ReviewStep(props: ReviewStepProps) {
   const isEligible = isConceptVisualEligible(props.selected)
   return <>
     <FlowHeading eyebrow="Etapa 3 de 3" title="Revise antes de enviar" description="Você poderá complementar o briefing na conversa do projeto depois do envio." />
-    <div className="new-project-review-block"><header><div><span>Briefing</span><h2>{props.name}</h2></div><button type="button" onClick={props.onEditBrief}>Editar</button></header><p>{props.overview}</p><dl><div><dt>Pedido</dt><dd>{props.objective}</dd></div><div><dt>Objetivo</dt><dd>{props.projectGoal}</dd></div><div><dt>Caminho criativo</dt><dd>{isEligible ? ((props.creativePath === 'new-concept' || props.creativePath === 'new-direction') ? 'Quero um novo conceito visual (+3 créditos)' : 'Seguir exatamente minhas referências') : (props.creativePath === 'new-direction' ? 'Explorar nova direção' : 'Partir das referências')}</dd></div>{props.audience && <div><dt>Público</dt><dd>{props.audience}</dd></div>}{props.tone && <div><dt>Tom</dt><dd>{props.tone}</dd></div>}</dl></div>
+    <div className="new-project-review-block"><header><div><span>Briefing</span><h2>{props.name}</h2></div><button type="button" onClick={props.onEditBrief}>Editar</button></header><p>{props.overview}</p><dl><div><dt>Caminho criativo</dt><dd>{isEligible ? ((props.creativePath === 'new-concept' || props.creativePath === 'new-direction') ? 'Quero um novo conceito visual (+3 créditos)' : 'Seguir exatamente minhas referências') : (props.creativePath === 'new-direction' ? 'Explorar nova direção' : 'Partir das referências')}</dd></div>{!isEligible && <div><dt>Pedido</dt><dd>{props.objective}</dd></div>}<div><dt>Objetivo</dt><dd>{props.projectGoal}</dd></div>{props.audience && <div><dt>Público</dt><dd>{props.audience}</dd></div>}{props.tone && <div><dt>Tom</dt><dd>{props.tone}</dd></div>}</dl></div>
     <div className="new-project-review-block"><header><div><span>Entrega</span><h2>{props.selected.name}</h2></div><button type="button" onClick={props.onBack}>Editar</button></header><dl><div><dt>Quantidade</dt><dd>{props.scope.quantity} {props.selected.billing.unit}</dd></div><div><dt>Tarefas</dt><dd>{props.scope.taskRepeats}</dd></div>{Boolean(props.quote?.breakdown?.conceptVisual) && <div><dt>Conceito visual</dt><dd>Novo conceito visual (+3 créditos)</dd></div>}{props.selectedApplications.length > 0 && <div><dt>Aplicação</dt><dd>{props.selectedApplications.join(', ')}</dd></div>}{props.selectedSizes.length > 0 && <div><dt>Dimensões</dt><dd>{props.selectedSizes.join(', ')}</dd></div>}<div><dt>Arquivo final</dt><dd>{props.selectedFinalFormat ? displayFileFormat(props.selectedFinalFormat).toUpperCase() : 'Padrão do catálogo'}</dd></div><div><dt>Arquivo aberto</dt><dd>{props.selectedEditableFormat || 'Não solicitado'}</dd></div>{activeAddons.length > 0 && <div><dt>Adicionais</dt><dd>{activeAddons.map((item) => item.name).join(', ')}</dd></div>}<div><dt>Referências</dt><dd>{props.referenceFiles.length + props.referenceLinks.length || 'Nenhuma'}</dd></div></dl>{props.deliveryConfig && <div className="new-project-review-items"><strong>{props.deliveryConfig.title}</strong>{props.deliveryItems.map((item) => <article key={item.id}><span>{item.label}</span><div><b>{item.title.trim() || 'Sem título informado'}</b><p>{item.copy.trim() || 'Sem texto informado'}</p>{item.instructions.trim() && <small>Direção visual: {item.instructions}</small>}{item.cta.trim() && <small>CTA: {item.cta}</small>}</div></article>)}</div>}</div>
     <div className="new-project-review-total"><div><span>Estimativa da solicitação</span><strong>{props.quote ? `${formatCredits(props.quote.totalCredits)} créditos` : 'Calculando...'}</strong><small>{props.quote ? `Prazo estimado de ${formatCredits(props.quote.slaHours)} horas úteis` : 'Aguarde a atualização do escopo'}</small></div><p>A estimativa pode ser ajustada pelo time caso o briefing exija uma validação adicional. Você será avisado antes de qualquer alteração.</p></div>
     <FlowFooter><button type="button" className="secondary-button" onClick={props.onBack}><ArrowLeft size={15} /> Voltar</button><button type="button" className="primary-button" disabled={!props.quote || props.submitting} onClick={props.onSubmit}>{props.submitting ? 'Enviando...' : 'Enviar projeto'} <ArrowRight size={15} /></button></FlowFooter>
@@ -641,7 +672,7 @@ function FlowFooter({ children }: { children: React.ReactNode }) {
 }
 
 function ProductSummary({ product, quote, quoteError, onChange }: { product: CatalogProduct; quote: CatalogQuote | null; quoteError: string; onChange: () => void }) {
-  return <aside className="new-project-order-summary"><span className="new-project-order-summary__eyebrow">Sua escolha</span><div className={`new-project-order-summary__mark${product.imageUrl ? ' has-image' : ''}`} style={{ background: categoryAccent[product.category] || '#d7ff70' }}>{product.imageUrl ? <img src={product.imageUrl} alt="" onError={(event) => { event.currentTarget.style.display = 'none' }} /> : product.code}</div><small>{product.category}{product.subcategory ? ` · ${product.subcategory}` : ''}</small><h2>{product.name}</h2><p>{product.description}</p><button type="button" onClick={onChange}>Trocar serviço</button><div className="new-project-order-summary__quote"><span><Paperclip size={15} /> Estimativa</span><strong>{quote ? `${formatCredits(quote.totalCredits)} créditos` : 'Calculando...'}</strong><small><Clock3 size={14} /> {quote ? `${formatCredits(quote.slaHours)} horas úteis` : `${formatCredits(product.slaHours)} horas base`}</small>{Boolean(quote?.breakdown?.conceptVisual) && <small style={{ color: '#e11d48', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4 }}><Sparkles size={12} /> Inclui Conceito Visual (+3 créditos)</small>}{quoteError && <em>{quoteError}</em>}</div></aside>
+  return <aside className="new-project-order-summary"><span className="new-project-order-summary__eyebrow">Sua escolha</span><div className={`new-project-order-summary__mark${product.imageUrl ? ' has-image' : ''}`} style={{ background: categoryAccent[product.category] || '#d7ff70' }}>{product.imageUrl ? <img src={product.imageUrl} alt="" onError={(event) => { event.currentTarget.style.display = 'none' }} /> : product.code}</div><small>{product.category}{product.subcategory ? ` · ${product.subcategory}` : ''}</small><h2>{product.name}</h2><p>{product.description}</p><button type="button" onClick={onChange}>Trocar serviço</button><div className="new-project-order-summary__quote"><span><Paperclip size={15} /> Estimativa</span><strong>{quote ? `${formatCredits(quote.totalCredits)} créditos` : 'Calculando...'}</strong><small><Clock3 size={14} /> {quote ? `${formatCredits(quote.slaHours)} horas úteis` : `${formatCredits(product.slaHours)} horas base`}</small>{Boolean(quote?.breakdown?.conceptVisual) && <small style={{ color: '#d7ff70', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4 }}><Sparkles size={12} /> Inclui Conceito Visual (+3 créditos)</small>}{quoteError && <em>{quoteError}</em>}</div></aside>
 }
 
 function ScopeCounter({ label, value, minimum = 0, onDecrease, onIncrease, disableIncrease = false }: { label: string; value: number; minimum?: number; onDecrease: () => void; onIncrease: () => void; disableIncrease?: boolean }) {
