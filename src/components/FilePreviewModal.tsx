@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { X, ExternalLink, Download, FileText, Trash2 } from 'lucide-react'
 
 export interface PreviewableFile {
@@ -57,7 +58,7 @@ export function FilePreviewModal({ file, onClose, onRemove }: FilePreviewModalPr
   const isVideo = mime.startsWith('video/') || /\.(mp4|webm|mov)$/i.test(file.name)
   const sizeText = formatSize(file.sizeBytes || file.file?.size)
 
-  return (
+  const modalContent = (
     <div className="file-preview-modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
       <div className="file-preview-modal" onClick={(e) => e.stopPropagation()}>
         <header className="file-preview-modal__header">
@@ -130,4 +131,10 @@ export function FilePreviewModal({ file, onClose, onRemove }: FilePreviewModalPr
       </div>
     </div>
   )
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modalContent, document.body)
+  }
+
+  return modalContent
 }

@@ -386,18 +386,18 @@ export function NewProjectPage() {
         </section>
         <ProductSummary product={selected} quote={quote} quoteError={quoteError} onChange={() => setStep('catalog')} />
       </main>}
-      {previewFile && (
-        <FilePreviewModal
-          file={previewFile}
-          onClose={() => setPreviewFile(null)}
-          onRemove={previewFile.file ? () => {
-            const fileName = previewFile.file!.name
-            const fileSize = previewFile.file!.size
-            setReferenceFiles((current) => current.filter((item) => !(item.name === fileName && item.size === fileSize)))
-          } : undefined}
-        />
-      )}
     </section>
+    {previewFile && (
+      <FilePreviewModal
+        file={previewFile}
+        onClose={() => setPreviewFile(null)}
+        onRemove={previewFile.file ? () => {
+          const fileName = previewFile.file!.name
+          const fileSize = previewFile.file!.size
+          setReferenceFiles((current) => current.filter((item) => !(item.name === fileName && item.size === fileSize)))
+        } : undefined}
+      />
+    )}
   </div>
 }
 
