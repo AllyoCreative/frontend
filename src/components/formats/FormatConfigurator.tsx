@@ -4,6 +4,7 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  LockKeyhole,
   Maximize2,
   Monitor,
   Pencil,
@@ -101,6 +102,10 @@ export function FormatConfigurator(props: FormatConfiguratorProps) {
 
   const finalFormatsList = props.availableFinalFormats?.length ? props.availableFinalFormats : defaultExtensionOptions
   const editableFormatsList = props.availableEditableFormats?.length ? props.availableEditableFormats : defaultSoftwareOptions
+  const canConfigureAddons = Boolean(activeFormat?.isPrincipal)
+  const visibleAddons = canConfigureAddons
+    ? STANDARD_ADDONS
+    : STANDARD_ADDONS.filter((addon) => Boolean(props.addons[addon.code] && props.addons[addon.code] > 0))
 
   return (
     <div className="format-configurator">
@@ -235,6 +240,11 @@ export function FormatConfigurator(props: FormatConfiguratorProps) {
                 <div className="format-config-section__title-row">
                   <Sparkles size={18} className="format-config-section__icon" />
                   <h4>Adicionais</h4>
+                  {!canConfigureAddons && (
+                    <span className="format-addons-inherited-badge">
+                      <LockKeyhole size={12} /> Herdado da peça principal
+                    </span>
+                  )}
                 </div>
                 <button type="button" className="format-accordion-toggle" aria-label="Expandir ou recolher">
                   {addonsOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
@@ -243,30 +253,46 @@ export function FormatConfigurator(props: FormatConfiguratorProps) {
 
               {addonsOpen && (
                 <div className="format-addons-list">
-                  {STANDARD_ADDONS.map((addon) => {
-                    const isChecked = Boolean(props.addons[addon.code] && props.addons[addon.code] > 0)
-                    return (
-                      <label
-                        key={addon.code}
-                        className={`format-addon-card ${isChecked ? 'is-checked' : ''}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => props.onToggleAddon(addon.code)}
-                        />
-                        <div className="format-addon-card__info">
-                          <span className="format-addon-card__title">{addon.name}</span>
-                          {addon.description && (
-                            <small className="format-addon-card__desc">{addon.description}</small>
-                          )}
-                        </div>
-                        <span className="format-addon-card__badge">
-                          +{addon.credits} crédito{addon.credits > 1 ? 's' : ''}
-                        </span>
-                      </label>
-                    )
-                  })}
+                  {!canConfigureAddons && (
+                    <div className="format-addons-inherited-note">
+                      <LockKeyhole size={15} />
+                      <span>Esta peça acompanha os adicionais definidos no formato principal.</span>
+                    </div>
+                  )}
+
+                  {visibleAddons.length > 0 ? (
+                    visibleAddons.map((addon) => {
+                      const isChecked = Boolean(props.addons[addon.code] && props.addons[addon.code] > 0)
+                      return (
+                        <label
+                          key={addon.code}
+                          className={`format-addon-card ${isChecked ? 'is-checked' : ''} ${!canConfigureAddons ? 'is-locked' : ''}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            disabled={!canConfigureAddons}
+                            onChange={() => canConfigureAddons && props.onToggleAddon(addon.code)}
+                          />
+                          <div className="format-addon-card__info">
+                            <span className="format-addon-card__title">{addon.name}</span>
+                            {addon.description && (
+                              <small className="format-addon-card__desc">{addon.description}</small>
+                            )}
+                          </div>
+                          <span className="format-addon-card__badge">
+                            {canConfigureAddons
+                              ? `+${addon.credits} crédito${addon.credits > 1 ? 's' : ''}`
+                              : 'Incluído'}
+                          </span>
+                        </label>
+                      )
+                    })
+                  ) : (
+                    <div className="format-addons-empty-state">
+                      Nenhum adicional foi selecionado na peça principal.
+                    </div>
+                  )}
                 </div>
               )}
             </div>
