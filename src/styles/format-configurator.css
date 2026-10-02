@@ -81,12 +81,12 @@
 .format-configurator__list {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(218px, 1fr);
+  grid-auto-columns: 218px;
   grid-template-rows: 1fr;
   gap: 10px;
   min-width: 0;
   overflow-x: auto;
-  padding: 2px 2px 7px;
+  padding: 2px 2px 14px;
   scroll-snap-type: x proximity;
   scrollbar-width: thin;
   scrollbar-color: #cbd2cc transparent;
@@ -314,7 +314,7 @@
   }
 
   .format-configurator__list {
-    grid-auto-columns: minmax(210px, 84%);
+    grid-auto-columns: 210px;
   }
 
   .format-config-section {
