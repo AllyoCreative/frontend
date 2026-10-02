@@ -39,6 +39,10 @@ export interface ProjectTask {
   deadlineAt?: string | null
   deadlineDays?: number
   orderIndex?: number
+  dependencyBlocked?: boolean
+  dependsOn?: string[]
+  requiresClientApproval?: boolean
+  credits?: number
   briefing: TaskBriefing
   createdAt?: string
   updatedAt?: string

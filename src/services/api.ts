@@ -236,6 +236,8 @@ export interface CatalogScope {
   variationCount: number
   characterCount: number
   addons: Record<string, number>
+  creativePath?: 'new-direction' | 'new-concept' | 'follow-references'
+  hasConceptVisual?: boolean
 }
 
 export interface CatalogQuote {
@@ -251,6 +253,7 @@ export interface CatalogQuote {
     variation: number
     characters: number
     addons: number
+    conceptVisual?: number
     taskRepeats: number
     addonItems: Array<{ code: string; name: string; quantity: number; credits: number }>
   }
@@ -275,7 +278,7 @@ export interface ProjectBriefingInput {
   tone?: string
   overview?: string
   projectGoal?: string
-  creativePath?: 'new-direction' | 'follow-references'
+  creativePath?: 'new-direction' | 'new-concept' | 'follow-references'
   referenceLinks?: string[]
   selectedFormats?: string[]
   catalogCode?: string

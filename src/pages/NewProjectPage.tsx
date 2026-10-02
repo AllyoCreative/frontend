@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, FileOutput, FileText, Layers3, Link2, Maximize2, Minus, Paperclip, PenTool, Plus, Search, Upload, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, FileOutput, FileText, Layers3, Link2, Maximize2, Minus, PaintBucket, Paperclip, PenTool, Pencil, Plus, Search, Sparkles, Upload, X } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
+import { isConceptVisualEligible } from '../config/creativePathConfig'
 import { api, type CatalogProduct, type CatalogQuote, type CatalogScope, type ProjectDeliveryItem, type ProjectDeliverySchema } from '../services/api'
 
 type FlowStep = 'catalog' | 'brief' | 'configure' | 'review' | 'success'
@@ -131,7 +132,7 @@ export function NewProjectPage() {
   const [audience, setAudience] = useState('')
   const [tone, setTone] = useState('')
   const [notApplicable, setNotApplicable] = useState({ audience: false, tone: false })
-  const [creativePath, setCreativePath] = useState<'new-direction' | 'follow-references'>('follow-references')
+  const [creativePath, setCreativePath] = useState<'new-direction' | 'new-concept' | 'follow-references'>('follow-references')
   const [selectedApplications, setSelectedApplications] = useState<string[]>([])
   const [selectedSizes, setSelectedSizes] = useState<string[]>([])
   const [selectedFinalFormat, setSelectedFinalFormat] = useState('')
@@ -161,7 +162,7 @@ export function NewProjectPage() {
     if (!selected || step === 'catalog' || step === 'success') return
     let active = true
     const timer = window.setTimeout(() => {
-      api.quoteCatalogProduct(selected.code, scope).then((result) => {
+      api.quoteCatalogProduct(selected.code, { ...scope, creativePath }).then((result) => {
         if (!active) return
         setQuote(result)
         setQuoteError('')
@@ -172,7 +173,7 @@ export function NewProjectPage() {
       })
     }, 180)
     return () => { active = false; window.clearTimeout(timer) }
-  }, [scope, selected, step])
+  }, [scope, selected, step, creativePath])
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -389,10 +390,10 @@ function FlowProgress({ step, briefReady, onStep }: { step: FlowStep; briefReady
 
 interface BriefStepProps {
   selected: CatalogProduct; name: string; objective: string; overview: string; projectGoal: string; audience: string; tone: string
-  notApplicable: { audience: boolean; tone: boolean }; creativePath: 'new-direction' | 'follow-references'; referenceFiles: File[]; referenceLinks: string[]; linkDraft: string
+  notApplicable: { audience: boolean; tone: boolean }; creativePath: 'new-direction' | 'new-concept' | 'follow-references'; referenceFiles: File[]; referenceLinks: string[]; linkDraft: string
   setName: (value: string) => void; setObjective: (value: string) => void; setOverview: (value: string) => void
   setProjectGoal: (value: string) => void; setAudience: (value: string) => void; setTone: (value: string) => void
-  setNotApplicable: React.Dispatch<React.SetStateAction<{ audience: boolean; tone: boolean }>>; setCreativePath: (value: 'new-direction' | 'follow-references') => void
+  setNotApplicable: React.Dispatch<React.SetStateAction<{ audience: boolean; tone: boolean }>>; setCreativePath: (value: 'new-direction' | 'new-concept' | 'follow-references') => void
   setLinkDraft: (value: string) => void; addReferenceLink: () => void; addReferenceFiles: (files: FileList | null) => void; removeFile: (index: number) => void; removeLink: (link: string) => void
   onCancel: () => void; onNext: () => void; ready: boolean
 }
@@ -403,6 +404,7 @@ function BriefStep(props: BriefStepProps) {
     if (key === 'audience') props.setAudience('')
     else props.setTone('')
   }
+  const isEligible = isConceptVisualEligible(props.selected)
   return <>
     <FlowHeading eyebrow="Etapa 1 de 3" title="Conte o que precisa ser criado" description="Reunimos só o contexto que realmente ajuda o time a começar bem." />
     <div className="new-project-form-section">
@@ -415,7 +417,75 @@ function BriefStep(props: BriefStepProps) {
       <label className="new-project-field"><span>Público</span><small>Com quem estamos falando?</small><textarea value={props.audience} onChange={(event) => props.setAudience(event.target.value)} disabled={props.notApplicable.audience} placeholder="Perfil, contexto e comportamentos relevantes..." /><button type="button" className="new-project-inline-action" onClick={() => toggleNotApplicable('audience')}>{props.notApplicable.audience ? 'Adicionar público' : 'Não se aplica'}</button></label>
       <label className="new-project-field"><span>Tom e atmosfera</span><small>Como a comunicação deve ser percebida?</small><textarea value={props.tone} onChange={(event) => props.setTone(event.target.value)} disabled={props.notApplicable.tone} placeholder="Ex.: próximo, direto, calmo, premium..." /><button type="button" className="new-project-inline-action" onClick={() => toggleNotApplicable('tone')}>{props.notApplicable.tone ? 'Adicionar direcionamento' : 'Não se aplica'}</button></label>
     </div>
-    <div className="new-project-form-section"><SectionTitle title="Direção criativa" description="Defina quanto de exploração o time deve aplicar." /><div className="new-project-paths"><button type="button" className={props.creativePath === 'new-direction' ? 'active' : ''} onClick={() => props.setCreativePath('new-direction')}><span>Explorar uma nova direção</span><small>O time propõe um caminho visual a partir do briefing e do Brand Kit.</small></button><button type="button" className={props.creativePath === 'follow-references' ? 'active' : ''} onClick={() => props.setCreativePath('follow-references')}><span>Partir das minhas referências</span><small>O time preserva o caminho das referências enviadas e adapta à marca.</small></button></div></div>
+    {isEligible ? (
+      <div className="new-project-form-section">
+        <h3 className="new-project-creative-path-title">Escolha o caminho criativo do seu pedido</h3>
+        <div className="new-project-creative-paths" role="radiogroup" aria-label="Escolha o caminho criativo do seu pedido">
+          <div
+            role="radio"
+            aria-checked={props.creativePath === 'new-concept' || props.creativePath === 'new-direction'}
+            tabIndex={0}
+            className={`new-project-creative-card ${(props.creativePath === 'new-concept' || props.creativePath === 'new-direction') ? 'active' : ''}`}
+            onClick={() => props.setCreativePath('new-concept')}
+            onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); props.setCreativePath('new-concept') } }}
+          >
+            <div className="new-project-creative-card__icon-box">
+              <PaintBucket size={22} />
+            </div>
+            <div className="new-project-creative-card__content">
+              <div className="new-project-creative-card__header">
+                <span className="new-project-creative-card__title">Quero um novo conceito visual</span>
+                <span className="new-project-creative-card__badge">+ 3 créditos</span>
+              </div>
+              <p className="new-project-creative-card__description">
+                Nosso time criará um conceito visual personalizado para essa entrega, com base nas informações fornecidas e em conformidade com o manual da sua marca. Esse processo poderá adicionar até 3 dias úteis ao prazo de entrega.
+              </p>
+            </div>
+            <div className="new-project-creative-card__radio">
+              {(props.creativePath === 'new-concept' || props.creativePath === 'new-direction') && <span className="new-project-creative-card__radio-dot" />}
+            </div>
+          </div>
+
+          <div
+            role="radio"
+            aria-checked={props.creativePath === 'follow-references'}
+            tabIndex={0}
+            className={`new-project-creative-card ${props.creativePath === 'follow-references' ? 'active' : ''}`}
+            onClick={() => props.setCreativePath('follow-references')}
+            onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); props.setCreativePath('follow-references') } }}
+          >
+            <div className="new-project-creative-card__icon-box">
+              <Pencil size={20} />
+            </div>
+            <div className="new-project-creative-card__content">
+              <div className="new-project-creative-card__header">
+                <span className="new-project-creative-card__title">Seguir exatamente minhas referências</span>
+              </div>
+              <p className="new-project-creative-card__description">
+                Vamos seguir exatamente as referências enviadas, aliando com o contexto criativo já existente da sua marca.
+              </p>
+            </div>
+            <div className="new-project-creative-card__radio">
+              {props.creativePath === 'follow-references' && <span className="new-project-creative-card__radio-dot" />}
+            </div>
+          </div>
+        </div>
+      </div>
+    ) : (
+      <div className="new-project-form-section">
+        <SectionTitle title="Direção criativa" description="Defina quanto de exploração o time deve aplicar." />
+        <div className="new-project-paths">
+          <button type="button" className={props.creativePath === 'new-direction' ? 'active' : ''} onClick={() => props.setCreativePath('new-direction')}>
+            <span>Explorar uma nova direção</span>
+            <small>O time propõe um caminho visual a partir do briefing e do Brand Kit.</small>
+          </button>
+          <button type="button" className={props.creativePath === 'follow-references' ? 'active' : ''} onClick={() => props.setCreativePath('follow-references')}>
+            <span>Partir das minhas referências</span>
+            <small>O time preserva o caminho das referências enviadas e adapta à marca.</small>
+          </button>
+        </div>
+      </div>
+    )}
     <div className="new-project-form-section">
       <SectionTitle title="Referências" description="Opcional. Anexe materiais ou compartilhe links; eles serão salvos no projeto." />
       <div className="new-project-reference-actions"><label><Upload size={16} /> Adicionar arquivos<input type="file" multiple hidden onChange={(event) => { props.addReferenceFiles(event.target.files); event.target.value = '' }} /></label><div><Link2 size={16} /><input value={props.linkDraft} onChange={(event) => props.setLinkDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); props.addReferenceLink() } }} placeholder="Cole um link de referência" /><button type="button" onClick={props.addReferenceLink}>Adicionar</button></div></div>
@@ -542,16 +612,17 @@ function DeliveryFileChoice({ title, description, icon, options, selected, onSel
 
 interface ReviewStepProps {
   selected: CatalogProduct; name: string; overview: string; objective: string; projectGoal: string; audience: string; tone: string
-  creativePath: 'new-direction' | 'follow-references'; selectedApplications: string[]; selectedSizes: string[]; selectedFinalFormat: string; selectedEditableFormat: string; referenceFiles: File[]; referenceLinks: string[]; scope: CatalogScope
+  creativePath: 'new-direction' | 'new-concept' | 'follow-references'; selectedApplications: string[]; selectedSizes: string[]; selectedFinalFormat: string; selectedEditableFormat: string; referenceFiles: File[]; referenceLinks: string[]; scope: CatalogScope
   quote: CatalogQuote | null; deliveryConfig: DeliveryConfig | null; deliveryItems: ProjectDeliveryItem[]; submitting: boolean; onBack: () => void; onEditBrief: () => void; onSubmit: () => void
 }
 
 function ReviewStep(props: ReviewStepProps) {
   const activeAddons = props.selected.addons.filter((addon) => props.scope.addons[addon.code] > 0)
+  const isEligible = isConceptVisualEligible(props.selected)
   return <>
     <FlowHeading eyebrow="Etapa 3 de 3" title="Revise antes de enviar" description="Você poderá complementar o briefing na conversa do projeto depois do envio." />
-    <div className="new-project-review-block"><header><div><span>Briefing</span><h2>{props.name}</h2></div><button type="button" onClick={props.onEditBrief}>Editar</button></header><p>{props.overview}</p><dl><div><dt>Pedido</dt><dd>{props.objective}</dd></div><div><dt>Objetivo</dt><dd>{props.projectGoal}</dd></div><div><dt>Direção</dt><dd>{props.creativePath === 'new-direction' ? 'Explorar nova direção' : 'Partir das referências'}</dd></div>{props.audience && <div><dt>Público</dt><dd>{props.audience}</dd></div>}{props.tone && <div><dt>Tom</dt><dd>{props.tone}</dd></div>}</dl></div>
-    <div className="new-project-review-block"><header><div><span>Entrega</span><h2>{props.selected.name}</h2></div><button type="button" onClick={props.onBack}>Editar</button></header><dl><div><dt>Quantidade</dt><dd>{props.scope.quantity} {props.selected.billing.unit}</dd></div><div><dt>Tarefas</dt><dd>{props.scope.taskRepeats}</dd></div>{props.selectedApplications.length > 0 && <div><dt>Aplicação</dt><dd>{props.selectedApplications.join(', ')}</dd></div>}{props.selectedSizes.length > 0 && <div><dt>Dimensões</dt><dd>{props.selectedSizes.join(', ')}</dd></div>}<div><dt>Arquivo final</dt><dd>{props.selectedFinalFormat ? displayFileFormat(props.selectedFinalFormat).toUpperCase() : 'Padrão do catálogo'}</dd></div><div><dt>Arquivo aberto</dt><dd>{props.selectedEditableFormat || 'Não solicitado'}</dd></div>{activeAddons.length > 0 && <div><dt>Adicionais</dt><dd>{activeAddons.map((item) => item.name).join(', ')}</dd></div>}<div><dt>Referências</dt><dd>{props.referenceFiles.length + props.referenceLinks.length || 'Nenhuma'}</dd></div></dl>{props.deliveryConfig && <div className="new-project-review-items"><strong>{props.deliveryConfig.title}</strong>{props.deliveryItems.map((item) => <article key={item.id}><span>{item.label}</span><div><b>{item.title.trim() || 'Sem título informado'}</b><p>{item.copy.trim() || 'Sem texto informado'}</p>{item.instructions.trim() && <small>Direção visual: {item.instructions}</small>}{item.cta.trim() && <small>CTA: {item.cta}</small>}</div></article>)}</div>}</div>
+    <div className="new-project-review-block"><header><div><span>Briefing</span><h2>{props.name}</h2></div><button type="button" onClick={props.onEditBrief}>Editar</button></header><p>{props.overview}</p><dl><div><dt>Pedido</dt><dd>{props.objective}</dd></div><div><dt>Objetivo</dt><dd>{props.projectGoal}</dd></div><div><dt>Caminho criativo</dt><dd>{isEligible ? ((props.creativePath === 'new-concept' || props.creativePath === 'new-direction') ? 'Quero um novo conceito visual (+3 créditos)' : 'Seguir exatamente minhas referências') : (props.creativePath === 'new-direction' ? 'Explorar nova direção' : 'Partir das referências')}</dd></div>{props.audience && <div><dt>Público</dt><dd>{props.audience}</dd></div>}{props.tone && <div><dt>Tom</dt><dd>{props.tone}</dd></div>}</dl></div>
+    <div className="new-project-review-block"><header><div><span>Entrega</span><h2>{props.selected.name}</h2></div><button type="button" onClick={props.onBack}>Editar</button></header><dl><div><dt>Quantidade</dt><dd>{props.scope.quantity} {props.selected.billing.unit}</dd></div><div><dt>Tarefas</dt><dd>{props.scope.taskRepeats}</dd></div>{Boolean(props.quote?.breakdown?.conceptVisual) && <div><dt>Conceito visual</dt><dd>Novo conceito visual (+3 créditos)</dd></div>}{props.selectedApplications.length > 0 && <div><dt>Aplicação</dt><dd>{props.selectedApplications.join(', ')}</dd></div>}{props.selectedSizes.length > 0 && <div><dt>Dimensões</dt><dd>{props.selectedSizes.join(', ')}</dd></div>}<div><dt>Arquivo final</dt><dd>{props.selectedFinalFormat ? displayFileFormat(props.selectedFinalFormat).toUpperCase() : 'Padrão do catálogo'}</dd></div><div><dt>Arquivo aberto</dt><dd>{props.selectedEditableFormat || 'Não solicitado'}</dd></div>{activeAddons.length > 0 && <div><dt>Adicionais</dt><dd>{activeAddons.map((item) => item.name).join(', ')}</dd></div>}<div><dt>Referências</dt><dd>{props.referenceFiles.length + props.referenceLinks.length || 'Nenhuma'}</dd></div></dl>{props.deliveryConfig && <div className="new-project-review-items"><strong>{props.deliveryConfig.title}</strong>{props.deliveryItems.map((item) => <article key={item.id}><span>{item.label}</span><div><b>{item.title.trim() || 'Sem título informado'}</b><p>{item.copy.trim() || 'Sem texto informado'}</p>{item.instructions.trim() && <small>Direção visual: {item.instructions}</small>}{item.cta.trim() && <small>CTA: {item.cta}</small>}</div></article>)}</div>}</div>
     <div className="new-project-review-total"><div><span>Estimativa da solicitação</span><strong>{props.quote ? `${formatCredits(props.quote.totalCredits)} créditos` : 'Calculando...'}</strong><small>{props.quote ? `Prazo estimado de ${formatCredits(props.quote.slaHours)} horas úteis` : 'Aguarde a atualização do escopo'}</small></div><p>A estimativa pode ser ajustada pelo time caso o briefing exija uma validação adicional. Você será avisado antes de qualquer alteração.</p></div>
     <FlowFooter><button type="button" className="secondary-button" onClick={props.onBack}><ArrowLeft size={15} /> Voltar</button><button type="button" className="primary-button" disabled={!props.quote || props.submitting} onClick={props.onSubmit}>{props.submitting ? 'Enviando...' : 'Enviar projeto'} <ArrowRight size={15} /></button></FlowFooter>
   </>
@@ -570,7 +641,7 @@ function FlowFooter({ children }: { children: React.ReactNode }) {
 }
 
 function ProductSummary({ product, quote, quoteError, onChange }: { product: CatalogProduct; quote: CatalogQuote | null; quoteError: string; onChange: () => void }) {
-  return <aside className="new-project-order-summary"><span className="new-project-order-summary__eyebrow">Sua escolha</span><div className={`new-project-order-summary__mark${product.imageUrl ? ' has-image' : ''}`} style={{ background: categoryAccent[product.category] || '#d7ff70' }}>{product.imageUrl ? <img src={product.imageUrl} alt="" onError={(event) => { event.currentTarget.style.display = 'none' }} /> : product.code}</div><small>{product.category}{product.subcategory ? ` · ${product.subcategory}` : ''}</small><h2>{product.name}</h2><p>{product.description}</p><button type="button" onClick={onChange}>Trocar serviço</button><div className="new-project-order-summary__quote"><span><Paperclip size={15} /> Estimativa</span><strong>{quote ? `${formatCredits(quote.totalCredits)} créditos` : 'Calculando...'}</strong><small><Clock3 size={14} /> {quote ? `${formatCredits(quote.slaHours)} horas úteis` : `${formatCredits(product.slaHours)} horas base`}</small>{quoteError && <em>{quoteError}</em>}</div></aside>
+  return <aside className="new-project-order-summary"><span className="new-project-order-summary__eyebrow">Sua escolha</span><div className={`new-project-order-summary__mark${product.imageUrl ? ' has-image' : ''}`} style={{ background: categoryAccent[product.category] || '#d7ff70' }}>{product.imageUrl ? <img src={product.imageUrl} alt="" onError={(event) => { event.currentTarget.style.display = 'none' }} /> : product.code}</div><small>{product.category}{product.subcategory ? ` · ${product.subcategory}` : ''}</small><h2>{product.name}</h2><p>{product.description}</p><button type="button" onClick={onChange}>Trocar serviço</button><div className="new-project-order-summary__quote"><span><Paperclip size={15} /> Estimativa</span><strong>{quote ? `${formatCredits(quote.totalCredits)} créditos` : 'Calculando...'}</strong><small><Clock3 size={14} /> {quote ? `${formatCredits(quote.slaHours)} horas úteis` : `${formatCredits(product.slaHours)} horas base`}</small>{Boolean(quote?.breakdown?.conceptVisual) && <small style={{ color: '#e11d48', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4 }}><Sparkles size={12} /> Inclui Conceito Visual (+3 créditos)</small>}{quoteError && <em>{quoteError}</em>}</div></aside>
 }
 
 function ScopeCounter({ label, value, minimum = 0, onDecrease, onIncrease, disableIncrease = false }: { label: string; value: number; minimum?: number; onDecrease: () => void; onIncrease: () => void; disableIncrease?: boolean }) {

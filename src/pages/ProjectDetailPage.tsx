@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useParams } from 'react-router-dom'
-import { ChevronDown, ChevronUp, Circle, Download, ExternalLink, FileText, Image as ImageIcon, Layers3, MessageSquareText, Pencil, Play, Plus, Upload } from 'lucide-react'
+import { ChevronDown, ChevronUp, Circle, Download, ExternalLink, FileText, Image as ImageIcon, Layers3, Lock, MessageSquareText, Pencil, Play, Plus, Upload } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
 import { DesignReviewModal, type ReviewCollectionItem, type ReviewOrigin } from '../components/DesignReviewModal'
@@ -606,9 +606,15 @@ export function ProjectDetailPage() {
                     <div className="project-task-stack-index"><span>{index + 1}</span>{index < projectTasks.length - 1 && <i />}</div>
                     <div className="project-task-stack-card">
                       <header>
-                        <div className="project-task-stack-title"><span><Layers3 size={14} /> Tarefa #{task.publicId}</span><h3>{task.title}</h3><p>{task.team} · prazo estimado de {task.deadlineDays || 2} dias úteis</p></div>
+                        <div className="project-task-stack-title"><span><Layers3 size={14} /> Tarefa #{task.publicId}</span><h3>{task.title}</h3><p>{task.team} · prazo estimado de {task.deadlineDays || 2} dias úteis{task.status === 'Bloqueada' || task.dependencyBlocked ? ' · Bloqueada por dependência' : ''}</p></div>
                         <span className={`project-task-status project-task-status--${task.status.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '')}`}>{task.status}</span>
                       </header>
+                      {(task.status === 'Bloqueada' || task.dependencyBlocked) && (
+                        <div className="project-task-dependency-note">
+                          <Lock size={12} />
+                          <span>Esta tarefa está bloqueada e só iniciará após a conclusão e aprovação da etapa anterior.</span>
+                        </div>
+                      )}
                       <p className="project-task-summary">{task.briefing?.objective || task.briefing?.overview || 'Briefing herdado do projeto.'}</p>
                       <footer>
                         <button type="button" onClick={() => setExpandedTaskId(expanded ? null : task.id)}>{expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}{expanded ? 'Ocultar briefing' : 'Ver briefing'}</button>
