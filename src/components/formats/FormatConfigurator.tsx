@@ -74,17 +74,6 @@ export function FormatConfigurator(props: FormatConfiguratorProps) {
     ]
   }, [formatDefinition])
 
-  // Group configured formats by channel for the left sidebar
-  const groupedFormats = useMemo(() => {
-    const groups: Record<string, ConfiguredFormatItem[]> = {}
-    props.configuredFormats.forEach((item) => {
-      const ch = item.channel || 'Outros'
-      if (!groups[ch]) groups[ch] = []
-      groups[ch].push(item)
-    })
-    return groups
-  }, [props.configuredFormats])
-
   const handleSelectProportion = (prop: FormatProportion) => {
     if (!activeFormat) return
     props.onUpdateFormat(activeFormat.id, {
@@ -115,13 +104,25 @@ export function FormatConfigurator(props: FormatConfiguratorProps) {
 
   return (
     <div className="format-configurator">
-      {/* LEFT COLUMN: LIST OF FORMATS */}
+      {/* TOP TRAY: SELECTED FORMATS */}
       <aside className="format-configurator__sidebar">
         <div className="format-configurator__sidebar-header">
-          <h3>Formatos</h3>
-          <span className="format-configurator__counter-pill">
-            {props.configuredFormats.length}
-          </span>
+          <div className="format-configurator__sidebar-title">
+            <div>
+              <h3>Formatos selecionados</h3>
+              <span className="format-configurator__counter-pill">
+                {props.configuredFormats.length}
+              </span>
+            </div>
+            <p>Escolha uma peça para configurar os detalhes.</p>
+          </div>
+          <button
+            type="button"
+            className="format-configurator__add-format-btn"
+            onClick={props.onOpenAddModal}
+          >
+            <Plus size={16} /> Adicionar formato
+          </button>
         </div>
 
         <div className="format-configurator__list">
@@ -131,76 +132,60 @@ export function FormatConfigurator(props: FormatConfiguratorProps) {
               <small>Adicione formatos para compor o seu pedido.</small>
             </div>
           ) : (
-            Object.entries(groupedFormats).map(([channel, items]) => (
-              <div key={channel} className="format-sidebar-group">
-                <span className="format-sidebar-group__channel-title">{channel.toUpperCase()}</span>
-                <div className="format-sidebar-group__items">
-                  {items.map((item) => {
-                    const isActive = activeFormat?.id === item.id
-                    return (
-                      <div
-                        key={item.id}
-                        className={`format-sidebar-item ${isActive ? 'is-active' : ''} ${item.isPrincipal ? 'is-principal' : ''}`}
-                        onClick={() => props.onSelectFormat(item.id)}
+            props.configuredFormats.map((item) => {
+              const isActive = activeFormat?.id === item.id
+              return (
+                <div
+                  key={item.id}
+                  className={`format-sidebar-item ${isActive ? 'is-active' : ''} ${item.isPrincipal ? 'is-principal' : ''}`}
+                  onClick={() => props.onSelectFormat(item.id)}
+                >
+                  <div className="format-sidebar-item__icon">
+                    <ChannelBadgeIcon channel={item.channel} size={20} />
+                  </div>
+
+                  <div className="format-sidebar-item__body">
+                    <span className="format-sidebar-item__channel">{item.channel}</span>
+                    <div className="format-sidebar-item__name-row">
+                      <span className="format-sidebar-item__name">{item.formatName}</span>
+                      {item.isPrincipal && (
+                        <span className="format-sidebar-item__badge-principal">Principal</span>
+                      )}
+                    </div>
+                    <span
+                      className={`format-sidebar-item__dimension ${!item.dimension ? 'is-missing' : ''}`}
+                    >
+                      {item.dimension || 'Não definido'}
+                    </span>
+                  </div>
+
+                  <div className="format-sidebar-item__actions">
+                    {isActive ? (
+                      <span className="format-sidebar-item__edit-indicator" title="Em edição">
+                        <Pencil size={15} />
+                      </span>
+                    ) : !item.isPrincipal ? (
+                      <button
+                        type="button"
+                        className="format-sidebar-item__remove-btn"
+                        title="Remover formato"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          props.onRemoveFormat(item.id)
+                        }}
                       >
-                        <div className="format-sidebar-item__icon">
-                          <ChannelBadgeIcon channel={item.channel} size={20} />
-                        </div>
-
-                        <div className="format-sidebar-item__body">
-                          <div className="format-sidebar-item__name-row">
-                            <span className="format-sidebar-item__name">{item.formatName}</span>
-                            {item.isPrincipal && (
-                              <span className="format-sidebar-item__badge-principal">Principal</span>
-                            )}
-                          </div>
-                          <span
-                            className={`format-sidebar-item__dimension ${!item.dimension ? 'is-missing' : ''}`}
-                          >
-                            {item.dimension || 'Não definido'}
-                          </span>
-                        </div>
-
-                        <div className="format-sidebar-item__actions">
-                          {isActive ? (
-                            <span className="format-sidebar-item__edit-indicator" title="Em edição">
-                              <Pencil size={15} />
-                            </span>
-                          ) : !item.isPrincipal ? (
-                            <button
-                              type="button"
-                              className="format-sidebar-item__remove-btn"
-                              title="Remover formato"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                props.onRemoveFormat(item.id)
-                              }}
-                            >
-                              <X size={15} />
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    )
-                  })}
+                        <X size={15} />
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            ))
+              )
+            })
           )}
-        </div>
-
-        <div className="format-configurator__sidebar-footer">
-          <button
-            type="button"
-            className="format-configurator__add-format-btn"
-            onClick={props.onOpenAddModal}
-          >
-            <Plus size={16} /> Adicionar
-          </button>
         </div>
       </aside>
 
-      {/* RIGHT COLUMN: CONFIGURATION OF ACTIVE FORMAT */}
+      {/* FULL-WIDTH CONFIGURATION OF ACTIVE FORMAT */}
       <section className="format-configurator__content">
         {props.configuredFormats.length === 0 || !activeFormat ? (
           <div className="format-configurator__empty-content">
