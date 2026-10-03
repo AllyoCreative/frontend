@@ -177,6 +177,116 @@ function deliveryItemPlural(label: string) {
   return deliveryItemPlurals[label] || `${label}s`
 }
 
+function isVideoMediaUrl(url?: string | null): boolean {
+  if (!url) return false
+  const clean = url.split('?')[0].split('#')[0].toLowerCase()
+  if (
+    clean.endsWith('.mp4') ||
+    clean.endsWith('.webm') ||
+    clean.endsWith('.ogg') ||
+    clean.endsWith('.mov')
+  ) {
+    return true
+  }
+  const full = url.toLowerCase()
+  return (
+    full.includes('.mp4') ||
+    full.includes('.webm') ||
+    full.includes('/video/') ||
+    full.includes('format=mp4') ||
+    full.includes('ext=mp4')
+  )
+}
+
+function CatalogMediaPreview({
+  url,
+  priority = false,
+}: {
+  url?: string | null
+  priority?: boolean
+}) {
+  const [isInView, setIsInView] = useState(priority)
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [hasError, setHasError] = useState(false)
+  const containerRef = useRef<HTMLSpanElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  const isVideo = isVideoMediaUrl(url)
+
+  useEffect(() => {
+    if (priority || isInView || !containerRef.current) return
+    const el = containerRef.current
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setIsInView(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '350px 0px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [priority, isInView])
+
+  useEffect(() => {
+    if (!isVideo || !videoRef.current || !isInView) return
+    const el = videoRef.current
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          el.play().catch(() => {})
+        } else {
+          el.pause()
+        }
+      },
+      { threshold: 0.05 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [isVideo, isInView])
+
+  if (!url || hasError) return null
+
+  return (
+    <span ref={containerRef} className="catalog-media-wrap">
+      {isInView && (
+        isVideo ? (
+          <video
+            ref={videoRef}
+            src={url}
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="metadata"
+            disablePictureInPicture
+            disableRemotePlayback
+            aria-hidden="true"
+            className={`catalog-media-element${isLoaded ? ' is-ready' : ''}`}
+            onLoadedData={() => setIsLoaded(true)}
+            onError={() => setHasError(true)}
+          />
+        ) : (
+          <img
+            src={url}
+            alt=""
+            loading={priority ? 'eager' : 'lazy'}
+            decoding="async"
+            fetchPriority={priority ? 'high' : 'low'}
+            className={`catalog-media-element${isLoaded ? ' is-ready' : ''}`}
+            ref={(node) => {
+              if (node?.complete) setIsLoaded(true)
+            }}
+            onLoad={() => setIsLoaded(true)}
+            onError={() => setHasError(true)}
+          />
+        )
+      )}
+    </span>
+  )
+}
+
 export function NewProjectPage() {
   const navigate = useNavigate()
   const { addProject, notify } = useApp()
@@ -186,6 +296,8 @@ export function NewProjectPage() {
   const [filter, setFilter] = useState<string>('all')
   const [subfilter, setSubfilter] = useState<string>('')
   const [catalogSearch, setCatalogSearch] = useState('')
+  const [displayLimit, setDisplayLimit] = useState(24)
+  const loadMoreRef = useRef<HTMLDivElement>(null)
   const [selected, setSelected] = useState<CatalogProduct | null>(null)
   const [step, setStep] = useState<FlowStep>('catalog')
   const [scope, setScope] = useState<CatalogScope>({ quantity: 1, taskRepeats: 1, resizeCount: 0, variationCount: 0, characterCount: 1, addons: {} })
@@ -384,6 +496,27 @@ export function NewProjectPage() {
         .some((value) => String(value).toLocaleLowerCase('pt-BR').includes(query))
     })
   }, [catalogSearch, filter, subfilter, products])
+
+  useEffect(() => {
+    setDisplayLimit(24)
+  }, [filter, subfilter, catalogSearch])
+
+  useEffect(() => {
+    if (displayLimit >= visible.length || !loadMoreRef.current) return
+    const el = loadMoreRef.current
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setDisplayLimit((prev) => Math.min(visible.length, prev + 24))
+        }
+      },
+      { rootMargin: '400px 0px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [displayLimit, visible.length])
+
+  const paginatedVisible = useMemo(() => visible.slice(0, displayLimit), [visible, displayLimit])
   const briefReady = Boolean(name.trim() && objective && overview.trim().length >= 10 && projectGoal)
   const selectedFormats = useMemo(() => [
     ...selectedApplications.map((application) => `Aplicação: ${application}`),
@@ -637,7 +770,41 @@ export function NewProjectPage() {
         {!loaded && <div className="new-project-catalog-state">Carregando catálogo...</div>}
         {loaded && catalogError && <div className="new-project-catalog-state is-error"><strong>Catálogo indisponível</strong><span>{catalogError}</span><button className="secondary-button" onClick={() => window.location.reload()}>Tentar novamente</button></div>}
         {loaded && !catalogError && visible.length === 0 && <div className="new-project-catalog-state"><strong>Nenhum produto encontrado</strong><span>{catalogSearch ? `Não encontramos resultados para “${catalogSearch}”.` : 'Tente selecionar outra categoria.'}</span></div>}
-        <div className="new-project-services">{visible.map((product) => <button type="button" key={product.code} className="new-project-service" onClick={() => selectProduct(product)} aria-label={`${product.name}: ${product.description}`}><span className={`new-project-service__preview${product.imageUrl ? ' has-image' : ''}`} style={{ backgroundColor: categoryAccent[product.category] || '#d9d9d9' }}>{product.imageUrl && <img src={product.imageUrl} alt="" loading="lazy" onError={(event) => { event.currentTarget.style.display = 'none' }} />}</span><span className="new-project-service__body"><h2>{product.name}</h2><small>{product.category}{product.subcategory ? ` · ${product.subcategory}` : ''} · {formatCredits(product.credits.original)} cr. · {formatCredits(product.slaHours)}h úteis</small></span></button>)}</div>
+        <div className="new-project-services">
+          {paginatedVisible.map((product, index) => (
+            <button
+              type="button"
+              key={product.code}
+              className="new-project-service"
+              onClick={() => selectProduct(product)}
+              aria-label={`${product.name}: ${product.description}`}
+            >
+              <span
+                className={`new-project-service__preview${product.imageUrl ? ' has-image' : ''}`}
+                style={{ backgroundColor: categoryAccent[product.category] || '#d9d9d9' }}
+              >
+                <CatalogMediaPreview url={product.imageUrl} priority={index < 6} />
+              </span>
+              <span className="new-project-service__body">
+                <h2>{product.name}</h2>
+                <small>
+                  {product.category}{product.subcategory ? ` · ${product.subcategory}` : ''} · {formatCredits(product.credits.original)} cr. · {formatCredits(product.slaHours)}h úteis
+                </small>
+              </span>
+            </button>
+          ))}
+          {visible.length > displayLimit && (
+            <div ref={loadMoreRef} className="new-project-catalog-load-more">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setDisplayLimit((current) => current + 24)}
+              >
+                Carregar mais serviços ({visible.length - displayLimit} restantes)
+              </button>
+            </div>
+          )}
+        </div>
       </main> : selected && <main className="new-project-flow">
         <section className="new-project-flow__main">
           {step === 'brief' && <BriefStep selected={selected} name={name} objective={objective} overview={overview} projectGoal={projectGoal} audience={audience} tone={tone} notApplicable={notApplicable} creativePath={creativePath} referenceFiles={referenceFiles} referenceLinks={referenceLinks} linkDraft={linkDraft} setName={setName} setObjective={setObjective} setOverview={setOverview} setProjectGoal={setProjectGoal} setAudience={setAudience} setTone={setTone} setNotApplicable={setNotApplicable} setCreativePath={setCreativePath} setLinkDraft={setLinkDraft} addReferenceLink={addReferenceLink} addReferenceFiles={addReferenceFiles} removeFile={(index) => setReferenceFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} removeLink={(link) => setReferenceLinks((current) => current.filter((item) => item !== link))} onPreviewFile={(file) => setPreviewFile({ name: file.name, file, sizeBytes: file.size, contentType: file.type })} onCancel={() => setStep('catalog')} onNext={() => setStep('configure')} ready={briefReady} />}
@@ -1305,7 +1472,29 @@ function FlowFooter({ children }: { children: React.ReactNode }) {
 }
 
 function ProductSummary({ product, quote, quoteError, onChange }: { product: CatalogProduct; quote: CatalogQuote | null; quoteError: string; onChange: () => void }) {
-  return <aside className="new-project-order-summary"><span className="new-project-order-summary__eyebrow">Sua escolha</span><div className={`new-project-order-summary__mark${product.imageUrl ? ' has-image' : ''}`} style={{ background: categoryAccent[product.category] || '#d7ff70' }}>{product.imageUrl ? <img src={product.imageUrl} alt="" onError={(event) => { event.currentTarget.style.display = 'none' }} /> : product.code}</div><small>{product.category}{product.subcategory ? ` · ${product.subcategory}` : ''}</small><h2>{product.name}</h2><p>{product.description}</p><button type="button" onClick={onChange}>Trocar serviço</button><div className="new-project-order-summary__quote"><span><Paperclip size={15} /> Estimativa</span><strong>{quote ? `${formatCredits(quote.totalCredits)} créditos` : 'Calculando...'}</strong><small><Clock3 size={14} /> {quote ? `${formatCredits(quote.slaHours)} horas úteis` : `${formatCredits(product.slaHours)} horas base`}</small>{Boolean(quote?.breakdown?.conceptVisual) && <small style={{ color: '#d7ff70', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4 }}><Sparkles size={12} /> Inclui Conceito Visual (+3 créditos)</small>}{quoteError && <em>{quoteError}</em>}</div></aside>
+  return <aside className="new-project-order-summary">
+    <span className="new-project-order-summary__eyebrow">Sua escolha</span>
+    <div className={`new-project-order-summary__mark${product.imageUrl ? ' has-image' : ''}`} style={{ background: categoryAccent[product.category] || '#d7ff70' }}>
+      {product.imageUrl ? (
+        isVideoMediaUrl(product.imageUrl) ? (
+          <video src={product.imageUrl} autoPlay loop muted playsInline aria-hidden="true" />
+        ) : (
+          <img src={product.imageUrl} alt="" onError={(event) => { event.currentTarget.style.display = 'none' }} />
+        )
+      ) : product.code}
+    </div>
+    <small>{product.category}{product.subcategory ? ` · ${product.subcategory}` : ''}</small>
+    <h2>{product.name}</h2>
+    <p>{product.description}</p>
+    <button type="button" onClick={onChange}>Trocar serviço</button>
+    <div className="new-project-order-summary__quote">
+      <span><Paperclip size={15} /> Estimativa</span>
+      <strong>{quote ? `${formatCredits(quote.totalCredits)} créditos` : 'Calculando...'}</strong>
+      <small><Clock3 size={14} /> {quote ? `${formatCredits(quote.slaHours)} horas úteis` : `${formatCredits(product.slaHours)} horas base`}</small>
+      {Boolean(quote?.breakdown?.conceptVisual) && <small style={{ color: '#d7ff70', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4 }}><Sparkles size={12} /> Inclui Conceito Visual (+3 créditos)</small>}
+      {quoteError && <em>{quoteError}</em>}
+    </div>
+  </aside>
 }
 
 function ScopeCounter({ label, value, minimum = 0, onDecrease, onIncrease, disableIncrease = false }: { label: string; value: number; minimum?: number; onDecrease: () => void; onIncrease: () => void; disableIncrease?: boolean }) {
