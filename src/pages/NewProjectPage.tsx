@@ -1035,7 +1035,7 @@ export function NewProjectPage() {
                 <h2 id="credit-modal-title">{hasInsufficientCredits ? 'Saldo insuficiente' : 'Comprar créditos extras'}</h2>
                 <p id="credit-modal-description">
                   {hasInsufficientCredits
-                    ? `Faltam ${formatCredits(missingCredits)} créditos para confirmar o envio. Escolha um plano e continue sem perder o briefing.`
+                    ? 'Adicione créditos para confirmar o envio sem perder o briefing.'
                     : 'Adicione mais créditos ao seu saldo escolhendo um dos planos disponíveis.'}
                 </p>
               </span>
