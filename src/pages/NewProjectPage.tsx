@@ -470,14 +470,15 @@ export function NewProjectPage() {
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
-      if (step === 'review') setStep('configure')
+      if (showCreditModal) setShowCreditModal(false)
+      else if (step === 'review') setStep('configure')
       else if (step === 'configure') setStep('brief')
       else if (step === 'brief') setStep('catalog')
       else navigate(-1)
     }
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
-  }, [navigate, step])
+  }, [navigate, showCreditModal, step])
 
   useEffect(() => {
     const dialog = document.querySelector<HTMLElement>('.new-project-dialog')
@@ -730,7 +731,6 @@ export function NewProjectPage() {
     }
 
     if (hasInsufficientCredits) {
-      notify(`Saldo insuficiente (${creditsAvailable} de ${requiredCredits} créditos). Escolha um plano de créditos para continuar.`)
       setShowCreditModal(true)
       return
     }
@@ -985,11 +985,6 @@ export function NewProjectPage() {
               onSubmit={() => void submit()}
               onPreviewFile={(file) => setPreviewFile({ name: file.name, file, sizeBytes: file.size, contentType: file.type })}
               configuredFormats={configuredFormats}
-              creditsAvailable={creditsAvailable}
-              requiredCredits={requiredCredits}
-              hasInsufficientCredits={hasInsufficientCredits}
-              missingCredits={missingCredits}
-              onOpenCreditModal={() => setShowCreditModal(true)}
               submitError={submitError}
               briefReady={briefReady}
             />
@@ -1000,10 +995,6 @@ export function NewProjectPage() {
           quote={quote}
           quoteError={quoteError}
           onChange={() => setStep('catalog')}
-          creditsAvailable={creditsAvailable}
-          requiredCredits={requiredCredits}
-          hasInsufficientCredits={hasInsufficientCredits}
-          onOpenCreditModal={() => setShowCreditModal(true)}
         />
       </main>}
     </section>
@@ -1029,22 +1020,23 @@ export function NewProjectPage() {
     )}
     {showCreditModal && createPortal(
       <div
-        className="account-modal account-modal--credits"
+        className={`account-modal account-modal--credits${hasInsufficientCredits ? ' is-insufficient' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="credit-modal-title"
+        aria-describedby="credit-modal-description"
         onMouseDown={(event) => { if (event.target === event.currentTarget) setShowCreditModal(false) }}
       >
         <div>
           <header>
             <div>
-              <Sparkles size={22} />
+              {hasInsufficientCredits ? <AlertTriangle size={22} /> : <Sparkles size={22} />}
               <span>
-                <h2 id="credit-modal-title">Comprar créditos extras</h2>
-                <p>
+                <h2 id="credit-modal-title">{hasInsufficientCredits ? 'Saldo insuficiente' : 'Comprar créditos extras'}</h2>
+                <p id="credit-modal-description">
                   {hasInsufficientCredits
-                    ? `Seu projeto requer ${requiredCredits} créditos (saldo atual: ${creditsAvailable}). Escolha um dos 3 planos abaixo para liberar o envio:`
-                    : 'Adicione mais créditos ao seu saldo instantaneamente através de um dos 3 planos disponíveis:'}
+                    ? `Faltam ${formatCredits(missingCredits)} créditos para confirmar o envio. Escolha um plano e continue sem perder o briefing.`
+                    : 'Adicione mais créditos ao seu saldo escolhendo um dos planos disponíveis.'}
                 </p>
               </span>
             </div>
@@ -1059,7 +1051,7 @@ export function NewProjectPage() {
               <div>
                 <span>Saldo disponível: <strong>{creditsAvailable} créditos</strong></span>
                 <span>Necessário para este projeto: <strong>{requiredCredits} créditos</strong></span>
-                <span className="diff">Faltam: <strong>{missingCredits.toFixed(missingCredits % 1 === 0 ? 0 : 1)} créditos</strong></span>
+                <span className="diff">Faltam: <strong>{formatCredits(missingCredits)} créditos</strong></span>
               </div>
             </div>
           )}
@@ -1558,11 +1550,6 @@ interface ReviewStepProps {
   quote: CatalogQuote | null; deliveryConfig: DeliveryConfig | null; deliveryItems: ProjectDeliveryItem[]; submitting: boolean; onBack: () => void; onEditBrief: () => void; onSubmit: () => void
   onPreviewFile?: (file: File) => void
   configuredFormats?: ConfiguredFormatItem[]
-  creditsAvailable: number
-  requiredCredits: number
-  hasInsufficientCredits: boolean
-  missingCredits: number
-  onOpenCreditModal: () => void
   submitError?: string
   briefReady?: boolean
 }
@@ -1645,32 +1632,6 @@ function ReviewStep(props: ReviewStepProps) {
         >
           Completar briefing
         </button>
-      </div>
-    )}
-    {props.hasInsufficientCredits && (
-      <div className="new-project-credit-alert">
-        <div className="new-project-credit-alert__icon">
-          <AlertTriangle size={24} />
-        </div>
-        <div className="new-project-credit-alert__content">
-          <div className="new-project-credit-alert__header">
-            <h3>Saldo de créditos insuficiente para enviar este projeto</h3>
-            <span className="new-project-credit-alert__badge">Ação necessária</span>
-          </div>
-          <p>
-            Você possui <strong>{props.creditsAvailable} crédito{props.creditsAvailable === 1 ? '' : 's'}</strong> disponível{props.creditsAvailable === 1 ? '' : 'is'}, mas esta solicitação requer <strong>{props.requiredCredits} créditos</strong>. Faltam <strong>{props.missingCredits.toFixed(props.missingCredits % 1 === 0 ? 0 : 1)} créditos</strong> para viabilizar este projeto.
-          </p>
-          <div className="new-project-credit-alert__footer">
-            <button
-              type="button"
-              className="primary-button new-project-credit-alert__button"
-              onClick={props.onOpenCreditModal}
-            >
-              <Sparkles size={16} /> Ver 3 planos de créditos
-            </button>
-            <small>Adquira mais créditos sem perder os dados e configurações do seu briefing.</small>
-          </div>
-        </div>
       </div>
     )}
     <div className="new-project-review-block">
@@ -1762,32 +1723,22 @@ function ReviewStep(props: ReviewStepProps) {
       <button type="button" className="secondary-button" onClick={props.onBack}>
         <ArrowLeft size={15} /> Voltar
       </button>
-      {props.hasInsufficientCredits ? (
-        <button
-          type="button"
-          className="primary-button primary-button--insufficient"
-          onClick={props.onOpenCreditModal}
-        >
-          <AlertTriangle size={15} /> Saldo insuficiente · Comprar créditos
-        </button>
-      ) : (
-        <button
-          type="button"
-          className="primary-button"
-          disabled={!props.quote || props.submitting}
-          onClick={props.onSubmit}
-        >
-          {props.submitting ? (
-            <>
-              <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> Enviando projeto...
-            </>
-          ) : (
-            <>
-              Enviar projeto <ArrowRight size={15} />
-            </>
-          )}
-        </button>
-      )}
+      <button
+        type="button"
+        className="primary-button"
+        disabled={!props.quote || props.submitting}
+        onClick={props.onSubmit}
+      >
+        {props.submitting ? (
+          <>
+            <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> Enviando projeto...
+          </>
+        ) : (
+          <>
+            Confirmar e enviar <ArrowRight size={15} />
+          </>
+        )}
+      </button>
     </FlowFooter>
   </>
 }
@@ -1809,10 +1760,6 @@ interface ProductSummaryProps {
   quote: CatalogQuote | null
   quoteError: string
   onChange: () => void
-  creditsAvailable?: number
-  requiredCredits?: number
-  hasInsufficientCredits?: boolean
-  onOpenCreditModal?: () => void
 }
 
 function ProductSummary({
@@ -1820,10 +1767,6 @@ function ProductSummary({
   quote,
   quoteError,
   onChange,
-  creditsAvailable = 0,
-  requiredCredits = 0,
-  hasInsufficientCredits = false,
-  onOpenCreditModal,
 }: ProductSummaryProps) {
   return <aside className="new-project-order-summary">
     <span className="new-project-order-summary__eyebrow">Sua escolha</span>
@@ -1846,23 +1789,6 @@ function ProductSummary({
       <small><Clock3 size={14} /> {quote ? `${formatCredits(quote.slaHours)} horas úteis` : `${formatCredits(product.slaHours)} horas base`}</small>
       {Boolean(quote?.breakdown?.conceptVisual) && <small style={{ color: '#d7ff70', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4 }}><Sparkles size={12} /> Inclui Conceito Visual (+3 créditos)</small>}
       {quoteError && <em>{quoteError}</em>}
-
-      {hasInsufficientCredits && (
-        <div className="order-summary-credits-warning">
-          <div className="order-summary-credits-warning__header">
-            <AlertTriangle size={13} />
-            <span>Saldo insuficiente</span>
-          </div>
-          <p>
-            Disponível: <strong>{creditsAvailable}</strong> · Requer: <strong>{requiredCredits}</strong>
-          </p>
-          {onOpenCreditModal && (
-            <button type="button" onClick={onOpenCreditModal}>
-              <Sparkles size={12} /> Comprar créditos
-            </button>
-          )}
-        </div>
-      )}
     </div>
   </aside>
 }
