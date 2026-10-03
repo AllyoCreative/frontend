@@ -181,29 +181,51 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
       }
     }
 
+    const handleCreditsUpdated = (payload: SocketEventPayload) => {
+      if (payload.data?.creditsAvailable !== undefined) {
+        setWorkspace((current) => current ? { ...current, credits: payload.data.creditsAvailable } : current)
+        setAccount((current) => current ? {
+          ...current,
+          workspace: {
+            ...current.workspace,
+            creditsAvailable: payload.data.creditsAvailable,
+            creditsUsed: payload.data.creditsUsed ?? current.workspace.creditsUsed,
+          },
+          creditTransactions: payload.data.transaction
+            ? [payload.data.transaction, ...(current.creditTransactions || [])]
+            : current.creditTransactions,
+        } : current)
+      } else {
+        void refreshAccount()
+      }
+    }
+
     socket.on('STATUS_UPDATED', handleStatusUpdate)
     socket.on('TEAM_ASSIGNED', handleTeamAssigned)
     socket.on('PROJECT_DELETED', handleProjectDeleted)
+    socket.on('CREDITS_UPDATED', handleCreditsUpdated)
 
     return () => {
       isMounted = false
       socket.off('STATUS_UPDATED', handleStatusUpdate)
       socket.off('TEAM_ASSIGNED', handleTeamAssigned)
       socket.off('PROJECT_DELETED', handleProjectDeleted)
+      socket.off('CREDITS_UPDATED', handleCreditsUpdated)
     }
-  }, [notify, logout])
+  }, [notify, logout, refreshAccount])
 
   const addProject = useCallback(async (projectData: Partial<Project> & ProjectBriefingInput) => {
     try {
       const created = await api.createProject(projectData)
       setProjects((current) => [created, ...current])
+      void refreshAccount()
       notify('Projeto criado com sucesso!')
       return created
     } catch (error: unknown) {
       notify(error instanceof Error ? error.message : 'Não foi possível criar o projeto')
       throw error
     }
-  }, [notify])
+  }, [notify, refreshAccount])
 
   const updateProfile = useCallback(async (data: ProfileUpdate) => {
     try {
@@ -257,13 +279,14 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
           }
         })
       )
+      void refreshAccount()
       notify('Tarefa criada com sucesso!')
       return task
     } catch (error) {
       notify('Erro ao criar tarefa')
       throw error
     }
-  }, [notify])
+  }, [notify, refreshAccount])
 
   const toggleTaskStatus = useCallback(async (projectId: string, taskId: string, currentStatus: string) => {
     const nextStatus: ProjectTask['status'] = currentStatus === 'A iniciar'
