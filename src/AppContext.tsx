@@ -182,17 +182,18 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
     }
 
     const handleCreditsUpdated = (payload: SocketEventPayload) => {
-      if (payload.data?.creditsAvailable !== undefined) {
-        setWorkspace((current) => current ? { ...current, credits: payload.data.creditsAvailable } : current)
+      const data = payload.data as { creditsAvailable?: number; creditsUsed?: number; transaction?: any } | undefined
+      if (data?.creditsAvailable !== undefined) {
+        setWorkspace((current) => current ? { ...current, credits: data.creditsAvailable } : current)
         setAccount((current) => current ? {
           ...current,
           workspace: {
             ...current.workspace,
-            creditsAvailable: payload.data.creditsAvailable,
-            creditsUsed: payload.data.creditsUsed ?? current.workspace.creditsUsed,
+            creditsAvailable: data.creditsAvailable!,
+            creditsUsed: data.creditsUsed ?? current.workspace.creditsUsed,
           },
-          creditTransactions: payload.data.transaction
-            ? [payload.data.transaction, ...(current.creditTransactions || [])]
+          creditTransactions: data.transaction
+            ? [data.transaction, ...(current.creditTransactions || [])]
             : current.creditTransactions,
         } : current)
       } else {
@@ -382,4 +383,15 @@ export function useApp() {
   const context = useContext(AppContext)
   if (!context) throw new Error('useApp must be used inside AppProvider')
   return context
+}
+
+export function GlobalToast() {
+  const { toast } = useApp()
+  if (!toast) return null
+  return (
+    <div className="toast" role="status">
+      <span>✓</span>
+      {toast.message}
+    </div>
+  )
 }

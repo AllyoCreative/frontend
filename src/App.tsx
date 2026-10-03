@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useState } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { AppProvider } from './AppContext'
+import { AppProvider, GlobalToast } from './AppContext'
 import { AppShell } from './components/AppShell'
 import { Logo } from './components/Logo'
 import { canAccessBrandBrain } from './config/productAccess'
@@ -37,8 +37,16 @@ export default function App() {
   if (!authenticated) return <LoginPage onAuthenticated={login} />
 
   return <>
-    <AppProvider onLogout={logout}><Suspense fallback={<LoadingScreen />}>
-      {location.pathname === '/novo-projeto' ? <Routes><Route path="/novo-projeto" element={<NewProjectPage />} /><Route path="*" element={<Navigate to="/novo-projeto" replace />} /></Routes> : <AppShell><Routes>
+    <AppProvider onLogout={logout}>
+      <Suspense fallback={<LoadingScreen />}>
+        {location.pathname === '/novo-projeto' ? (
+          <Routes>
+            <Route path="/novo-projeto" element={<NewProjectPage />} />
+            <Route path="*" element={<Navigate to="/novo-projeto" replace />} />
+          </Routes>
+        ) : (
+          <AppShell>
+            <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/projetos" element={<ProjectsPage />} />
         <Route path="/projetos/:id" element={<ProjectDetailPage />} />
@@ -47,9 +55,12 @@ export default function App() {
         {canAccessBrandBrain && <Route path="/brand-brain" element={<BrandBrainPage />} />}
         <Route path="/conta" element={<AccountPage onLogout={logout} />} />
         <Route path="/perfil" element={<ProfilePage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes></AppShell>}
-    </Suspense></AppProvider>
+              </Routes>
+            </AppShell>
+          )}
+      </Suspense>
+      <GlobalToast />
+    </AppProvider>
 
     {revealingPlatform && (
       <div

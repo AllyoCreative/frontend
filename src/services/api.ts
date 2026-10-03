@@ -339,6 +339,18 @@ export function clearAuthToken() {
   localStorage.removeItem('allyo-demo-auth')
 }
 
+export class ApiError extends Error {
+  status: number
+  data?: any
+
+  constructor(message: string, status: number, data?: any) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.data = data
+  }
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken()
   const headers = new Headers(options.headers || {})
@@ -354,7 +366,8 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: 'Erro de comunicação com o servidor' }))
-    throw new Error(errorData.error || `HTTP ${response.status}`)
+    const message = errorData.message || errorData.error || `HTTP ${response.status}`
+    throw new ApiError(message, response.status, errorData)
   }
 
   return response.json()

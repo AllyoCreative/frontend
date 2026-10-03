@@ -20,7 +20,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [brandKitOpen, setBrandKitOpen] = useState(() => window.location.pathname === '/brand-kit')
   const navigate = useNavigate()
   const location = useLocation()
-  const { toast, projects, currentUser, members, brands, notify } = useApp()
+  const { projects, currentUser, members, brands, notify } = useApp()
   const isHome = location.pathname === '/'
 
   const go = (path: string) => {
@@ -147,7 +147,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <main className="app-main">{children}</main>
-      {toast && <div className="toast" role="status"><span>✓</span>{toast.message}</div>}
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, ExternalLink, FileOutput, FileText, Layers3, Link2, Maximize2, Minus, PaintBucket, Paperclip, PenTool, Pencil, Plus, Search, ShoppingBag, Sparkles, Upload, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, ExternalLink, FileOutput, FileText, Layers3, Link2, Loader2, Maximize2, Minus, PaintBucket, Paperclip, PenTool, Pencil, Plus, Search, Sparkles, Upload, X } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
 import { isConceptVisualEligible } from '../config/creativePathConfig'
@@ -325,7 +325,7 @@ export function NewProjectPage() {
   }, [account, refreshAccount])
 
   const creditsAvailable = account?.workspace?.creditsAvailable ?? 0
-  const requiredCredits = quote?.totalCredits ?? (selected?.creditsOriginal ?? 1)
+  const requiredCredits = quote?.totalCredits ?? (selected?.credits.original ?? 1)
   const hasInsufficientCredits = Boolean(quote && creditsAvailable < requiredCredits)
   const missingCredits = Math.max(0, requiredCredits - creditsAvailable)
 
@@ -350,6 +350,7 @@ export function NewProjectPage() {
     }
   }
   const [name, setName] = useState('')
+  const [submitError, setSubmitError] = useState('')
   const [objective, setObjective] = useState('')
   const [overview, setOverview] = useState('')
   const [projectGoal, setProjectGoal] = useState(goals[0])
@@ -690,7 +691,43 @@ export function NewProjectPage() {
   }
 
   const submit = async () => {
-    if (!selected || !briefReady || !quote || submitting) return
+    if (submitting) return
+    setSubmitError('')
+
+    if (!selected) {
+      notify('Selecione um serviço no catálogo antes de continuar.')
+      setStep('catalog')
+      return
+    }
+
+    if (!name.trim()) {
+      notify('Por favor, informe o nome do projeto no briefing.')
+      setSubmitError('Informe o nome do projeto no briefing para prosseguir.')
+      setStep('brief')
+      return
+    }
+
+    if (name.trim().length < 2) {
+      notify('O nome do projeto deve ter no mínimo 2 caracteres.')
+      setSubmitError('O nome do projeto deve ter no mínimo 2 caracteres.')
+      setStep('brief')
+      return
+    }
+
+    if (!overview.trim() || overview.trim().length < 10) {
+      notify('Descreva o que precisa ser criado no briefing (mínimo de 10 caracteres).')
+      setSubmitError('A descrição do projeto precisa ter no mínimo 10 caracteres.')
+      setStep('brief')
+      return
+    }
+
+    const effectiveObjective = objective || (selected ? workOptionsFor(selected)[0] : 'Criar projeto')
+    const effectiveProjectGoal = projectGoal || goals[0] || 'Conversão direta'
+
+    if (!quote) {
+      notify('Calculando os créditos da solicitação. Aguarde um instante...')
+      return
+    }
 
     if (hasInsufficientCredits) {
       notify(`Saldo insuficiente (${creditsAvailable} de ${requiredCredits} créditos). Escolha um plano de créditos para continuar.`)
@@ -707,12 +744,26 @@ export function NewProjectPage() {
 
     try {
       const created = await addProject({
-        name: name.trim(), service: selected.name, status: 'Em andamento', deadline: 'A definir', progress: 8,
-        tasks: scope.taskRepeats + Object.values(scope.addons).filter((quantity) => quantity > 0).length, unread: 0,
-        accent: categoryAccent[selected.category] || '#d7ff70', team: [], description: overview.trim(), objective, overview: overview.trim(), projectGoal,
+        name: name.trim(),
+        service: selected.name,
+        status: 'Em andamento',
+        deadline: 'A definir',
+        progress: 8,
+        tasks: scope.taskRepeats + Object.values(scope.addons).filter((quantity) => quantity > 0).length,
+        unread: 0,
+        accent: categoryAccent[selected.category] || '#d7ff70',
+        team: [],
+        description: overview.trim(),
+        objective: effectiveObjective,
+        overview: overview.trim(),
+        projectGoal: effectiveProjectGoal,
         audience: !notApplicable.audience ? audience.trim() : undefined,
         tone: !notApplicable.tone ? tone.trim() : undefined,
-        creativePath, referenceLinks, selectedFormats: finalSelectedFormats, catalogCode: selected.code, catalogScope: scope,
+        creativePath,
+        referenceLinks,
+        selectedFormats: finalSelectedFormats,
+        catalogCode: selected.code,
+        catalogScope: scope,
         deliverySchema: deliveryConfig ? {
           version: 1,
           taskType: deliveryConfig.taskType,
@@ -736,9 +787,21 @@ export function NewProjectPage() {
       if (failedUploads) notify(`Projeto criado, mas ${failedUploads} arquivo(s) não foram anexados.`)
       setStep('success')
     } catch (error: any) {
-      if (error?.status === 402 || error?.message?.includes('Créditos insuficientes') || error?.message?.includes('Saldo insuficiente')) {
-        notify(error?.message || 'Saldo de créditos insuficiente para criar este projeto.')
+      console.error('Erro ao enviar projeto:', error)
+      const message = error?.message || error?.data?.message || error?.data?.error || 'Erro ao criar o projeto'
+      setSubmitError(message)
+
+      const isCreditError = error?.status === 402 ||
+        error?.data?.statusCode === 402 ||
+        message.toLowerCase().includes('crédito') ||
+        message.toLowerCase().includes('saldo') ||
+        message.toLowerCase().includes('payment required')
+
+      if (isCreditError) {
+        notify(message || 'Saldo de créditos insuficiente para criar este projeto.')
         setShowCreditModal(true)
+      } else {
+        notify(message)
       }
     } finally {
       setSubmitting(false)
@@ -918,7 +981,7 @@ export function NewProjectPage() {
               deliveryItems={deliveryItems}
               submitting={submitting}
               onBack={() => setStep('configure')}
-              onEditBrief={() => setStep('brief')}
+              onEditBrief={() => { setSubmitError(''); setStep('brief') }}
               onSubmit={() => void submit()}
               onPreviewFile={(file) => setPreviewFile({ name: file.name, file, sizeBytes: file.size, contentType: file.type })}
               configuredFormats={configuredFormats}
@@ -927,6 +990,8 @@ export function NewProjectPage() {
               hasInsufficientCredits={hasInsufficientCredits}
               missingCredits={missingCredits}
               onOpenCreditModal={() => setShowCreditModal(true)}
+              submitError={submitError}
+              briefReady={briefReady}
             />
           )}
         </section>
@@ -1498,6 +1563,8 @@ interface ReviewStepProps {
   hasInsufficientCredits: boolean
   missingCredits: number
   onOpenCreditModal: () => void
+  submitError?: string
+  briefReady?: boolean
 }
 
 function ReviewStep(props: ReviewStepProps) {
@@ -1505,6 +1572,81 @@ function ReviewStep(props: ReviewStepProps) {
   const isEligible = isConceptVisualEligible(props.selected)
   return <>
     <FlowHeading eyebrow="Etapa 3 de 3" title="Revise antes de enviar" description="Você poderá complementar o briefing na conversa do projeto depois do envio." />
+    {props.submitError && (
+      <div className="new-project-submit-error" style={{
+        margin: '0 0 20px',
+        padding: '14px 16px',
+        borderRadius: 10,
+        background: '#fff1f1',
+        border: '1.5px solid #fecaca',
+        color: '#b91c1c',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        fontSize: 14,
+        fontWeight: 500,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <AlertTriangle size={18} style={{ flexShrink: 0 }} />
+          <span>{props.submitError}</span>
+        </div>
+        <button
+          type="button"
+          onClick={props.onEditBrief}
+          style={{
+            background: '#b91c1c',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 6,
+            padding: '6px 12px',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Corrigir briefing
+        </button>
+      </div>
+    )}
+    {!props.briefReady && !props.submitError && (
+      <div className="new-project-submit-warning" style={{
+        margin: '0 0 20px',
+        padding: '14px 16px',
+        borderRadius: 10,
+        background: '#fffbeb',
+        border: '1.5px solid #fef3c7',
+        color: '#92400e',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        fontSize: 14,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <AlertTriangle size={18} style={{ flexShrink: 0 }} />
+          <span>Informações obrigatórias do briefing estão incompletas (nome ou descrição do projeto).</span>
+        </div>
+        <button
+          type="button"
+          onClick={props.onEditBrief}
+          style={{
+            background: '#d97706',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 6,
+            padding: '6px 12px',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Completar briefing
+        </button>
+      </div>
+    )}
     {props.hasInsufficientCredits && (
       <div className="new-project-credit-alert">
         <div className="new-project-credit-alert__icon">
@@ -1635,7 +1777,15 @@ function ReviewStep(props: ReviewStepProps) {
           disabled={!props.quote || props.submitting}
           onClick={props.onSubmit}
         >
-          {props.submitting ? 'Enviando...' : 'Enviar projeto'} <ArrowRight size={15} />
+          {props.submitting ? (
+            <>
+              <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> Enviando projeto...
+            </>
+          ) : (
+            <>
+              Enviar projeto <ArrowRight size={15} />
+            </>
+          )}
         </button>
       )}
     </FlowFooter>
