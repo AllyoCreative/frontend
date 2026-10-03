@@ -869,6 +869,43 @@
   box-shadow: 0 0 0 2px rgba(0, 76, 70, 0.1);
 }
 
+/* Structured products (carousel, slides, scenes, pages, image sets) */
+.format-delivery-quantity {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 300px);
+  align-items: center;
+  gap: 18px;
+}
+
+.format-delivery-quantity > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.format-delivery-quantity p {
+  margin: 0;
+  color: #68726c;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.format-configurator .new-project-structured-delivery {
+  padding: 20px 22px;
+  border: 1px solid #e7e7e2;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+@media (max-width: 640px) {
+  .format-delivery-quantity {
+    grid-template-columns: 1fr;
+  }
+
+  .format-configurator .new-project-structured-delivery {
+    padding: 17px;
+  }
+}
+
 /* Delivery files */
 .format-delivery-files-grid {
   display: flex;

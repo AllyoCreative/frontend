@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import {
   AlertCircle,
   Check,
@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import { CHANNEL_FORMATS, STANDARD_ADDONS } from './channelData'
 import { ChannelBadgeIcon } from './ChannelIcons'
-import type { ConfiguredFormatItem, FormatProportion } from './formatTypes'
+import type { ChannelFormatOption, ConfiguredFormatItem, FormatProportion } from './formatTypes'
 
 interface FormatConfiguratorProps {
   configuredFormats: ConfiguredFormatItem[]
@@ -34,6 +34,9 @@ interface FormatConfiguratorProps {
   onSelectEditableFormat: (format: string) => void
   availableFinalFormats?: string[]
   availableEditableFormats?: string[]
+  formatOptions?: ChannelFormatOption[]
+  deliveryContent?: ReactNode
+  availableAddons?: Array<{ code: string; name: string; credits: number; description?: string }>
 }
 
 export function FormatConfigurator(props: FormatConfiguratorProps) {
@@ -54,13 +57,13 @@ export function FormatConfigurator(props: FormatConfiguratorProps) {
   const formatDefinition = useMemo(() => {
     if (!activeFormat) return null
     return (
-      CHANNEL_FORMATS.find(
+      (props.formatOptions || CHANNEL_FORMATS).find(
         (item) =>
           item.channel.toLowerCase() === activeFormat.channel.toLowerCase() &&
           item.name.toLowerCase() === activeFormat.formatName.toLowerCase()
       ) || null
     )
-  }, [activeFormat])
+  }, [activeFormat, props.formatOptions])
 
   const availableProportions = useMemo<FormatProportion[]>(() => {
     if (formatDefinition) {
@@ -102,10 +105,11 @@ export function FormatConfigurator(props: FormatConfiguratorProps) {
 
   const finalFormatsList = props.availableFinalFormats?.length ? props.availableFinalFormats : defaultExtensionOptions
   const editableFormatsList = props.availableEditableFormats?.length ? props.availableEditableFormats : defaultSoftwareOptions
+  const availableAddons = props.availableAddons ?? STANDARD_ADDONS
   const canConfigureAddons = Boolean(activeFormat?.isPrincipal)
   const visibleAddons = canConfigureAddons
-    ? STANDARD_ADDONS
-    : STANDARD_ADDONS.filter((addon) => Boolean(props.addons[addon.code] && props.addons[addon.code] > 0))
+    ? availableAddons
+    : availableAddons.filter((addon) => Boolean(props.addons[addon.code] && props.addons[addon.code] > 0))
 
   return (
     <div className="format-configurator">
@@ -232,7 +236,7 @@ export function FormatConfigurator(props: FormatConfiguratorProps) {
             )}
 
             {/* 2. ADICIONAIS ACCORDION */}
-            <div className="format-config-section format-addons-section">
+            {availableAddons.length > 0 && <div className="format-config-section format-addons-section">
               <header
                 className="format-config-section__header"
                 onClick={() => setAddonsOpen(!addonsOpen)}
@@ -295,7 +299,7 @@ export function FormatConfigurator(props: FormatConfiguratorProps) {
                   )}
                 </div>
               )}
-            </div>
+            </div>}
 
             {/* 3. CHANNEL SPECIFIC PROPORTIONS */}
             <div className="format-config-section">
@@ -426,6 +430,8 @@ export function FormatConfigurator(props: FormatConfiguratorProps) {
                 )}
               </div>
             </div>
+
+            {props.deliveryContent}
 
             {/* 5. DELIVERY FILES (SOFTWARE & EXTENSION) */}
             <div className="format-config-section">

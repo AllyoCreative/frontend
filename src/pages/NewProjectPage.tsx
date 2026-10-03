@@ -8,26 +8,76 @@ import { api, type CatalogProduct, type CatalogQuote, type CatalogScope, type Pr
 import { FilePreviewModal, type PreviewableFile } from '../components/FilePreviewModal'
 import { ReferenceFileCard } from '../components/ReferenceFileCard'
 import { AddFormatsModal } from '../components/formats/AddFormatsModal'
+import { buildCatalogFormatOptions } from '../components/formats/catalogFormatOptions'
 import { FormatConfigurator } from '../components/formats/FormatConfigurator'
 import { ChannelBadgeIcon } from '../components/formats/ChannelIcons'
 import type { ChannelFormatOption, ConfiguredFormatItem } from '../components/formats/formatTypes'
 
 type FlowStep = 'catalog' | 'brief' | 'configure' | 'review' | 'success'
-type CatalogFilter = 'all' | 'design' | 'production' | 'ai' | 'fast'
 type DeliveryConfig = Pick<ProjectDeliverySchema, 'taskType' | 'structure' | 'itemLabel'> & { title: string; description: string }
 
-const catalogFilters: Array<{
-  id: CatalogFilter
+interface CategoryMeta {
   label: string
   title: string
   description: string
   asset?: 'catalog.imgGravityUiBrush' | 'catalog.imgTablerVideo' | 'catalog.imgGroup' | 'catalog.imgMaterialSymbolsBoltBoostRounded'
-}> = [
-  { id: 'all', label: 'Todos os serviços', title: 'Todos os serviços', description: 'Explore o catálogo completo e encontre o formato ideal para o seu projeto.' },
-  { id: 'design', label: 'Criação e Design', title: 'Criação e Design', description: 'Ativos com precisão de pixel e alinhados à marca, em velocidade relâmpago.', asset: 'catalog.imgGravityUiBrush' },
-  { id: 'production', label: 'Produção', title: 'Produção', description: 'Conteúdos audiovisuais produzidos para cada canal e objetivo.', asset: 'catalog.imgTablerVideo' },
-  { id: 'ai', label: 'IA Disponível', title: 'IA Disponível', description: 'Soluções criativas potencializadas por inteligência artificial.', asset: 'catalog.imgGroup' },
-  { id: 'fast', label: 'Entrega Rápida', title: 'Entrega Rápida', description: 'Produtos com prazo estimado de até 8 horas úteis.', asset: 'catalog.imgMaterialSymbolsBoltBoostRounded' },
+}
+
+const CATEGORY_META: Record<string, CategoryMeta> = {
+  all: {
+    label: 'Todos os serviços',
+    title: 'Todos os serviços',
+    description: 'Explore o catálogo completo e encontre o formato ideal para o seu projeto.',
+  },
+  'Redes Sociais': {
+    label: 'Redes Sociais',
+    title: 'Redes Sociais',
+    description: 'Formatos para feed, stories, carrosséis e anúncios em todas as redes.',
+  },
+  Digital: {
+    label: 'Digital',
+    title: 'Design Digital',
+    description: 'Banners, landing pages, apresentações e ativos digitais para sua marca.',
+    asset: 'catalog.imgGravityUiBrush',
+  },
+  Criação: {
+    label: 'Criação',
+    title: 'Criação e Branding',
+    description: 'Ativos com precisão de pixel, identidades visuais e conceitos exclusivos.',
+    asset: 'catalog.imgGravityUiBrush',
+  },
+  'Vídeo & Áudio': {
+    label: 'Vídeo & Áudio',
+    title: 'Vídeo & Áudio',
+    description: 'Conteúdos audiovisuais, motion graphics, vídeos institucionais e edições.',
+    asset: 'catalog.imgTablerVideo',
+  },
+  Impresso: {
+    label: 'Impresso',
+    title: 'Materiais Impressos',
+    description: 'Papelaria institucional, materiais promocionais, brindes e fechamento de arquivos para gráfica.',
+  },
+  Copywriting: {
+    label: 'Copywriting',
+    title: 'Copywriting e Conteúdo',
+    description: 'Textos persuasivos, redação publicitária, roteiros e estratégias de conteúdo.',
+  },
+  'Feitos com IA': {
+    label: 'Feitos com IA',
+    title: 'Feitos com IA',
+    description: 'Soluções criativas potencializadas por inteligência artificial em velocidade relâmpago.',
+    asset: 'catalog.imgGroup',
+  },
+}
+
+const BASE_MANYSPACE_CATEGORIES = [
+  'Redes Sociais',
+  'Digital',
+  'Criação',
+  'Vídeo & Áudio',
+  'Impresso',
+  'Copywriting',
+  'Feitos com IA',
 ]
 
 const goals = ['Reconhecimento de marca', 'Geração de demanda', 'Engajamento', 'Vendas e conversão', 'Comunicação interna', 'Outro']
@@ -95,12 +145,13 @@ const normalizeText = (value: string) => value.normalize('NFD').replace(/[\u0300
 
 function deliveryConfigFor(product: CatalogProduct): DeliveryConfig | null {
   const name = normalizeText(product.name)
+  const availableFormats = normalizeText(product.formats.available.join(' '))
   const unit = normalizeText(product.billing.unit)
-  if (/carrossel|carousel/.test(name)) return { taskType: 'carousel', structure: 'cards', itemLabel: 'card', title: 'Conteúdo dos cards', description: 'Organize a mensagem, o texto e a direção visual de cada card na ordem de leitura.' }
-  if (/storyboard|roteiro visual/.test(name)) return { taskType: 'storyboard', structure: 'scenes', itemLabel: 'cena', title: 'Conteúdo das cenas', description: 'Descreva o texto e o que deve acontecer visualmente em cada cena.' }
+  if (/carrossel|carousel/.test(`${name} ${availableFormats}`) || unit === 'cards') return { taskType: 'carousel', structure: 'cards', itemLabel: 'card', title: 'Conteúdo dos cards', description: 'Organize a mensagem, o texto e a direção visual de cada card na ordem de leitura.' }
+  if (/storyboard|roteiro visual/.test(`${name} ${availableFormats}`) || unit === 'cenas') return { taskType: 'storyboard', structure: 'scenes', itemLabel: 'cena', title: 'Conteúdo das cenas', description: 'Descreva o texto e o que deve acontecer visualmente em cada cena.' }
   if (/apresentacao de slides|pitch deck/.test(name) || unit === 'slides') return { taskType: 'presentation', structure: 'slides', itemLabel: 'slide', title: 'Conteúdo dos slides', description: 'Estruture a narrativa slide a slide para orientar a criação.' }
   if (/landing page|hotsite/.test(name) || unit === 'secoes') return { taskType: 'landing', structure: 'sections', itemLabel: 'seção', title: 'Conteúdo das seções', description: 'Defina a mensagem, a direção visual e o CTA de cada seção.' }
-  if (/catalogo|e-book|ebook|livro|revista|newsletter|relatorio/.test(name) && unit === 'paginas') return { taskType: 'document', structure: 'pages', itemLabel: 'página', title: 'Conteúdo das páginas', description: 'Informe a mensagem e as orientações de cada página do material.' }
+  if (unit === 'paginas') return { taskType: 'document', structure: 'pages', itemLabel: 'página', title: 'Conteúdo das páginas', description: 'Informe a mensagem e as orientações de cada página do material.' }
   if (unit === 'imagens' || unit === 'ilustracoes') return { taskType: 'image-set', structure: 'images', itemLabel: unit === 'ilustracoes' ? 'ilustração' : 'imagem', title: unit === 'ilustracoes' ? 'Conteúdo das ilustrações' : 'Conteúdo das imagens', description: 'Detalhe a mensagem e a direção visual esperada para cada item.' }
   return null
 }
@@ -117,13 +168,23 @@ function resizeDeliveryItems(config: DeliveryConfig, count: number, current: Pro
   })
 }
 
+const deliveryItemPlurals: Record<string, string> = {
+  card: 'cards', cena: 'cenas', slide: 'slides', seção: 'seções', página: 'páginas',
+  imagem: 'imagens', ilustração: 'ilustrações',
+}
+
+function deliveryItemPlural(label: string) {
+  return deliveryItemPlurals[label] || `${label}s`
+}
+
 export function NewProjectPage() {
   const navigate = useNavigate()
   const { addProject, notify } = useApp()
   const [products, setProducts] = useState<CatalogProduct[]>([])
   const [loaded, setLoaded] = useState(false)
   const [catalogError, setCatalogError] = useState('')
-  const [filter, setFilter] = useState<CatalogFilter>('design')
+  const [filter, setFilter] = useState<string>('all')
+  const [subfilter, setSubfilter] = useState<string>('')
   const [catalogSearch, setCatalogSearch] = useState('')
   const [selected, setSelected] = useState<CatalogProduct | null>(null)
   const [step, setStep] = useState<FlowStep>('catalog')
@@ -149,6 +210,7 @@ export function NewProjectPage() {
   const [submitting, setSubmitting] = useState(false)
   const [deliveryItems, setDeliveryItems] = useState<ProjectDeliveryItem[]>([])
   const deliveryConfig = useMemo(() => selected ? deliveryConfigFor(selected) : null, [selected])
+  const catalogFormatOptions = useMemo(() => selected ? buildCatalogFormatOptions(selected) : [], [selected])
 
   // Modular format configuration state
   const [configuredFormats, setConfiguredFormats] = useState<ConfiguredFormatItem[]>([
@@ -186,7 +248,7 @@ export function NewProjectPage() {
     setActiveFormatId(newId)
     setScope((current) => ({
       ...current,
-      quantity: nextList.length,
+      quantity: deliveryConfig ? current.quantity : nextList.length,
       resizeCount: Math.max(0, nextList.length - 1),
     }))
   }
@@ -202,7 +264,7 @@ export function NewProjectPage() {
     }
     setScope((current) => ({
       ...current,
-      quantity: Math.max(1, nextList.length),
+      quantity: deliveryConfig ? current.quantity : Math.max(1, nextList.length),
       resizeCount: Math.max(0, nextList.length - 1),
     }))
   }
@@ -264,22 +326,64 @@ export function NewProjectPage() {
     window.scrollTo({ top: 0, behavior: 'auto' })
   }, [step])
 
+  const categoryFilters = useMemo(() => {
+    const categoriesInProducts = Array.from(
+      new Set(products.map((p) => p.category?.trim()).filter(Boolean))
+    )
+    const orderedKnown = BASE_MANYSPACE_CATEGORIES.filter((cat) =>
+      categoriesInProducts.length > 0 ? categoriesInProducts.includes(cat) : true
+    )
+    const extras = categoriesInProducts.filter(
+      (cat) => !BASE_MANYSPACE_CATEGORIES.includes(cat)
+    )
+    const finalCategories = [...orderedKnown, ...extras]
+
+    return [
+      { id: 'all', ...CATEGORY_META.all },
+      ...finalCategories.map((cat) => ({
+        id: cat,
+        ...(CATEGORY_META[cat] || {
+          label: cat,
+          title: cat,
+          description: `Explore os serviços disponíveis na categoria ${cat}.`,
+        }),
+      })),
+    ]
+  }, [products])
+
+  const availableSubcategories = useMemo(() => {
+    if (filter === 'all' || !filter) return []
+    const subs = new Set<string>()
+    products.forEach((p) => {
+      if (p.category === filter && p.subcategory) {
+        subs.add(p.subcategory.trim())
+      }
+    })
+    return Array.from(subs)
+  }, [filter, products])
+
+  const activeFilter = useMemo(() => {
+    if (filter === 'all' || !filter) return CATEGORY_META.all
+    if (CATEGORY_META[filter]) return CATEGORY_META[filter]
+    return {
+      label: filter,
+      title: filter,
+      description: `Explore os serviços disponíveis na categoria ${filter}.`,
+    }
+  }, [filter])
+
   const visible = useMemo(() => {
     const query = catalogSearch.trim().toLocaleLowerCase('pt-BR')
     return products.filter((product) => {
-      const matchesFilter = filter === 'production' ? product.category === 'Vídeo & Áudio'
-        : filter === 'ai' ? product.category === 'Feitos com IA'
-          : filter === 'fast' ? product.slaHours <= 8
-            : filter === 'design' ? product.category !== 'Vídeo & Áudio' && product.category !== 'Feitos com IA'
-              : true
-      if (!matchesFilter || !query) return matchesFilter
+      const matchesCategory = filter === 'all' || !filter ? true : product.category === filter
+      const matchesSubcategory = !subfilter ? true : product.subcategory === subfilter
+      if (!matchesCategory || !matchesSubcategory) return false
+      if (!query) return true
       return [product.name, product.description, product.category, product.subcategory, product.code]
         .filter(Boolean)
         .some((value) => String(value).toLocaleLowerCase('pt-BR').includes(query))
     })
-  }, [catalogSearch, filter, products])
-
-  const activeFilter = catalogFilters.find((item) => item.id === filter) || catalogFilters[0]
+  }, [catalogSearch, filter, subfilter, products])
   const briefReady = Boolean(name.trim() && objective && overview.trim().length >= 10 && projectGoal)
   const selectedFormats = useMemo(() => [
     ...selectedApplications.map((application) => `Aplicação: ${application}`),
@@ -313,17 +417,19 @@ export function NewProjectPage() {
     setReferenceLinks([])
     setDeliveryItems(nextDeliveryConfig ? resizeDeliveryItems(nextDeliveryConfig, nextScope.quantity) : [])
 
-    const isMultiFormat = product.code === '168' || (product.formats.available.length > 0 && !nextDeliveryConfig)
+    const nextFormatOptions = buildCatalogFormatOptions(product)
+    const isMultiFormat = nextFormatOptions.length > 0
     if (isMultiFormat) {
+      const initialOption = nextFormatOptions.find((option) => option.channel === 'Instagram') || nextFormatOptions[0]
       const defaultFmt: ConfiguredFormatItem = {
         id: `fmt-${Date.now()}-1`,
-        channel: 'Instagram',
-        formatName: 'Post',
-        dimension: '1080 × 1350px',
-        proportionLabel: 'Retrato',
+        channel: initialOption.channel,
+        formatName: initialOption.name,
+        dimension: initialOption.defaultProportion.dimension,
+        proportionLabel: initialOption.defaultProportion.label,
         isPrincipal: true,
         exclusiveDirection: '',
-        software: 'Photoshop',
+        software: product.formats.editable.find((item) => normalizeText(item) === 'photoshop') || product.formats.editable[0] || 'Photoshop',
         extension: defaultFinalFormat(product) || '.PNG',
       }
       setConfiguredFormats([defaultFmt])
@@ -464,16 +570,74 @@ export function NewProjectPage() {
     <section className={`new-project-dialog new-project-dialog--${step}`} role="dialog" aria-modal="true" aria-labelledby="new-project-title">
       <header className="new-project-dialog__header">
         {step === 'catalog' ? <strong id="new-project-title">Novo projeto</strong> : <button type="button" className="new-project-dialog__back new-project-dialog__brief-title" onClick={() => setStep('catalog')} aria-label="Voltar ao catálogo"><strong id="new-project-title">{selected?.name}</strong></button>}
-        {step === 'catalog' ? <nav className="new-project-filters" aria-label="Filtrar catálogo">{catalogFilters.map((item) => <button type="button" key={item.id} className={filter === item.id ? 'active' : ''} aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>{item.asset && <img src={figmaAsset(item.asset)} alt="" />}{item.label}</button>)}</nav> : <FlowProgress step={step} briefReady={briefReady} onStep={setStep} />}
+        {step === 'catalog' ? (
+          <nav className="new-project-filters" aria-label="Filtrar catálogo por categoria">
+            {categoryFilters.map((item) => (
+              <button
+                type="button"
+                key={item.id}
+                className={filter === item.id ? 'active' : ''}
+                aria-pressed={filter === item.id}
+                onClick={() => {
+                  setFilter(item.id)
+                  setSubfilter('')
+                }}
+              >
+                {item.asset ? (
+                  <img src={figmaAsset(item.asset)} alt="" />
+                ) : item.id !== 'all' && categoryAccent[item.id] ? (
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      backgroundColor: categoryAccent[item.id],
+                      display: 'inline-block',
+                      flexShrink: 0,
+                      boxShadow: '0 0 0 1px rgba(0,0,0,0.1)',
+                    }}
+                  />
+                ) : null}
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        ) : (
+          <FlowProgress step={step} briefReady={briefReady} onStep={setStep} />
+        )}
         <button type="button" className="new-project-dialog__close" onClick={() => navigate(-1)} aria-label="Fechar"><img src={figmaAsset(step === 'catalog' ? 'catalog.imgMaterialSymbolsClose' : 'brief.imgMaterialSymbolsClose')} alt="" /></button>
       </header>
 
       {step === 'catalog' ? <main className="new-project-catalog">
         <header className="new-project-catalog__heading"><div><h1>{activeFilter.title}</h1><p>{activeFilter.description}</p></div><label className="new-project-catalog__search"><Search size={17} aria-hidden="true" /><input type="search" value={catalogSearch} onChange={(event) => setCatalogSearch(event.target.value)} placeholder="Pesquisar tarefa ou produto" aria-label="Pesquisar tarefa ou produto no catálogo" />{catalogSearch && <button type="button" onClick={() => setCatalogSearch('')} aria-label="Limpar pesquisa"><X size={15} /></button>}</label></header>
+        {availableSubcategories.length > 0 && (
+          <div className="new-project-subcategories" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', margin: '14px 0 20px' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#778078', textTransform: 'uppercase', letterSpacing: '0.04em', marginRight: 4 }}>
+              Subcategoria:
+            </span>
+            <button
+              type="button"
+              className={`new-project-subfilter-btn ${!subfilter ? 'active' : ''}`}
+              onClick={() => setSubfilter('')}
+            >
+              Todas
+            </button>
+            {availableSubcategories.map((sub) => (
+              <button
+                type="button"
+                key={sub}
+                className={`new-project-subfilter-btn ${subfilter === sub ? 'active' : ''}`}
+                onClick={() => setSubfilter(sub)}
+              >
+                {sub}
+              </button>
+            ))}
+          </div>
+        )}
         {!loaded && <div className="new-project-catalog-state">Carregando catálogo...</div>}
         {loaded && catalogError && <div className="new-project-catalog-state is-error"><strong>Catálogo indisponível</strong><span>{catalogError}</span><button className="secondary-button" onClick={() => window.location.reload()}>Tentar novamente</button></div>}
         {loaded && !catalogError && visible.length === 0 && <div className="new-project-catalog-state"><strong>Nenhum produto encontrado</strong><span>{catalogSearch ? `Não encontramos resultados para “${catalogSearch}”.` : 'Tente selecionar outra categoria.'}</span></div>}
-        <div className="new-project-services">{visible.map((product) => <button type="button" key={product.code} className="new-project-service" onClick={() => selectProduct(product)} aria-label={`${product.name}: ${product.description}`}><span className={`new-project-service__preview${product.imageUrl ? ' has-image' : ''}`} style={{ backgroundColor: categoryAccent[product.category] || '#d9d9d9' }}>{product.imageUrl && <img src={product.imageUrl} alt="" loading="lazy" onError={(event) => { event.currentTarget.style.display = 'none' }} />}</span><span className="new-project-service__body"><h2>{product.name}</h2><small>{formatCredits(product.credits.original)} cr. · {formatCredits(product.slaHours)}h úteis</small></span></button>)}</div>
+        <div className="new-project-services">{visible.map((product) => <button type="button" key={product.code} className="new-project-service" onClick={() => selectProduct(product)} aria-label={`${product.name}: ${product.description}`}><span className={`new-project-service__preview${product.imageUrl ? ' has-image' : ''}`} style={{ backgroundColor: categoryAccent[product.category] || '#d9d9d9' }}>{product.imageUrl && <img src={product.imageUrl} alt="" loading="lazy" onError={(event) => { event.currentTarget.style.display = 'none' }} />}</span><span className="new-project-service__body"><h2>{product.name}</h2><small>{product.category}{product.subcategory ? ` · ${product.subcategory}` : ''} · {formatCredits(product.credits.original)} cr. · {formatCredits(product.slaHours)}h úteis</small></span></button>)}</div>
       </main> : selected && <main className="new-project-flow">
         <section className="new-project-flow__main">
           {step === 'brief' && <BriefStep selected={selected} name={name} objective={objective} overview={overview} projectGoal={projectGoal} audience={audience} tone={tone} notApplicable={notApplicable} creativePath={creativePath} referenceFiles={referenceFiles} referenceLinks={referenceLinks} linkDraft={linkDraft} setName={setName} setObjective={setObjective} setOverview={setOverview} setProjectGoal={setProjectGoal} setAudience={setAudience} setTone={setTone} setNotApplicable={setNotApplicable} setCreativePath={setCreativePath} setLinkDraft={setLinkDraft} addReferenceLink={addReferenceLink} addReferenceFiles={addReferenceFiles} removeFile={(index) => setReferenceFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} removeLink={(link) => setReferenceLinks((current) => current.filter((item) => item !== link))} onPreviewFile={(file) => setPreviewFile({ name: file.name, file, sizeBytes: file.size, contentType: file.type })} onCancel={() => setStep('catalog')} onNext={() => setStep('configure')} ready={briefReady} />}
@@ -506,6 +670,7 @@ export function NewProjectPage() {
               onOpenAddModal={() => setIsAddFormatsModalOpen(true)}
               onUpdateFormat={handleUpdateFormat}
               quote={quote}
+              formatOptions={catalogFormatOptions}
             />
           )}
           {step === 'review' && (
@@ -557,6 +722,7 @@ export function NewProjectPage() {
         onClose={() => setIsAddFormatsModalOpen(false)}
         onAddFormat={handleAddFormat}
         configuredFormats={configuredFormats}
+        formatOptions={catalogFormatOptions}
       />
     )}
   </div>
@@ -824,10 +990,11 @@ interface ConfigureStepProps {
   onOpenAddModal: () => void
   onUpdateFormat: (id: string, updates: Partial<ConfiguredFormatItem>) => void
   quote: CatalogQuote | null
+  formatOptions: ChannelFormatOption[]
 }
 
 function ConfigureStep(props: ConfigureStepProps) {
-  const isMultiFormat = props.selected.code === '168' || (props.selected.formats.available.length > 0 && !props.deliveryConfig)
+  const isMultiFormat = props.formatOptions.length > 0
   const applications = uniqueOptions(props.selected.formats.available)
   const sizes = uniqueOptions(props.selected.formats.sizesAndRatios)
   const finalFormats = uniqueOptions(props.selected.formats.final)
@@ -860,6 +1027,38 @@ function ConfigureStep(props: ConfigureStepProps) {
           onSelectEditableFormat={props.setSelectedEditableFormat}
           availableFinalFormats={finalFormats}
           availableEditableFormats={editableFormats}
+          formatOptions={props.formatOptions}
+          availableAddons={props.selected.addons.map((addon) => ({
+            code: addon.code,
+            name: addon.name,
+            credits: addon.rule?.credits ?? addon.credits,
+            description: addon.rule?.unit
+              ? `${addon.rule.step || 1} ${addon.rule.unit}`
+              : 'Adicional opcional desta entrega.',
+          }))}
+          deliveryContent={props.deliveryConfig ? (
+            <>
+              <div className="format-config-section format-delivery-quantity">
+                <div>
+                  <h4>Quantidade de {deliveryItemPlural(props.deliveryConfig.itemLabel)}</h4>
+                  <p>Defina quantos itens fazem parte desta entrega.</p>
+                </div>
+                <ScopeCounter
+                  label={props.deliveryConfig.itemLabel}
+                  value={props.scope.quantity}
+                  minimum={1}
+                  onDecrease={() => props.updateCounter('quantity', -1)}
+                  onIncrease={() => props.updateCounter('quantity', 1)}
+                  disableIncrease={Boolean(props.selected.billing.maxQuantity && props.scope.quantity >= props.selected.billing.maxQuantity)}
+                />
+              </div>
+              <StructuredDeliveryEditor
+                config={props.deliveryConfig}
+                items={props.deliveryItems}
+                onChange={props.setDeliveryItems}
+              />
+            </>
+          ) : undefined}
         />
 
         <FlowFooter>
@@ -920,10 +1119,9 @@ function StructuredDeliveryEditor({ config, items, onChange }: {
   }
   if (!activeItem) return null
   const completed = items.filter((item) => item.title.trim() || item.copy.trim() || item.instructions.trim() || item.cta.trim()).length
-  const itemPlural: Record<string, string> = { card: 'cards', cena: 'cenas', slide: 'slides', seção: 'seções', página: 'páginas', imagem: 'imagens', ilustração: 'ilustrações' }
   return <div className="new-project-form-section new-project-structured-delivery">
     <SectionTitle title={config.title} description={`${config.description} Opcional: campos vazios serão tratados como “sem texto informado”.`} />
-    <div className="new-project-structured-delivery__status"><span>{items.length} {items.length === 1 ? config.itemLabel : itemPlural[config.itemLabel] || 'itens'}</span><small>{completed} com conteúdo preenchido</small></div>
+    <div className="new-project-structured-delivery__status"><span>{items.length} {items.length === 1 ? config.itemLabel : deliveryItemPlural(config.itemLabel)}</span><small>{completed} com conteúdo preenchido</small></div>
     <div className="new-project-structured-delivery__tabs" role="tablist" aria-label={config.title}>
       {items.map((item, index) => <button type="button" role="tab" aria-selected={index === visibleActiveIndex} className={index === visibleActiveIndex ? 'active' : ''} key={item.id} onClick={() => setActiveIndex(index)}><span>{index + 1}</span>{item.title.trim() || item.label}</button>)}
     </div>

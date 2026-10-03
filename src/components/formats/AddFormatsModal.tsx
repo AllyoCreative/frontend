@@ -1,6 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Check, Search, X } from 'lucide-react'
-import { CHANNELS, CHANNEL_FORMATS, type ChannelName } from './channelData'
 import { ChannelBadgeIcon, FormatDeviceMockup } from './ChannelIcons'
 import type { ChannelFormatOption, ConfiguredFormatItem } from './formatTypes'
 
@@ -9,14 +8,25 @@ interface AddFormatsModalProps {
   onClose: () => void
   onAddFormat: (option: ChannelFormatOption) => void
   configuredFormats: ConfiguredFormatItem[]
+  formatOptions: ChannelFormatOption[]
 }
 
-export function AddFormatsModal({ isOpen, onClose, onAddFormat, configuredFormats }: AddFormatsModalProps) {
-  const [activeChannel, setActiveChannel] = useState<ChannelName>('Instagram')
+export function AddFormatsModal({ isOpen, onClose, onAddFormat, configuredFormats, formatOptions }: AddFormatsModalProps) {
+  const channels = useMemo(() => [
+    'Tudo',
+    ...Array.from(new Set(formatOptions.map((option) => option.channel))),
+  ], [formatOptions])
+  const [activeChannel, setActiveChannel] = useState('Tudo')
   const [searchQuery, setSearchQuery] = useState('')
 
+  useEffect(() => {
+    if (!isOpen) return
+    const preferred = channels.find((channel) => channel === 'Instagram') || channels[1] || 'Tudo'
+    setActiveChannel((current) => channels.includes(current) ? current : preferred)
+  }, [channels, isOpen])
+
   const filteredFormats = useMemo(() => {
-    let list = CHANNEL_FORMATS
+    let list = formatOptions
     if (activeChannel !== 'Tudo') {
       list = list.filter((item) => item.channel.toLowerCase() === activeChannel.toLowerCase())
     }
@@ -29,7 +39,7 @@ export function AddFormatsModal({ isOpen, onClose, onAddFormat, configuredFormat
       )
     }
     return list
-  }, [activeChannel, searchQuery])
+  }, [activeChannel, formatOptions, searchQuery])
 
   if (!isOpen) return null
 
@@ -59,7 +69,7 @@ export function AddFormatsModal({ isOpen, onClose, onAddFormat, configuredFormat
         <div className="format-modal-tabs-bar">
           <span className="format-modal-tabs-label">FORMATOS</span>
           <div className="format-modal-tabs" role="tablist">
-            {CHANNELS.map((channel) => {
+            {channels.map((channel) => {
               const isActive = activeChannel === channel
               return (
                 <button
