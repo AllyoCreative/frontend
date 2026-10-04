@@ -100,8 +100,8 @@ export function FormatConfigurator(props: FormatConfiguratorProps) {
     setProportionsDropdownOpen(false)
   }
 
-  const defaultSoftwareOptions = ['Photoshop', 'Illustrator', 'Figma', 'Canva']
-  const defaultExtensionOptions = ['.PNG', '.JPG', '.PDF']
+  const defaultSoftwareOptions = ['A definir']
+  const defaultExtensionOptions = ['A definir']
 
   const finalFormatsList = props.availableFinalFormats?.length ? props.availableFinalFormats : defaultExtensionOptions
   const editableFormatsList = props.availableEditableFormats?.length ? props.availableEditableFormats : defaultSoftwareOptions
@@ -322,7 +322,7 @@ export function FormatConfigurator(props: FormatConfiguratorProps) {
               </div>
 
               <div className="format-field-group">
-                <label className="format-field-label">Proporção da imagem</label>
+                <label className="format-field-label">Tamanho e proporção</label>
                 <div className="format-select-wrapper">
                   <button
                     type="button"
@@ -457,9 +457,11 @@ export function FormatConfigurator(props: FormatConfiguratorProps) {
                     <span className="format-file-card__label">Software utilizado</span>
                     <div className="format-file-card__value-row">
                       <strong className="format-file-card__name">
-                        {activeFormat.software || 'Photoshop'}
+                        {activeFormat.software || 'A definir'}
                       </strong>
-                      <span className="format-file-card__badge">Recomendado Allyo</span>
+                      {activeFormat.software && activeFormat.software !== 'A definir' && (
+                        <span className="format-file-card__badge">Recomendado Allyo</span>
+                      )}
                     </div>
                   </div>
                   <button
@@ -497,9 +499,11 @@ export function FormatConfigurator(props: FormatConfiguratorProps) {
                     <span className="format-file-card__label">Extensão do arquivo</span>
                     <div className="format-file-card__value-row">
                       <strong className="format-file-card__name">
-                        {activeFormat.extension || '.PNG'}
+                        {activeFormat.extension || 'A definir'}
                       </strong>
-                      <span className="format-file-card__badge">Recomendado Allyo</span>
+                      {activeFormat.extension && activeFormat.extension !== 'A definir' && (
+                        <span className="format-file-card__badge">Recomendado Allyo</span>
+                      )}
                     </div>
                   </div>
                   <button

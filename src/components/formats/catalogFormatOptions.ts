@@ -62,7 +62,7 @@ function iconFor(label: string, dimension: string): FormatProportion['icon'] {
   if (/paisagem|horizontal|banner/.test(normalizedLabel)) return 'banner'
   const match = dimension.match(/(\d+)\D+(\d+)/)
   if (match && Number(match[1]) > Number(match[2]) * 1.25) return 'banner'
-  return 'phone'
+  return match ? 'phone' : 'square'
 }
 
 function catalogProportion(value: string, channel: string, index: number): FormatProportion {
@@ -102,8 +102,10 @@ function scopedFormat(value: string, channels: string[]) {
  * channels + available formats + sizesAndRatios without requiring frontend code.
  */
 export function buildCatalogFormatOptions(product: CatalogProduct): ChannelFormatOption[] {
-  const channels = uniqueCatalogValues(product.formats.channels)
-  if (channels.length === 0) return []
+  const managedChannels = uniqueCatalogValues(product.formats.channels)
+  const channels = managedChannels.length > 0
+    ? managedChannels
+    : [product.category || product.subcategory || 'Geral']
 
   const availableValues = uniqueCatalogValues(
     product.formats.available.length > 0 ? product.formats.available : [product.name]
@@ -129,7 +131,7 @@ export function buildCatalogFormatOptions(product: CatalogProduct): ChannelForma
       const channelSizes = sizeEntries
         .filter((size) => !size.channel || normalize(size.channel) === normalize(channel))
         .map((size) => size.name)
-      const proportions = (channelSizes.length > 0 ? channelSizes : ['Retrato']).map((value, index) =>
+      const proportions = (channelSizes.length > 0 ? channelSizes : ['Padrão do produto']).map((value, index) =>
         catalogProportion(value, channel, index)
       )
       const preferences = preferredProportionByChannel[normalize(channel)] || []

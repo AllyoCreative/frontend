@@ -407,16 +407,15 @@ export function NewProjectPage() {
       proportionLabel: option.defaultProportion.label,
       isPrincipal: isFirst,
       exclusiveDirection: '',
-      software: configuredFormats[0]?.software || selectedEditableFormat || 'Photoshop',
-      extension: configuredFormats[0]?.extension || selectedFinalFormat || '.PNG',
+      software: configuredFormats[0]?.software || selectedEditableFormat || 'A definir',
+      extension: configuredFormats[0]?.extension || selectedFinalFormat || 'A definir',
     }
     const nextList = [...configuredFormats, newItem]
     setConfiguredFormats(nextList)
     setActiveFormatId(newId)
     setScope((current) => ({
       ...current,
-      quantity: deliveryConfig ? current.quantity : nextList.length,
-      resizeCount: Math.max(0, nextList.length - 1),
+      resizeCount: selected?.credits.resizeAllowed ? Math.max(0, nextList.length - 1) : 0,
     }))
   }
 
@@ -431,8 +430,7 @@ export function NewProjectPage() {
     }
     setScope((current) => ({
       ...current,
-      quantity: deliveryConfig ? current.quantity : Math.max(1, nextList.length),
-      resizeCount: Math.max(0, nextList.length - 1),
+      resizeCount: selected?.credits.resizeAllowed ? Math.max(0, nextList.length - 1) : 0,
     }))
   }
 
@@ -618,8 +616,8 @@ export function NewProjectPage() {
         proportionLabel: initialOption.defaultProportion.label,
         isPrincipal: true,
         exclusiveDirection: '',
-        software: product.formats.editable.find((item) => normalizeText(item) === 'photoshop') || product.formats.editable[0] || 'Photoshop',
-        extension: defaultFinalFormat(product) || '.PNG',
+        software: product.formats.editable.find((item) => normalizeText(item) === 'photoshop') || product.formats.editable[0] || 'A definir',
+        extension: defaultFinalFormat(product) || 'A definir',
       }
       setConfiguredFormats([defaultFmt])
       setActiveFormatId(defaultFmt.id)
@@ -1398,15 +1396,15 @@ function ConfigureStep(props: ConfigureStepProps) {
               ? `${addon.rule.step || 1} ${addon.rule.unit}`
               : 'Adicional opcional desta entrega.',
           }))}
-          deliveryContent={props.deliveryConfig ? (
+          deliveryContent={(
             <>
               <div className="format-config-section format-delivery-quantity">
                 <div>
-                  <h4>Quantidade de {deliveryItemPlural(props.deliveryConfig.itemLabel)}</h4>
-                  <p>Defina quantos itens fazem parte desta entrega.</p>
+                  <h4>{props.selected.billing.label || 'Quantidade da entrega'}</h4>
+                  <p>{props.selected.billing.unitNote || `Defina a quantidade de ${props.selected.billing.unit} desta entrega.`}</p>
                 </div>
                 <ScopeCounter
-                  label={props.deliveryConfig.itemLabel}
+                  label={props.selected.billing.unit}
                   value={props.scope.quantity}
                   minimum={1}
                   onDecrease={() => props.updateCounter('quantity', -1)}
@@ -1414,13 +1412,13 @@ function ConfigureStep(props: ConfigureStepProps) {
                   disableIncrease={Boolean(props.selected.billing.maxQuantity && props.scope.quantity >= props.selected.billing.maxQuantity)}
                 />
               </div>
-              <StructuredDeliveryEditor
+              {props.deliveryConfig && <StructuredDeliveryEditor
                 config={props.deliveryConfig}
                 items={props.deliveryItems}
                 onChange={props.setDeliveryItems}
-              />
+              />}
             </>
-          ) : undefined}
+          )}
         />
 
         <FlowFooter>
