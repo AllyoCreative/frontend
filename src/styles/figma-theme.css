@@ -780,6 +780,14 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .project-task-card { min-height: 0; gap: 20px; }
 .project-task-card > header { align-items: center; }
 .project-task-card > header h2 span { display: inline-grid; place-items: center; min-width: 28px; height: 24px; margin-left: 6px; padding: 0 8px; border-radius: 999px; background: #eaf2eb; color: #356052; font-size: 12px; vertical-align: 2px; }
+.project-task-flow-summary { display: flex; flex-wrap: wrap; gap: 7px 14px; margin-top: 10px; }
+.project-task-flow-summary span { display: inline-flex; align-items: center; gap: 6px; color: #68726c; font-size: 12px; font-weight: 650; }
+.project-task-flow-summary i { width: 8px; height: 8px; border-radius: 50%; background: #829188; }
+.project-task-flow-summary .is-a-iniciar i { background: #94a75d; }
+.project-task-flow-summary .is-em-andamento i { background: #4e82ab; }
+.project-task-flow-summary .is-em-revisao i, .project-task-flow-summary .is-alteracao i { background: #d77843; }
+.project-task-flow-summary .is-bloqueada i { background: #7b8580; }
+.project-task-flow-summary .is-concluido i { background: #3d9167; }
 .project-task-add-trigger { width: auto !important; min-height: 42px !important; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 18px !important; font-size: 13px !important; }
 .project-task-form { display: grid; grid-template-columns: minmax(0,1fr) 190px auto; align-items: end; gap: 10px; padding: 14px; border: 1px solid #e2e6e1; border-radius: 9px; background: #f7f9f6; }
 .project-task-field { min-width: 0; display: grid; gap: 6px; }
@@ -790,16 +798,18 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .project-task-submit { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 0 16px; border: 0; border-radius: 7px; background: #004c46; color: #fff; font-size: 13px; font-weight: 700; white-space: nowrap; }
 .project-task-submit:hover:not(:disabled) { background: #0d1e1d; }
 .project-task-submit:disabled { cursor: not-allowed; opacity: .42; }
-.project-task-stack { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(300px, 340px); gap: 14px; padding-bottom: 8px; overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; scrollbar-color: #b8c4bb transparent; }
-.project-task-stack-card { min-width: 0; min-height: 188px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #dde2dc; border-radius: 12px; background: #fff; transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease; }
+.project-task-stack { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(260px, 290px); gap: 32px; padding: 5px 3px 12px; overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; scrollbar-color: #b8c4bb transparent; }
+.project-task-stack-card { position: relative; min-width: 0; min-height: 166px; display: flex; flex-direction: column; overflow: visible; border: 1px solid #dde2dc; border-radius: 12px; background: #fff; transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease; }
+.project-task-stack-card:not(:last-child)::after { content: ''; position: absolute; z-index: 2; top: 50%; right: -33px; width: 32px; height: 2px; background: #b9c8c0; }
+.project-task-stack-card:not(:last-child)::before { content: ''; position: absolute; z-index: 3; top: calc(50% - 4px); right: -32px; width: 8px; height: 8px; border-top: 2px solid #789086; border-right: 2px solid #789086; transform: rotate(45deg); }
 .project-task-stack-card:hover { transform: translateY(-2px); border-color: #aabbb0; box-shadow: 0 8px 20px rgba(20,48,37,.07); }
 .project-task-stack-card.is-active { border-color: #397365; box-shadow: 0 0 0 2px rgba(0,76,70,.08); }
-.project-task-card-open { width: 100% !important; min-height: 110px !important; display: grid !important; grid-template-columns: auto minmax(0,1fr) auto; grid-template-rows: auto 1fr; align-items: start !important; gap: 8px 11px !important; padding: 16px !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; color: inherit !important; text-align: left; }
+.project-task-card-open { width: 100% !important; min-height: 96px !important; display: grid !important; grid-template-columns: auto minmax(0,1fr) auto; grid-template-rows: auto 1fr; align-items: start !important; gap: 8px 11px !important; padding: 15px !important; border: 0 !important; border-radius: 12px 12px 0 0 !important; background: transparent !important; color: inherit !important; text-align: left; }
 .project-task-card-open > svg { grid-column: 3; align-self: end; color: #718078; }
 .project-task-number { grid-row: 1 / 3; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; background: #edf4ef; color: #245b4d; font-size: 12px; font-weight: 800; }
 .project-task-stack-title { min-width: 0; }
 .project-task-stack-title > span { display: flex; align-items: center; gap: 6px; color: #778078; font-size: 12px; font-weight: 650; }
-.project-task-stack-title h3 { overflow: hidden; margin: 7px 0 0; color: #17211c; font-size: 17px; line-height: 22px; white-space: nowrap; text-overflow: ellipsis; }
+.project-task-stack-title h3 { display: -webkit-box; overflow: hidden; margin: 7px 0 0; color: #17211c; font-size: 16px; line-height: 21px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .project-task-status { display: inline-flex; align-items: center; gap: 6px; flex: none; padding: 6px 10px; border-radius: 100px; background: #edf1eb; color: #526159; font-size: 11px; font-weight: 750; white-space: nowrap; }
 .project-task-status::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .project-task-status--a-iniciar { background: #eff4e5; color: #687d3d; }
@@ -807,17 +817,19 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .project-task-status--em-revisao { background: #fff0e8; color: #9b4e2c; }
 .project-task-status--alteracao { background: #fff3e6; color: #d9651a; border: 1px solid #ffd6b3; }
 .project-task-status--concluido { background: #e1f1e8; color: #28714e; }
-.project-task-meta { display: flex; flex-wrap: wrap; gap: 7px; padding: 0 16px 14px; }
+.project-task-meta { display: flex; flex-wrap: wrap; gap: 7px; padding: 0 15px 12px; }
 .project-task-meta > span { padding: 5px 8px; border-radius: 6px; background: #f2f4f1; color: #56625b; font-size: 11px; font-weight: 650; }
 .project-task-meta > span.is-blocked { display: inline-flex; align-items: center; gap: 5px; background: #fff1e8; color: #9b4e2c; }
-.project-task-stack-card > footer { min-height: 52px; display: flex; align-items: center; gap: 8px; margin-top: auto; padding: 9px 12px; border-top: 1px solid #edf0ec; background: #fafbf9; }
+.project-task-stack-card > footer { min-height: 46px; display: flex; align-items: center; gap: 8px; margin-top: auto; padding: 7px 10px; border-top: 1px solid #edf0ec; border-radius: 0 0 12px 12px; background: #fafbf9; }
 .project-task-stack-card > footer button { width: auto; min-height: 34px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid #dbe1da; border-radius: 7px; background: #fff; color: #415047; font-size: 12px; font-weight: 700; }
 .project-task-stack-card > footer button:hover { border-color: #aebdb2; }
 .project-task-detail { display: grid; gap: 18px; padding: 20px; border: 1px solid #d9e2da; border-radius: 12px; background: #f8faf7; }
 .project-task-detail > header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .project-task-detail > header span { color: #758078; font-size: 12px; font-weight: 700; }
 .project-task-detail > header h3 { margin: 3px 0 0; font-size: 18px; }
+.project-task-detail-actions { display: flex; align-items: center; gap: 8px; }
 .project-task-detail > header button { width: 36px !important; min-height: 36px !important; display: grid; place-items: center; padding: 0 !important; border: 1px solid #d7ded7 !important; border-radius: 8px !important; background: #fff !important; color: #405147 !important; }
+.project-task-detail > header .project-task-detail-edit { width: auto !important; display: inline-flex; grid-auto-flow: column; gap: 7px; padding: 0 12px !important; font-size: 12px !important; font-weight: 700; }
 .project-task-briefing-content { display: grid; gap: 16px; }
 .project-task-briefing-content > div { display: grid; gap: 5px; }
 .project-task-briefing-content span, .project-task-briefing-editor label > span { color: #758078; font-size: 11px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }

@@ -669,6 +669,12 @@ export function ProjectDetailPage() {
             <header>
               <div>
                 <h2>Tarefas do projeto <span>{projectTasks.length}</span></h2>
+                <div className="project-task-flow-summary">
+                  {(['A iniciar', 'Em andamento', 'Em revisão', 'Alteração', 'Bloqueada', 'Concluído'] as const).map((status) => {
+                    const count = projectTasks.filter((task) => task.status === status).length
+                    return count > 0 && <span className={`is-${status.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '')}`} key={status}><i />{count} {status.toLowerCase()}</span>
+                  })}
+                </div>
               </div>
               <button className="project-task-add-trigger" type="button" onClick={() => setShowTaskForm((current) => !current)}><Plus size={15} /> Nova tarefa</button>
             </header>
@@ -702,8 +708,7 @@ export function ProjectDetailPage() {
                       {(task.status === 'Bloqueada' || task.dependencyBlocked) && <span className="is-blocked"><Lock size={13} /> Dependência</span>}
                     </div>
                     <footer>
-                      <button type="button" onClick={() => setExpandedTaskId(expanded ? null : task.id)}><Eye size={15} />{expanded ? 'Fechar tarefa' : 'Abrir tarefa'}</button>
-                      <button type="button" onClick={() => startEditingTaskBriefing(task)}><Pencil size={14} /> Editar briefing</button>
+                      <button type="button" onClick={() => setExpandedTaskId(expanded ? null : task.id)}><Eye size={15} />{expanded ? 'Fechar detalhes' : 'Ver detalhes'}</button>
                     </footer>
                   </article>
                 })
@@ -711,7 +716,7 @@ export function ProjectDetailPage() {
             </div>
 
             {expandedTask && <section className="project-task-detail">
-              <header><div><span>Tarefa #{expandedTask.publicId}</span><h3>{expandedTask.title}</h3></div><button type="button" onClick={() => setExpandedTaskId(null)} aria-label="Fechar tarefa"><ChevronUp size={18} /></button></header>
+              <header><div><span>Tarefa #{expandedTask.publicId}</span><h3>{expandedTask.title}</h3></div><div className="project-task-detail-actions">{!editingExpandedTask && <button className="project-task-detail-edit" type="button" onClick={() => startEditingTaskBriefing(expandedTask)}><Pencil size={14} /> Editar briefing</button>}<button type="button" onClick={() => setExpandedTaskId(null)} aria-label="Fechar tarefa"><ChevronUp size={18} /></button></div></header>
               {editingExpandedTask && taskBriefingDraft ? <div className="project-task-briefing-editor">
                 <label><span>Objetivo desta tarefa</span><textarea value={taskBriefingDraft.objective || ''} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, objective: event.target.value })} /></label>
                 <label><span>Contexto</span><textarea value={taskBriefingDraft.overview || ''} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, overview: event.target.value })} /></label>
