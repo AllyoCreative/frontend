@@ -171,7 +171,7 @@ function ProjectBriefing({
           <h2>Briefing do projeto</h2>
           <p>{briefing.deliveryDate || project.deadline} <b>•</b> {briefing.creditsEstimated} créditos estimados <b>•</b> {briefing.estimatedHours} horas úteis</p>
         </div>
-        <button onClick={onDuplicate}>duplicar briefing do projeto</button>
+        <button onClick={onDuplicate}>Duplicar briefing</button>
       </header>
       <img className="project-briefing-divider" src={figmaAsset('overview.imgLine29')} alt="" />
       <section>
