@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useParams } from 'react-router-dom'
-import { ChevronDown, ChevronUp, Circle, Download, ExternalLink, Eye, FileText, Image as ImageIcon, Layers3, Lock, MessageSquareText, Pencil, Play, Plus, Upload } from 'lucide-react'
+import { ChevronDown, ChevronUp, Circle, Download, ExternalLink, Eye, FileText, Flag, Image as ImageIcon, Layers3, Lock, MessageSquareText, Pencil, Play, Plus, Rocket, Upload } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
 import { DesignReviewModal, type ReviewCollectionItem, type ReviewOrigin } from '../components/DesignReviewModal'
@@ -98,45 +98,50 @@ function projectTimeline(project: Project, tasks: ProjectTask[], designs: Design
     if (designCreatedAt) events.push({ id: `design-${design.id}`, date: designCreatedAt, title: cleanDecodedText(design.name), detail: `${design.version} enviada para revisão`, completed: design.approved })
   })
 
-  if (updatedAt && createdAt && updatedAt.getTime() - createdAt.getTime() > 1_000) {
-    events.push({ id: 'project-updated', date: updatedAt, title: `Projeto ${project.status.toLowerCase()}`, detail: `${project.progress}% do projeto concluído`, completed: project.status === 'Concluído' })
+  if (updatedAt && createdAt && updatedAt.getTime() - createdAt.getTime() > 1_000 && project.status !== 'Concluído') {
+    events.push({ id: 'project-updated', date: updatedAt, title: `Projeto ${project.status.toLowerCase()}`, detail: `${project.progress}% do projeto concluído` })
   }
 
   return events.sort((left, right) => left.date.getTime() - right.date.getTime()).slice(-12)
 }
 
 function OverviewTimeline({ project, tasks, designs }: { project: Project; tasks: ProjectTask[]; designs: DesignSummary[] }) {
-  const events = projectTimeline(project, tasks, designs).slice(-6)
-  const positions = ['1%', '17%', '33.5%', '50%', '66%', '82%']
-  const labelDates = [...events.map((event) => event.date), validDate(project.updatedAt) || new Date()].slice(0, 7)
-  const month = (events[0]?.date || validDate(project.createdAt) || new Date()).toLocaleDateString('pt-BR', { month: 'long' }).toUpperCase()
+  const projectCompleted = project.status === 'Concluído' || (tasks.length > 0 && tasks.every((task) => task.status === 'Concluído'))
+  const createdAt = validDate(project.createdAt) || new Date()
+  const activity = projectTimeline(project, tasks, designs).filter((event) => event.id !== 'project-created')
+  const latestActivity = activity.at(-1)
+  const completedMilestone = projectCompleted ? {
+    id: 'project-finished',
+    date: validDate(project.updatedAt) || latestActivity?.date || createdAt,
+    title: 'Projeto concluído',
+    detail: 'Todas as tarefas foram finalizadas',
+  } : latestActivity?.completed ? latestActivity : null
+  const events = activity.filter((event) => event.id !== completedMilestone?.id && !(projectCompleted && event.completed)).slice(-8)
+  const formatDateTime = (date: Date) => `${date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')} · ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
   return (
     <article className="overview-timeline-card">
-      <h2>Timeline</h2>
-      <span className="overview-timeline-month">{month}</span>
-      <div className="overview-timeline-viewport">
-        <div className="overview-timeline-plot">
-          <div className="overview-timeline-labels" aria-hidden="true">
-            {labelDates.map((date, index) => <span key={`${date.toISOString()}-${index}`}>{index === 0 || index === labelDates.length - 1 ? <><b>{date.toLocaleDateString('pt-BR', { day: '2-digit' })}</b>{date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}<small>{date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</small></> : <b>{date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</b>}</span>)}
-          </div>
-          <div className="overview-timeline-track" aria-hidden="true">
-            <span className="overview-timeline-endpoint overview-timeline-endpoint--start"><img src={figmaAsset('overview.imgLucideFlag')} alt="" /></span>
-            <img className="timeline-line timeline-line--1" src={figmaAsset('overview.imgLine21')} alt="" />
-            <img className="timeline-line timeline-line--2" src={figmaAsset('overview.imgLine22')} alt="" />
-            <img className="timeline-line timeline-line--3" src={figmaAsset('overview.imgLine23')} alt="" />
-            <img className="timeline-line timeline-line--4" src={figmaAsset('overview.imgLine25')} alt="" />
-            <img className="timeline-line timeline-line--5" src={figmaAsset('overview.imgLine26')} alt="" />
-            <img className="timeline-line timeline-line--6" src={figmaAsset('overview.imgLine27')} alt="" />
-            <img className="timeline-line timeline-line--7" src={figmaAsset('overview.imgLine28')} alt="" />
-            {['16.67%', '33.33%', '50%'].map((left) => <img key={left} className="timeline-node" style={{ left }} src={figmaAsset('overview.imgEllipse18')} alt="" />)}
-            {['66.67%', '83.33%'].map((left) => <img key={left} className="timeline-node" style={{ left }} src={figmaAsset('overview.imgEllipse21')} alt="" />)}
-            <img className="timeline-arrow" src={figmaAsset('overview.imgVector11')} alt="" />
-            <span className="overview-timeline-endpoint overview-timeline-endpoint--finish"><img src={figmaAsset('overview.imgMaterialSymbolsRocketLaunchOutline')} alt="" /></span>
-          </div>
-          <div className="overview-timeline-events">
-            {events.map((event, index) => <div className={`overview-timeline-event${event.completed ? '' : ' has-clock'}`} style={{ left: positions[index] }} key={event.id}><strong>{event.date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</strong><span><span>{event.title}</span><span>{event.detail}</span></span>{!event.completed && <img src={figmaAsset('overview.imgGroup2')} alt="Em andamento" />}</div>)}
-          </div>
-        </div>
+      <header><h2>Timeline do projeto</h2><span>Arraste para ver o histórico</span></header>
+      <div className="overview-timeline-viewport" tabIndex={0} aria-label="Histórico do projeto">
+        <ol className="overview-timeline-list">
+          <li className="overview-timeline-step is-start">
+            <span className="overview-timeline-node"><Flag size={15} /></span>
+            <article><time>{formatDateTime(createdAt)}</time><strong>Briefing enviado</strong><p>Projeto criado</p></article>
+          </li>
+          {events.map((event) => (
+            <li className={`overview-timeline-step${event.completed ? ' is-complete' : ''}`} key={event.id}>
+              <span className="overview-timeline-node"><Circle size={9} fill="currentColor" /></span>
+              <article><time>{formatDateTime(event.date)}</time><strong>{event.title}</strong><p>{event.detail}</p></article>
+            </li>
+          ))}
+          <li className={`overview-timeline-step is-finish${completedMilestone ? ' is-complete' : ''}`}>
+            <span className="overview-timeline-node"><Rocket size={15} /></span>
+            <article>
+              <time>{completedMilestone ? formatDateTime(completedMilestone.date) : 'Próximo marco'}</time>
+              <strong>{completedMilestone?.title || 'Conclusão do projeto'}</strong>
+              <p>{completedMilestone?.detail || 'Aguardando as tarefas'}</p>
+            </article>
+          </li>
+        </ol>
       </div>
     </article>
   )
@@ -630,6 +635,8 @@ export function ProjectDetailPage() {
   const displayedProject = projectStatus === project.status && !projectCompleted
     ? project
     : { ...project, status: projectStatus, progress: projectCompleted ? 100 : project.progress }
+  const expandedTask = projectTasks.find((task) => task.id === expandedTaskId) || null
+  const editingExpandedTask = Boolean(expandedTask && editingTaskId === expandedTask.id && taskBriefingDraft)
 
   return (
     <div className={`page project-detail-page project-detail-page--${tab}`}>
@@ -661,8 +668,7 @@ export function ProjectDetailPage() {
           <article className="project-briefing-card project-task-card">
             <header>
               <div>
-                <h2>Stack do projeto ({projectTasks.length})</h2>
-                <p>Cada tarefa é uma entrega independente, com ID, status e briefing próprios.</p>
+                <h2>Tarefas do projeto <span>{projectTasks.length}</span></h2>
               </div>
               <button className="project-task-add-trigger" type="button" onClick={() => setShowTaskForm((current) => !current)}><Plus size={15} /> Nova tarefa</button>
             </header>
@@ -684,47 +690,43 @@ export function ProjectDetailPage() {
               ) : (
                 projectTasks.map((task, index) => {
                   const expanded = expandedTaskId === task.id
-                  const editing = editingTaskId === task.id && taskBriefingDraft
-                  return <article className="project-task-stack-item" key={task.id}>
-                    <div className="project-task-stack-index"><span>{index + 1}</span>{index < projectTasks.length - 1 && <i />}</div>
-                    <div className="project-task-stack-card">
-                      <header>
-                        <div className="project-task-stack-title"><span><Layers3 size={14} /> Tarefa #{task.publicId}</span><h3>{task.title}</h3><p>{task.team} · prazo estimado de {task.deadlineDays || 2} dias úteis{task.status === 'Bloqueada' || task.dependencyBlocked ? ' · Bloqueada por dependência' : ''}</p></div>
-                        <span className={`project-task-status project-task-status--${task.status.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '')}`}>{task.status}</span>
-                      </header>
-                      {(task.status === 'Bloqueada' || task.dependencyBlocked) && (
-                        <div className="project-task-dependency-note">
-                          <Lock size={12} />
-                          <span>Esta tarefa está bloqueada e só iniciará após a conclusão e aprovação da etapa anterior.</span>
-                        </div>
-                      )}
-                      <p className="project-task-summary">{task.briefing?.objective || task.briefing?.overview || 'Briefing herdado do projeto.'}</p>
-                      <footer>
-                        <button type="button" onClick={() => setExpandedTaskId(expanded ? null : task.id)}>{expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}{expanded ? 'Ocultar briefing' : 'Ver briefing'}</button>
-                        <button type="button" onClick={() => startEditingTaskBriefing(task)}><Pencil size={13} /> Personalizar briefing</button>
-                        {task.briefing?.inheritedFromProject && <span>Herdado do projeto</span>}
-                      </footer>
-                      {expanded && <section className="project-task-briefing">
-                        {editing ? <div className="project-task-briefing-editor">
-                          <label><span>Objetivo desta tarefa</span><textarea value={taskBriefingDraft.objective || ''} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, objective: event.target.value })} /></label>
-                          <label><span>Contexto</span><textarea value={taskBriefingDraft.overview || ''} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, overview: event.target.value })} /></label>
-                          <div><label><span>Público</span><input value={taskBriefingDraft.audience || ''} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, audience: event.target.value })} /></label><label><span>Tom</span><input value={taskBriefingDraft.tone || ''} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, tone: event.target.value })} /></label></div>
-                          <label><span>Entregáveis, separados por vírgula</span><input value={taskBriefingDraft.deliverables.join(', ')} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, deliverables: event.target.value.split(',').map((item) => item.trim()).filter(Boolean) })} /></label>
-                          <label><span>Formatos, separados por vírgula</span><input value={taskBriefingDraft.formats.join(', ')} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, formats: event.target.value.split(',').map((item) => item.trim()).filter(Boolean) })} /></label>
-                          <div className="project-task-briefing-editor__actions"><button type="button" onClick={() => { setEditingTaskId(null); setTaskBriefingDraft(null) }}>Cancelar</button><button type="button" disabled={savingTaskBriefing} onClick={() => void saveTaskBriefing(task)}>{savingTaskBriefing ? 'Salvando...' : 'Salvar briefing'}</button></div>
-                        </div> : <div className="project-task-briefing-content">
-                          <div><span>Objetivo</span><p>{task.briefing?.objective || 'Mesmo objetivo geral do projeto.'}</p></div>
-                          {task.briefing?.overview && <div><span>Contexto</span><p>{task.briefing.overview}</p></div>}
-                          <div className="project-task-briefing-grid"><div><span>Público</span><p>{task.briefing?.audience || 'Herdado do projeto'}</p></div><div><span>Tom</span><p>{task.briefing?.tone || 'Herdado do projeto'}</p></div></div>
-                          {task.briefing?.deliverables?.length > 0 && <div><span>Entregáveis</span><div className="project-task-briefing-tags">{task.briefing.deliverables.map((item) => <b key={item}>{item}</b>)}</div></div>}
-                          {task.briefing?.formats?.length > 0 && <div><span>Formatos</span><div className="project-task-briefing-tags">{task.briefing.formats.map((item) => <b key={item}>{item}</b>)}</div></div>}
-                        </div>}
-                      </section>}
+                  return <article className={`project-task-stack-card${expanded ? ' is-active' : ''}`} key={task.id}>
+                    <button className="project-task-card-open" type="button" onClick={() => setExpandedTaskId(expanded ? null : task.id)} aria-expanded={expanded}>
+                      <span className="project-task-number">{String(index + 1).padStart(2, '0')}</span>
+                      <div className="project-task-stack-title"><span><Layers3 size={15} /> Tarefa #{task.publicId}</span><h3>{task.title}</h3></div>
+                      <span className={`project-task-status project-task-status--${task.status.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '')}`}>{task.status}</span>
+                      {expanded ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
+                    </button>
+                    <div className="project-task-meta">
+                      <span>{task.team}</span><span>{task.deadlineDays || 2} dias úteis</span>
+                      {(task.status === 'Bloqueada' || task.dependencyBlocked) && <span className="is-blocked"><Lock size={13} /> Dependência</span>}
                     </div>
+                    <footer>
+                      <button type="button" onClick={() => setExpandedTaskId(expanded ? null : task.id)}><Eye size={15} />{expanded ? 'Fechar tarefa' : 'Abrir tarefa'}</button>
+                      <button type="button" onClick={() => startEditingTaskBriefing(task)}><Pencil size={14} /> Editar briefing</button>
+                    </footer>
                   </article>
                 })
               )}
             </div>
+
+            {expandedTask && <section className="project-task-detail">
+              <header><div><span>Tarefa #{expandedTask.publicId}</span><h3>{expandedTask.title}</h3></div><button type="button" onClick={() => setExpandedTaskId(null)} aria-label="Fechar tarefa"><ChevronUp size={18} /></button></header>
+              {editingExpandedTask && taskBriefingDraft ? <div className="project-task-briefing-editor">
+                <label><span>Objetivo desta tarefa</span><textarea value={taskBriefingDraft.objective || ''} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, objective: event.target.value })} /></label>
+                <label><span>Contexto</span><textarea value={taskBriefingDraft.overview || ''} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, overview: event.target.value })} /></label>
+                <div><label><span>Público</span><input value={taskBriefingDraft.audience || ''} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, audience: event.target.value })} /></label><label><span>Tom</span><input value={taskBriefingDraft.tone || ''} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, tone: event.target.value })} /></label></div>
+                <label><span>Entregáveis, separados por vírgula</span><input value={taskBriefingDraft.deliverables.join(', ')} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, deliverables: event.target.value.split(',').map((item) => item.trim()).filter(Boolean) })} /></label>
+                <label><span>Formatos, separados por vírgula</span><input value={taskBriefingDraft.formats.join(', ')} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, formats: event.target.value.split(',').map((item) => item.trim()).filter(Boolean) })} /></label>
+                <div className="project-task-briefing-editor__actions"><button type="button" onClick={() => { setEditingTaskId(null); setTaskBriefingDraft(null) }}>Cancelar</button><button type="button" disabled={savingTaskBriefing} onClick={() => void saveTaskBriefing(expandedTask)}>{savingTaskBriefing ? 'Salvando...' : 'Salvar briefing'}</button></div>
+              </div> : <div className="project-task-briefing-content">
+                <div><span>Objetivo</span><p>{expandedTask.briefing?.objective || 'Mesmo objetivo geral do projeto.'}</p></div>
+                {expandedTask.briefing?.overview && <div><span>Contexto</span><p>{expandedTask.briefing.overview}</p></div>}
+                <div className="project-task-briefing-grid"><div><span>Público</span><p>{expandedTask.briefing?.audience || 'Herdado do projeto'}</p></div><div><span>Tom</span><p>{expandedTask.briefing?.tone || 'Herdado do projeto'}</p></div></div>
+                {expandedTask.briefing?.deliverables?.length > 0 && <div><span>Entregáveis</span><div className="project-task-briefing-tags">{expandedTask.briefing.deliverables.map((item) => <b key={item}>{item}</b>)}</div></div>}
+                {expandedTask.briefing?.formats?.length > 0 && <div><span>Formatos</span><div className="project-task-briefing-tags">{expandedTask.briefing.formats.map((item) => <b key={item}>{item}</b>)}</div></div>}
+              </div>}
+            </section>}
           </article>
 
           <OverviewTimeline project={displayedProject} tasks={projectTasks} designs={designList} />
