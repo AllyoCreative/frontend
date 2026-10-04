@@ -97,12 +97,6 @@ export const CONCEPT_VISUAL_EXTRA_CREDITS = 3
 export const CONCEPT_VISUAL_EXTRA_DEADLINE_DAYS = 3
 
 export function isConceptVisualEligible(item: { code?: string | null; name?: string | null } | string | null | undefined): boolean {
-  if (!item) return false
-  if (typeof item === 'string') {
-    if (CONCEPT_VISUAL_CODES.has(item)) return true
-    return CONCEPT_VISUAL_NAMES.has(normalizeTaskName(item))
-  }
-  if (item.code && CONCEPT_VISUAL_CODES.has(item.code)) return true
-  if (item.name && CONCEPT_VISUAL_NAMES.has(normalizeTaskName(item.name))) return true
-  return false
+  if (typeof item === 'string') return item.trim().length > 0
+  return Boolean(item?.code?.trim() || item?.name?.trim())
 }
