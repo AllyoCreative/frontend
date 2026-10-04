@@ -1247,6 +1247,7 @@ function BriefStep(props: BriefStepProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [projectPickerOpen, setProjectPickerOpen] = useState(false)
   const selectedProject = props.projects.find((project) => project.id === props.targetProjectId)
+  const projectDisplayId = (project: Project) => project.tasksList?.[0]?.publicId
   useEffect(() => {
     if (!projectPickerOpen) return
     const closePicker = (event: MouseEvent) => {
@@ -1285,7 +1286,7 @@ function BriefStep(props: BriefStepProps) {
         >
           <span className="new-project-project-trigger__content">
             <strong>{selectedProject?.name || (props.creatingNewProject ? 'Novo projeto' : 'Selecione um projeto')}</strong>
-            {selectedProject && <small title={selectedProject.id}>ID: {selectedProject.id}</small>}
+            {selectedProject && projectDisplayId(selectedProject) && <small>ID: #{projectDisplayId(selectedProject)}</small>}
             {props.creatingNewProject && <small>Informe o nome no campo abaixo</small>}
           </span>
           {!props.fixedProjectId && <ChevronDown size={18} aria-hidden="true" />}
@@ -1308,7 +1309,7 @@ function BriefStep(props: BriefStepProps) {
                   }}
                 >
                   <strong>{project.name}</strong>
-                  <small title={project.id}>ID: {project.id}</small>
+                  {projectDisplayId(project) && <small>ID: #{projectDisplayId(project)}</small>}
                   {project.id === props.targetProjectId && <Check size={17} aria-hidden="true" />}
                 </button>
               )) : <p>Nenhum projeto em andamento.</p>}
