@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useParams } from 'react-router-dom'
-import { ChevronDown, ChevronUp, Circle, Download, ExternalLink, Eye, FileText, Flag, Image as ImageIcon, Layers3, Lock, MessageSquareText, Pencil, Play, Plus, Rocket, Upload } from 'lucide-react'
+import { ChevronDown, ChevronUp, Circle, Download, ExternalLink, Eye, FileText, Flag, Image as ImageIcon, Lock, MessageSquareText, Pencil, Play, Plus, Rocket, Upload } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
 import { DesignReviewModal, type ReviewCollectionItem, type ReviewOrigin } from '../components/DesignReviewModal'
@@ -694,22 +694,16 @@ export function ProjectDetailPage() {
               {projectTasks.length === 0 ? (
                 <div className="project-task-empty"><Circle size={16} /><span>Nenhuma tarefa cadastrada neste projeto.</span></div>
               ) : (
-                projectTasks.map((task, index) => {
+                projectTasks.map((task) => {
                   const expanded = expandedTaskId === task.id
                   return <article className={`project-task-stack-card${expanded ? ' is-active' : ''}`} key={task.id}>
                     <button className="project-task-card-open" type="button" onClick={() => setExpandedTaskId(expanded ? null : task.id)} aria-expanded={expanded}>
-                      <span className="project-task-number">{String(index + 1).padStart(2, '0')}</span>
-                      <div className="project-task-stack-title"><span><Layers3 size={15} /> Tarefa #{task.publicId}</span><h3>{task.title}</h3></div>
+                      <span className="project-task-id">#{task.publicId}</span>
                       <span className={`project-task-status project-task-status--${task.status.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '')}`}>{task.status}</span>
-                      {expanded ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
+                      <h3>{task.title}</h3>
+                      <span className="project-task-meta">{task.team} <i /> {task.deadlineDays || 2} dias úteis{(task.status === 'Bloqueada' || task.dependencyBlocked) && <Lock size={13} />}</span>
+                      <span className="project-task-open-label">{expanded ? 'Fechar' : 'Ver detalhes'} {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}</span>
                     </button>
-                    <div className="project-task-meta">
-                      <span>{task.team}</span><span>{task.deadlineDays || 2} dias úteis</span>
-                      {(task.status === 'Bloqueada' || task.dependencyBlocked) && <span className="is-blocked"><Lock size={13} /> Dependência</span>}
-                    </div>
-                    <footer>
-                      <button type="button" onClick={() => setExpandedTaskId(expanded ? null : task.id)}><Eye size={15} />{expanded ? 'Fechar detalhes' : 'Ver detalhes'}</button>
-                    </footer>
                   </article>
                 })
               )}
