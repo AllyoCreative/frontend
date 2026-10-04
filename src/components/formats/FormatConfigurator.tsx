@@ -110,6 +110,15 @@ export function FormatConfigurator(props: FormatConfiguratorProps) {
   const visibleAddons = canConfigureAddons
     ? availableAddons
     : availableAddons.filter((addon) => Boolean(props.addons[addon.code] && props.addons[addon.code] > 0))
+  const hasFormatsToAdd = (props.formatOptions || CHANNEL_FORMATS).some((option) =>
+    !props.configuredFormats.some((item) =>
+      item.channel.toLocaleLowerCase('pt-BR') === option.channel.toLocaleLowerCase('pt-BR')
+      && item.formatName.toLocaleLowerCase('pt-BR') === option.name.toLocaleLowerCase('pt-BR')
+    )
+  )
+  const completedFormatsLabel = props.formatOptions?.length === 1
+    ? 'Formato único já adicionado'
+    : 'Todos os formatos adicionados'
 
   return (
     <div className="format-configurator">
@@ -125,13 +134,17 @@ export function FormatConfigurator(props: FormatConfiguratorProps) {
             </div>
             <p>Escolha uma peça para configurar os detalhes.</p>
           </div>
-          <button
-            type="button"
-            className="format-configurator__add-format-btn"
-            onClick={props.onOpenAddModal}
-          >
-            <Plus size={16} /> Adicionar formato
-          </button>
+          {hasFormatsToAdd ? (
+            <button
+              type="button"
+              className="format-configurator__add-format-btn"
+              onClick={props.onOpenAddModal}
+            >
+              <Plus size={16} /> Adicionar formato
+            </button>
+          ) : (
+            <span className="format-configurator__formats-complete">{completedFormatsLabel}</span>
+          )}
         </div>
 
         <div className="format-configurator__list">

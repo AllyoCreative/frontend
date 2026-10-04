@@ -278,6 +278,13 @@
   color: #ffffff;
 }
 
+.format-configurator__formats-complete {
+  color: #7a817c;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
 /* --------------------------------------------------------------------------
    Content (Right Column: Configuration of Active Format)
    -------------------------------------------------------------------------- */
@@ -1284,6 +1291,7 @@
   background: #eef6ed;
   border-color: #004c46;
   color: #004c46;
+  cursor: default;
 }
 
 .format-card-add-btn.is-added:hover {

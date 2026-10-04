@@ -116,6 +116,7 @@ export function AddFormatsModal({ isOpen, onClose, onAddFormat, configuredFormat
             <div className="format-cards-grid">
               {filteredFormats.map((option) => {
                 const count = getFormatCount(option.name, option.channel)
+                const alreadyAdded = count > 0
                 return (
                   <div key={option.id} className="format-card-item">
                     <div className="format-card-mockup-area">
@@ -134,12 +135,13 @@ export function AddFormatsModal({ isOpen, onClose, onAddFormat, configuredFormat
 
                     <button
                       type="button"
-                      className={`format-card-add-btn ${count > 0 ? 'is-added' : ''}`}
+                      className={`format-card-add-btn ${alreadyAdded ? 'is-added' : ''}`}
+                      disabled={alreadyAdded}
                       onClick={() => onAddFormat(option)}
                     >
-                      {count > 0 ? (
+                      {alreadyAdded ? (
                         <>
-                          <Check size={16} /> Adicionado ({count})
+                          <Check size={16} /> Adicionado
                         </>
                       ) : (
                         '+ Adicionar'

@@ -389,6 +389,14 @@ export function NewProjectPage() {
   const [isAddFormatsModalOpen, setIsAddFormatsModalOpen] = useState(false)
 
   const handleAddFormat = (option: ChannelFormatOption) => {
+    const existing = configuredFormats.find((item) =>
+      item.channel.toLocaleLowerCase('pt-BR') === option.channel.toLocaleLowerCase('pt-BR')
+      && item.formatName.toLocaleLowerCase('pt-BR') === option.name.toLocaleLowerCase('pt-BR')
+    )
+    if (existing) {
+      setActiveFormatId(existing.id)
+      return
+    }
     const newId = `fmt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
     const isFirst = configuredFormats.length === 0
     const newItem: ConfiguredFormatItem = {
