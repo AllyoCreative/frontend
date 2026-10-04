@@ -109,15 +109,17 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .new-project-button img { width: 19px; height: 19px; }
 
 .primary-button, .secondary-button {
-  min-height: 36px;
-  padding: 0 15px;
+  min-height: 40px;
+  padding: 0 17px;
   border-radius: 999px;
   border-color: #0d1e1d;
   background: #0d1e1d;
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 650;
 }
 .primary-button:hover { background: #004c46; }
 .secondary-button { border-color: #d8dcd5; background: #fff; color: #131f15; }
+.text-button { font-size: 13px; font-weight: 600; }
 .eyebrow { color: #a1a79d; font-size: 8px; letter-spacing: .08em; }
 .page-header { align-items: center; margin-bottom: 29px; }
 .page-header h1 { margin: 0; font-size: 25px; line-height: 1.2; letter-spacing: -.04em; }
@@ -2031,6 +2033,7 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .account-modal header > button { width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 8px; background: #f0f2ee; color: #53605a; cursor: pointer; transition: background .16s ease; }
 .account-modal header > button:hover { background: #e3e6e0; color: #131f15; }
 .account-modal footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; padding-top: 16px; border-top: 1px solid #eef1ec; }
+.account-modal footer button { min-height: 40px; font-size: 13px; }
 .team-editor__members { max-height: 340px; overflow-y: auto; border: 1px solid #d8dcd5; border-radius: 10px; }
 .team-editor__members label { min-height: 60px; display: grid; grid-template-columns: 20px 38px minmax(0, 1fr); align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid #eef1ec; cursor: pointer; transition: background .14s ease; }
 .team-editor__members label:hover { background: #fbfcf9; }
@@ -2219,6 +2222,27 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .new-project-field textarea:focus { border-color: #6f968c; background: #fff; box-shadow: 0 0 0 3px rgba(0,76,70,.08); }
 .new-project-field select:disabled { opacity: .7; cursor: not-allowed; }
 .new-project-field textarea:disabled { opacity: .5; cursor: not-allowed; }
+.new-project-project-picker { position: relative; }
+.new-project-project-trigger { min-height: 58px; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 9px 14px; border: 1px solid transparent; border-radius: 9px; background: #f4f5f4; color: #131f15; text-align: left; cursor: pointer; }
+.new-project-project-trigger:hover { border-color: #cbd4cd; background: #f4f5f4; }
+.new-project-project-trigger.is-open { border-color: #6f968c; background: #fff; }
+.new-project-project-trigger:disabled { opacity: .75; cursor: not-allowed; }
+.new-project-project-trigger > svg { flex: none; color: #53605a; transition: transform .16s ease; }
+.new-project-project-trigger.is-open > svg { transform: rotate(180deg); }
+.new-project-project-trigger__content { min-width: 0; display: grid; gap: 2px; }
+.new-project-project-trigger__content strong { overflow: hidden; color: #131f15; font-size: 14px; font-weight: 650; line-height: 20px; text-overflow: ellipsis; white-space: nowrap; }
+.new-project-project-trigger__content small { overflow: hidden; color: #68726c; font-size: 12px; font-weight: 500; line-height: 17px; text-overflow: ellipsis; white-space: nowrap; }
+.new-project-project-menu { position: absolute; z-index: 30; top: calc(100% + 8px); left: 0; right: 0; overflow: hidden; border: 1px solid #cfd7d0; border-radius: 10px; background: #fff; }
+.new-project-project-list { max-height: 248px; overflow-y: auto; }
+.new-project-project-list > button { min-height: 58px; width: 100%; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 2px 12px; align-items: center; padding: 9px 14px; border: 0; border-bottom: 1px solid #edf0ec; background: #fff; color: #131f15; text-align: left; cursor: pointer; }
+.new-project-project-list > button:hover { background: #f4f7f3; }
+.new-project-project-list > button.selected { background: #edf4ed; color: #004c46; }
+.new-project-project-list > button strong { overflow: hidden; font-size: 14px; font-weight: 650; line-height: 20px; text-overflow: ellipsis; white-space: nowrap; }
+.new-project-project-list > button small { grid-column: 1; overflow: hidden; color: #68726c; font-size: 12px; font-weight: 500; line-height: 17px; text-overflow: ellipsis; white-space: nowrap; }
+.new-project-project-list > button svg { grid-column: 2; grid-row: 1 / 3; color: #004c46; }
+.new-project-project-list > p { margin: 0; padding: 18px 14px; color: #68726c; font-size: 13px; font-weight: 500; text-align: center; }
+.new-project-project-create { position: sticky; bottom: 0; min-height: 48px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 14px; border: 0; border-top: 1px solid #dfe5df; background: #fff; color: #004c46; font-size: 13px; font-weight: 700; cursor: pointer; }
+.new-project-project-create:hover { background: #edf4ed; }
 .new-project-inline-action { position: absolute; right: 12px; bottom: 10px; padding: 0; border: 0; background: transparent; color: #004c46; font-size: 12px; font-weight: 700; }
 .new-project-context-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
 
@@ -2697,7 +2721,7 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .new-project-review-total small { color: #53605a; font-size: 12px; }
 .new-project-review-total p { align-self: center; margin: 0; color: #53605a; font-size: 12px; line-height: 18px; }
 .new-project-flow-footer { min-height: 70px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 30px; background: #fafbf9; }
-.new-project-flow-footer button { min-height: 40px; }
+.new-project-flow-footer button { min-height: 42px; font-size: 13px; }
 
 .new-project-order-summary { position: sticky; top: 76px; min-width: 0; display: grid; align-content: start; padding: 24px; border: 1px solid #e5e9e4; border-radius: 14px; background: #fff; }
 .new-project-order-summary__eyebrow { margin-bottom: 15px; color: #778078; font-size: 11px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }

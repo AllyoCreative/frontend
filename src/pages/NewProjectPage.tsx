@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, ExternalLink, FileOutput, FileText, Layers3, Link2, Loader2, Maximize2, Minus, PaintBucket, Paperclip, PenTool, Pencil, Plus, Search, Sparkles, Upload, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronDown, Clock3, ExternalLink, FileOutput, FileText, Layers3, Link2, Loader2, Maximize2, Minus, PaintBucket, Paperclip, PenTool, Pencil, Plus, Search, Sparkles, Upload, X } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
 import { isConceptVisualEligible } from '../config/creativePathConfig'
@@ -32,6 +32,7 @@ interface SavedRequestDraft {
   selectedCode?: string
   step?: FlowStep
   targetProjectId?: string
+  creatingNewProject?: boolean
   name?: string
   objective?: string
   overview?: string
@@ -380,6 +381,7 @@ export function NewProjectPage() {
   }
   const [name, setName] = useState('')
   const [targetProjectId, setTargetProjectId] = useState(fixedProjectId)
+  const [creatingNewProject, setCreatingNewProject] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [objective, setObjective] = useState('')
   const [overview, setOverview] = useState('')
@@ -426,7 +428,10 @@ export function NewProjectPage() {
   useEffect(() => {
     if (!targetProjectId) return
     const target = projects.find((project) => project.id === targetProjectId)
-    if (target) setName(target.name)
+    if (target) {
+      setName(target.name)
+      setCreatingNewProject(false)
+    }
   }, [projects, targetProjectId])
 
   const handleAddFormat = (option: ChannelFormatOption) => {
@@ -683,6 +688,7 @@ export function NewProjectPage() {
       if (!product) return
       selectProduct(product)
       if (draft.targetProjectId && (!fixedProjectId || draft.targetProjectId === fixedProjectId)) setTargetProjectId(draft.targetProjectId)
+      if (typeof draft.creatingNewProject === 'boolean') setCreatingNewProject(draft.creatingNewProject)
       if (typeof draft.name === 'string') setName(draft.name)
       if (typeof draft.objective === 'string') setObjective(draft.objective)
       if (typeof draft.overview === 'string') setOverview(draft.overview)
@@ -786,6 +792,7 @@ export function NewProjectPage() {
       selectedCode: selected.code,
       step,
       targetProjectId,
+      creatingNewProject,
       name,
       objective,
       overview,
@@ -1050,7 +1057,7 @@ export function NewProjectPage() {
         </div>
       </main> : selected && <main className="new-project-flow">
         <section className="new-project-flow__main">
-          {step === 'brief' && <BriefStep selected={selected} name={name} objective={objective} overview={overview} projectGoal={projectGoal} audience={audience} tone={tone} notApplicable={notApplicable} creativePath={creativePath} referenceFiles={referenceFiles} referenceLinks={referenceLinks} linkDraft={linkDraft} projects={availableProjects} targetProjectId={targetProjectId} fixedProjectId={fixedProjectId} setTargetProjectId={setTargetProjectId} setName={setName} setObjective={setObjective} setOverview={setOverview} setProjectGoal={setProjectGoal} setAudience={setAudience} setTone={setTone} setNotApplicable={setNotApplicable} setCreativePath={setCreativePath} setLinkDraft={setLinkDraft} addReferenceLink={addReferenceLink} addReferenceFiles={addReferenceFiles} removeFile={(index) => setReferenceFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} removeLink={(link) => setReferenceLinks((current) => current.filter((item) => item !== link))} onPreviewFile={(file) => setPreviewFile({ name: file.name, file, sizeBytes: file.size, contentType: file.type })} onCancel={() => setStep('catalog')} onNext={() => setStep('configure')} ready={briefReady} />}
+          {step === 'brief' && <BriefStep selected={selected} name={name} objective={objective} overview={overview} projectGoal={projectGoal} audience={audience} tone={tone} notApplicable={notApplicable} creativePath={creativePath} referenceFiles={referenceFiles} referenceLinks={referenceLinks} linkDraft={linkDraft} projects={availableProjects} targetProjectId={targetProjectId} fixedProjectId={fixedProjectId} creatingNewProject={creatingNewProject} setCreatingNewProject={setCreatingNewProject} setTargetProjectId={setTargetProjectId} setName={setName} setObjective={setObjective} setOverview={setOverview} setProjectGoal={setProjectGoal} setAudience={setAudience} setTone={setTone} setNotApplicable={setNotApplicable} setCreativePath={setCreativePath} setLinkDraft={setLinkDraft} addReferenceLink={addReferenceLink} addReferenceFiles={addReferenceFiles} removeFile={(index) => setReferenceFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} removeLink={(link) => setReferenceLinks((current) => current.filter((item) => item !== link))} onPreviewFile={(file) => setPreviewFile({ name: file.name, file, sizeBytes: file.size, contentType: file.type })} onCancel={() => setStep('catalog')} onNext={() => setStep('configure')} ready={briefReady} />}
           {step === 'configure' && (
             <ConfigureStep
               selected={selected}
@@ -1224,7 +1231,7 @@ function FlowProgress({ step, briefReady, onStep }: { step: FlowStep; briefReady
 
 interface BriefStepProps {
   selected: CatalogProduct; name: string; objective: string; overview: string; projectGoal: string; audience: string; tone: string
-  projects: Project[]; targetProjectId: string; fixedProjectId: string; setTargetProjectId: (value: string) => void
+  projects: Project[]; targetProjectId: string; fixedProjectId: string; creatingNewProject: boolean; setCreatingNewProject: (value: boolean) => void; setTargetProjectId: (value: string) => void
   notApplicable: { audience: boolean; tone: boolean }; creativePath: 'new-direction' | 'new-concept' | 'follow-references'; referenceFiles: File[]; referenceLinks: string[]; linkDraft: string
   setName: (value: string) => void; setObjective: (value: string) => void; setOverview: (value: string) => void
   setProjectGoal: (value: string) => void; setAudience: (value: string) => void; setTone: (value: string) => void
@@ -1236,7 +1243,25 @@ interface BriefStepProps {
 
 function BriefStep(props: BriefStepProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const projectPickerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false)
+  const selectedProject = props.projects.find((project) => project.id === props.targetProjectId)
+  useEffect(() => {
+    if (!projectPickerOpen) return
+    const closePicker = (event: MouseEvent) => {
+      if (!projectPickerRef.current?.contains(event.target as Node)) setProjectPickerOpen(false)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setProjectPickerOpen(false)
+    }
+    document.addEventListener('mousedown', closePicker)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('mousedown', closePicker)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [projectPickerOpen])
   const toggleNotApplicable = (key: 'audience' | 'tone') => {
     props.setNotApplicable((current) => ({ ...current, [key]: !current[key] }))
     if (key === 'audience') props.setAudience('')
@@ -1247,8 +1272,64 @@ function BriefStep(props: BriefStepProps) {
   return <>
     <FlowHeading eyebrow="Etapa 1 de 3" title="Conte o que precisa ser criado" description="Reunimos só o contexto que realmente ajuda o time a começar bem." />
     <div className="new-project-form-section">
-      <label className="new-project-field"><span>Projeto <b>Obrigatório</b></span><small>Adicione esta tarefa a um projeto em andamento ou crie um novo.</small><select value={props.targetProjectId} disabled={Boolean(props.fixedProjectId)} onChange={(event) => { const projectId = event.target.value; props.setTargetProjectId(projectId); const project = props.projects.find((item) => item.id === projectId); props.setName(project?.name || '') }}><option value="">Criar novo projeto</option>{props.projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
-      {!props.targetProjectId && <label className="new-project-field"><span>Nome do novo projeto <b>Obrigatório</b></span><input value={props.name} onChange={(event) => props.setName(event.target.value)} placeholder="Ex.: Campanha de lançamento — outubro" autoFocus /></label>}
+      <div className="new-project-field new-project-project-picker" ref={projectPickerRef}>
+        <span>Projeto <b>Obrigatório</b></span>
+        <small>Adicione esta tarefa a um projeto em andamento ou crie um novo.</small>
+        <button
+          type="button"
+          className={`new-project-project-trigger ${projectPickerOpen ? 'is-open' : ''}`}
+          disabled={Boolean(props.fixedProjectId)}
+          aria-haspopup="listbox"
+          aria-expanded={projectPickerOpen}
+          onClick={() => setProjectPickerOpen((open) => !open)}
+        >
+          <span className="new-project-project-trigger__content">
+            <strong>{selectedProject?.name || (props.creatingNewProject ? 'Novo projeto' : 'Selecione um projeto')}</strong>
+            {selectedProject && <small title={selectedProject.id}>ID: {selectedProject.id}</small>}
+            {props.creatingNewProject && <small>Informe o nome no campo abaixo</small>}
+          </span>
+          {!props.fixedProjectId && <ChevronDown size={18} aria-hidden="true" />}
+        </button>
+        {projectPickerOpen && !props.fixedProjectId && (
+          <div className="new-project-project-menu" role="listbox" aria-label="Projetos em andamento">
+            <div className="new-project-project-list">
+              {props.projects.length > 0 ? props.projects.map((project) => (
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={project.id === props.targetProjectId}
+                  className={project.id === props.targetProjectId ? 'selected' : ''}
+                  key={project.id}
+                  onClick={() => {
+                    props.setTargetProjectId(project.id)
+                    props.setCreatingNewProject(false)
+                    props.setName(project.name)
+                    setProjectPickerOpen(false)
+                  }}
+                >
+                  <strong>{project.name}</strong>
+                  <small title={project.id}>ID: {project.id}</small>
+                  {project.id === props.targetProjectId && <Check size={17} aria-hidden="true" />}
+                </button>
+              )) : <p>Nenhum projeto em andamento.</p>}
+            </div>
+            <button
+              type="button"
+              className="new-project-project-create"
+              onClick={() => {
+                props.setTargetProjectId('')
+                props.setCreatingNewProject(true)
+                props.setName('')
+                setProjectPickerOpen(false)
+              }}
+            >
+              <Plus size={17} aria-hidden="true" />
+              Criar novo projeto
+            </button>
+          </div>
+        )}
+      </div>
+      {props.creatingNewProject && !props.targetProjectId && <label className="new-project-field"><span>Nome do novo projeto <b>Obrigatório</b></span><input value={props.name} onChange={(event) => props.setName(event.target.value)} placeholder="Ex.: Campanha de lançamento — outubro" autoFocus /></label>}
       <label className="new-project-field"><span>O que você quer criar? <b>Obrigatório</b></span><small>Explique o contexto, a mensagem principal e o resultado esperado.</small><textarea value={props.overview} onChange={(event) => props.setOverview(event.target.value)} placeholder="Conte um pouco sobre a necessidade, o momento da marca e o que esta entrega precisa resolver..." /></label>
     </div>
     {isEligible ? (
