@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, ArrowLeft, ArrowRight, Check, CheckCircle2, Clock3, ExternalLink, FileOutput, FileText, Layers3, Link2, Loader2, Maximize2, Minus, PaintBucket, Paperclip, PenTool, Pencil, Plus, Search, Sparkles, Upload, X } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
@@ -13,6 +13,7 @@ import { buildCatalogFormatOptions } from '../components/formats/catalogFormatOp
 import { FormatConfigurator } from '../components/formats/FormatConfigurator'
 import { ChannelBadgeIcon } from '../components/formats/ChannelIcons'
 import type { ChannelFormatOption, ConfiguredFormatItem } from '../components/formats/formatTypes'
+import type { Project } from '../types'
 
 const DEFAULT_FALLBACK_PACKAGES: CreditPackageSummary[] = [
   { id: 'Starter', name: 'Starter', credits: 13, priceCents: 256300, bonusPercent: 30, recommended: false },
@@ -26,6 +27,29 @@ function formatCurrency(cents: number) {
 
 type FlowStep = 'catalog' | 'brief' | 'configure' | 'review' | 'success'
 type DeliveryConfig = Pick<ProjectDeliverySchema, 'taskType' | 'structure' | 'itemLabel'> & { title: string; description: string }
+
+interface SavedRequestDraft {
+  selectedCode?: string
+  step?: FlowStep
+  targetProjectId?: string
+  name?: string
+  objective?: string
+  overview?: string
+  projectGoal?: string
+  audience?: string
+  tone?: string
+  notApplicable?: { audience: boolean; tone: boolean }
+  creativePath?: 'new-direction' | 'new-concept' | 'follow-references'
+  referenceLinks?: string[]
+  selectedApplications?: string[]
+  selectedSizes?: string[]
+  selectedFinalFormat?: string
+  selectedEditableFormat?: string
+  scope?: CatalogScope
+  deliveryItems?: ProjectDeliveryItem[]
+  configuredFormats?: ConfiguredFormatItem[]
+  activeFormatId?: string
+}
 
 interface CategoryMeta {
   label: string
@@ -300,7 +324,9 @@ function CatalogMediaPreview({
 
 export function NewProjectPage() {
   const navigate = useNavigate()
-  const { addProject, notify, account, refreshAccount } = useApp()
+  const [searchParams] = useSearchParams()
+  const fixedProjectId = searchParams.get('projectId') || ''
+  const { addProject, notify, account, refreshAccount, projects } = useApp()
   const [products, setProducts] = useState<CatalogProduct[]>([])
   const [loaded, setLoaded] = useState(false)
   const [catalogError, setCatalogError] = useState('')
@@ -316,7 +342,10 @@ export function NewProjectPage() {
   const [quoteError, setQuoteError] = useState('')
 
   const [showCreditModal, setShowCreditModal] = useState(false)
+  const [showExitDialog, setShowExitDialog] = useState(false)
   const [purchasingPackageId, setPurchasingPackageId] = useState<string | null>(null)
+  const draftRestoredRef = useRef(false)
+  const draftStorageKey = `allyo-request-draft:${fixedProjectId || 'new-project'}`
 
   useEffect(() => {
     if (!account) {
@@ -350,6 +379,7 @@ export function NewProjectPage() {
     }
   }
   const [name, setName] = useState('')
+  const [targetProjectId, setTargetProjectId] = useState(fixedProjectId)
   const [submitError, setSubmitError] = useState('')
   const [objective, setObjective] = useState('')
   const [overview, setOverview] = useState('')
@@ -387,6 +417,17 @@ export function NewProjectPage() {
   ])
   const [activeFormatId, setActiveFormatId] = useState<string | null>('fmt-1')
   const [isAddFormatsModalOpen, setIsAddFormatsModalOpen] = useState(false)
+  const availableProjects = useMemo(() => projects.filter((project) => {
+    const tasks = project.tasksList || []
+    const allTasksCompleted = tasks.length > 0 && tasks.every((task) => task.status === 'Concluído')
+    return project.status !== 'Concluído' && !allTasksCompleted
+  }), [projects])
+
+  useEffect(() => {
+    if (!targetProjectId) return
+    const target = projects.find((project) => project.id === targetProjectId)
+    if (target) setName(target.name)
+  }, [projects, targetProjectId])
 
   const handleAddFormat = (option: ChannelFormatOption) => {
     const existing = configuredFormats.find((item) =>
@@ -593,7 +634,7 @@ export function NewProjectPage() {
     setSelectedSizes(initialSize ? [initialSize] : [])
     setSelectedFinalFormat(defaultFinalFormat(product))
     setSelectedEditableFormat('')
-    setName('')
+    setName(targetProjectId ? projects.find((item) => item.id === targetProjectId)?.name || '' : '')
     setOverview('')
     setProjectGoal(goals[0])
     setAudience('')
@@ -628,6 +669,43 @@ export function NewProjectPage() {
 
     setStep('brief')
   }
+
+  // A restauração deve acontecer apenas uma vez após o catálogo carregar.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!loaded || draftRestoredRef.current) return
+    draftRestoredRef.current = true
+    const rawDraft = window.localStorage.getItem(draftStorageKey)
+    if (!rawDraft) return
+    try {
+      const draft = JSON.parse(rawDraft) as SavedRequestDraft
+      const product = products.find((item) => item.code === draft.selectedCode)
+      if (!product) return
+      selectProduct(product)
+      if (draft.targetProjectId && (!fixedProjectId || draft.targetProjectId === fixedProjectId)) setTargetProjectId(draft.targetProjectId)
+      if (typeof draft.name === 'string') setName(draft.name)
+      if (typeof draft.objective === 'string') setObjective(draft.objective)
+      if (typeof draft.overview === 'string') setOverview(draft.overview)
+      if (typeof draft.projectGoal === 'string') setProjectGoal(draft.projectGoal)
+      if (typeof draft.audience === 'string') setAudience(draft.audience)
+      if (typeof draft.tone === 'string') setTone(draft.tone)
+      if (draft.notApplicable) setNotApplicable(draft.notApplicable)
+      if (draft.creativePath) setCreativePath(draft.creativePath)
+      if (Array.isArray(draft.referenceLinks)) setReferenceLinks(draft.referenceLinks)
+      if (Array.isArray(draft.selectedApplications)) setSelectedApplications(draft.selectedApplications)
+      if (Array.isArray(draft.selectedSizes)) setSelectedSizes(draft.selectedSizes)
+      if (typeof draft.selectedFinalFormat === 'string') setSelectedFinalFormat(draft.selectedFinalFormat)
+      if (typeof draft.selectedEditableFormat === 'string') setSelectedEditableFormat(draft.selectedEditableFormat)
+      if (draft.scope) setScope(draft.scope)
+      if (Array.isArray(draft.deliveryItems)) setDeliveryItems(draft.deliveryItems)
+      if (Array.isArray(draft.configuredFormats)) setConfiguredFormats(draft.configuredFormats)
+      if (typeof draft.activeFormatId === 'string') setActiveFormatId(draft.activeFormatId)
+      if (draft.step && ['brief', 'configure', 'review'].includes(draft.step)) setStep(draft.step)
+      notify('Rascunho restaurado. Você pode continuar de onde parou.')
+    } catch {
+      window.localStorage.removeItem(draftStorageKey)
+    }
+  }, [draftStorageKey, fixedProjectId, loaded, products])
 
   const updateCounter = (key: keyof Pick<CatalogScope, 'quantity' | 'taskRepeats' | 'resizeCount' | 'variationCount' | 'characterCount'>, delta: number) => {
     setQuote(null)
@@ -697,6 +775,44 @@ export function NewProjectPage() {
     notify(`${incoming.length} arquivo(s) adicionado(s) às referências`)
   }
 
+  const leaveFlow = () => {
+    if (fixedProjectId) navigate(`/projetos/${fixedProjectId}`)
+    else navigate(-1)
+  }
+
+  const saveDraftAndLeave = () => {
+    if (!selected) return leaveFlow()
+    window.localStorage.setItem(draftStorageKey, JSON.stringify({
+      selectedCode: selected.code,
+      step,
+      targetProjectId,
+      name,
+      objective,
+      overview,
+      projectGoal,
+      audience,
+      tone,
+      notApplicable,
+      creativePath,
+      referenceLinks,
+      selectedApplications,
+      selectedSizes,
+      selectedFinalFormat,
+      selectedEditableFormat,
+      scope,
+      deliveryItems,
+      configuredFormats,
+      activeFormatId,
+    }))
+    notify('Rascunho salvo para continuar depois.')
+    leaveFlow()
+  }
+
+  const requestClose = () => {
+    if (selected && step !== 'success') setShowExitDialog(true)
+    else leaveFlow()
+  }
+
   const submit = async () => {
     if (submitting) return
     setSubmitError('')
@@ -750,6 +866,7 @@ export function NewProjectPage() {
 
     try {
       const created = await addProject({
+        existingProjectId: targetProjectId || undefined,
         name: name.trim(),
         service: selected.name,
         status: 'Em andamento',
@@ -791,6 +908,7 @@ export function NewProjectPage() {
       }))
       const failedUploads = uploads.filter((result) => result.status === 'rejected').length
       if (failedUploads) notify(`Projeto criado, mas ${failedUploads} arquivo(s) não foram anexados.`)
+      window.localStorage.removeItem(draftStorageKey)
       setStep('success')
     } catch (error: any) {
       console.error('Erro ao enviar projeto:', error)
@@ -815,13 +933,13 @@ export function NewProjectPage() {
   }
 
   if (step === 'success') return <div className="new-project-page new-project-success">
-    <button type="button" className="new-project-success__close" onClick={() => navigate('/')} aria-label="Fechar"><X size={22} /></button>
+    <button type="button" className="new-project-success__close" onClick={() => navigate(targetProjectId ? `/projetos/${targetProjectId}` : '/')} aria-label="Fechar"><X size={22} /></button>
     <div className="new-project-success__mark"><Check size={28} /></div>
-    <span className="new-project-success__eyebrow">Briefing enviado</span>
-    <h1>Seu projeto decolou.</h1>
-    <p>O time Allyo recebeu o contexto, o escopo e as referências. Agora vamos validar a solicitação e confirmar a entrega.</p>
+    <span className="new-project-success__eyebrow">{targetProjectId ? 'Tarefa adicionada' : 'Briefing enviado'}</span>
+    <h1>{targetProjectId ? 'A nova tarefa entrou no projeto.' : 'Seu projeto decolou.'}</h1>
+    <p>O time Allyo recebeu o contexto e o escopo. Agora vamos validar a solicitação e confirmar a entrega.</p>
     <div className="new-project-success__summary"><span style={{ background: categoryAccent[selected?.category || ''] }} /><div><small>{selected?.category} · código {selected?.code}</small><strong>{name}</strong><p>{selected?.name} · {quote ? `${formatCredits(quote.totalCredits)} créditos estimados` : ''}</p></div></div>
-    <div className="new-project-success__actions"><button type="button" className="secondary-button" onClick={() => navigate('/projetos')}>Ver projetos</button><button type="button" className="primary-button" onClick={() => navigate('/')}>Voltar ao início <ArrowRight size={16} /></button></div>
+    <div className="new-project-success__actions"><button type="button" className="secondary-button" onClick={() => navigate('/projetos')}>Ver projetos</button><button type="button" className="primary-button" onClick={() => navigate(targetProjectId ? `/projetos/${targetProjectId}` : '/')}>{targetProjectId ? 'Abrir projeto' : 'Voltar ao início'} <ArrowRight size={16} /></button></div>
   </div>
 
   return <div className="new-project-page new-project-modal">
@@ -863,7 +981,7 @@ export function NewProjectPage() {
         ) : (
           <FlowProgress step={step} briefReady={briefReady} onStep={setStep} />
         )}
-        <button type="button" className="new-project-dialog__close" onClick={() => navigate(-1)} aria-label="Fechar"><img src={figmaAsset(step === 'catalog' ? 'catalog.imgMaterialSymbolsClose' : 'brief.imgMaterialSymbolsClose')} alt="" /></button>
+        <button type="button" className="new-project-dialog__close" onClick={requestClose} aria-label="Fechar"><img src={figmaAsset(step === 'catalog' ? 'catalog.imgMaterialSymbolsClose' : 'brief.imgMaterialSymbolsClose')} alt="" /></button>
       </header>
 
       {step === 'catalog' ? <main className="new-project-catalog">
@@ -932,7 +1050,7 @@ export function NewProjectPage() {
         </div>
       </main> : selected && <main className="new-project-flow">
         <section className="new-project-flow__main">
-          {step === 'brief' && <BriefStep selected={selected} name={name} objective={objective} overview={overview} projectGoal={projectGoal} audience={audience} tone={tone} notApplicable={notApplicable} creativePath={creativePath} referenceFiles={referenceFiles} referenceLinks={referenceLinks} linkDraft={linkDraft} setName={setName} setObjective={setObjective} setOverview={setOverview} setProjectGoal={setProjectGoal} setAudience={setAudience} setTone={setTone} setNotApplicable={setNotApplicable} setCreativePath={setCreativePath} setLinkDraft={setLinkDraft} addReferenceLink={addReferenceLink} addReferenceFiles={addReferenceFiles} removeFile={(index) => setReferenceFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} removeLink={(link) => setReferenceLinks((current) => current.filter((item) => item !== link))} onPreviewFile={(file) => setPreviewFile({ name: file.name, file, sizeBytes: file.size, contentType: file.type })} onCancel={() => setStep('catalog')} onNext={() => setStep('configure')} ready={briefReady} />}
+          {step === 'brief' && <BriefStep selected={selected} name={name} objective={objective} overview={overview} projectGoal={projectGoal} audience={audience} tone={tone} notApplicable={notApplicable} creativePath={creativePath} referenceFiles={referenceFiles} referenceLinks={referenceLinks} linkDraft={linkDraft} projects={availableProjects} targetProjectId={targetProjectId} fixedProjectId={fixedProjectId} setTargetProjectId={setTargetProjectId} setName={setName} setObjective={setObjective} setOverview={setOverview} setProjectGoal={setProjectGoal} setAudience={setAudience} setTone={setTone} setNotApplicable={setNotApplicable} setCreativePath={setCreativePath} setLinkDraft={setLinkDraft} addReferenceLink={addReferenceLink} addReferenceFiles={addReferenceFiles} removeFile={(index) => setReferenceFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} removeLink={(link) => setReferenceLinks((current) => current.filter((item) => item !== link))} onPreviewFile={(file) => setPreviewFile({ name: file.name, file, sizeBytes: file.size, contentType: file.type })} onCancel={() => setStep('catalog')} onNext={() => setStep('configure')} ready={briefReady} />}
           {step === 'configure' && (
             <ConfigureStep
               selected={selected}
@@ -1024,6 +1142,16 @@ export function NewProjectPage() {
         formatOptions={catalogFormatOptions}
       />
     )}
+    {showExitDialog && createPortal(
+      <div className="account-modal" role="dialog" aria-modal="true" aria-labelledby="save-draft-title">
+        <div>
+          <header><div><h2 id="save-draft-title">Salvar antes de sair?</h2><p>Você pode continuar esta solicitação futuramente.</p></div><button type="button" onClick={() => setShowExitDialog(false)} aria-label="Continuar editando"><X size={18} /></button></header>
+          {referenceFiles.length > 0 && <p>Os campos serão salvos, mas os arquivos locais precisarão ser anexados novamente.</p>}
+          <footer><button type="button" className="text-button" onClick={() => { window.localStorage.removeItem(draftStorageKey); leaveFlow() }}>Sair sem salvar</button><button type="button" className="secondary-button" onClick={() => setShowExitDialog(false)}>Continuar editando</button><button type="button" className="primary-button" onClick={saveDraftAndLeave}>Salvar rascunho</button></footer>
+        </div>
+      </div>,
+      document.body,
+    )}
     {showCreditModal && createPortal(
       <div
         className={`account-modal account-modal--credits${hasInsufficientCredits ? ' is-insufficient' : ''}`}
@@ -1096,6 +1224,7 @@ function FlowProgress({ step, briefReady, onStep }: { step: FlowStep; briefReady
 
 interface BriefStepProps {
   selected: CatalogProduct; name: string; objective: string; overview: string; projectGoal: string; audience: string; tone: string
+  projects: Project[]; targetProjectId: string; fixedProjectId: string; setTargetProjectId: (value: string) => void
   notApplicable: { audience: boolean; tone: boolean }; creativePath: 'new-direction' | 'new-concept' | 'follow-references'; referenceFiles: File[]; referenceLinks: string[]; linkDraft: string
   setName: (value: string) => void; setObjective: (value: string) => void; setOverview: (value: string) => void
   setProjectGoal: (value: string) => void; setAudience: (value: string) => void; setTone: (value: string) => void
@@ -1114,10 +1243,12 @@ function BriefStep(props: BriefStepProps) {
     else props.setTone('')
   }
   const isEligible = isConceptVisualEligible(props.selected)
+  const isFileConversion = normalizeText(props.selected.name).includes('conversao de arquivo')
   return <>
     <FlowHeading eyebrow="Etapa 1 de 3" title="Conte o que precisa ser criado" description="Reunimos só o contexto que realmente ajuda o time a começar bem." />
     <div className="new-project-form-section">
-      <label className="new-project-field"><span>Nome do projeto <b>Obrigatório</b></span><input value={props.name} onChange={(event) => props.setName(event.target.value)} placeholder="Ex.: Campanha de lançamento — outubro" autoFocus /></label>
+      <label className="new-project-field"><span>Projeto <b>Obrigatório</b></span><small>Adicione esta tarefa a um projeto em andamento ou crie um novo.</small><select value={props.targetProjectId} disabled={Boolean(props.fixedProjectId)} onChange={(event) => { const projectId = event.target.value; props.setTargetProjectId(projectId); const project = props.projects.find((item) => item.id === projectId); props.setName(project?.name || '') }}><option value="">Criar novo projeto</option>{props.projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
+      {!props.targetProjectId && <label className="new-project-field"><span>Nome do novo projeto <b>Obrigatório</b></span><input value={props.name} onChange={(event) => props.setName(event.target.value)} placeholder="Ex.: Campanha de lançamento — outubro" autoFocus /></label>}
       <label className="new-project-field"><span>O que você quer criar? <b>Obrigatório</b></span><small>Explique o contexto, a mensagem principal e o resultado esperado.</small><textarea value={props.overview} onChange={(event) => props.setOverview(event.target.value)} placeholder="Conte um pouco sobre a necessidade, o momento da marca e o que esta entrega precisa resolver..." /></label>
     </div>
     {isEligible ? (
@@ -1207,26 +1338,11 @@ function BriefStep(props: BriefStepProps) {
       </div>
     )}
     <div className="new-project-form-section"><SectionTitle title="Objetivo principal" description="Isso orienta as decisões criativas e a revisão da entrega." /><div className="new-project-goal-chips">{goals.map((goal) => <button type="button" key={goal} className={props.projectGoal === goal ? 'active' : ''} onClick={() => props.setProjectGoal(goal)}>{goal}</button>)}</div></div>
-    <div className="new-project-form-section new-project-context-grid">
+    {!isFileConversion && <div className="new-project-form-section new-project-context-grid">
       <label className="new-project-field"><span>Público</span><small>Com quem estamos falando?</small><textarea value={props.audience} onChange={(event) => props.setAudience(event.target.value)} disabled={props.notApplicable.audience} placeholder="Perfil, contexto e comportamentos relevantes..." /><button type="button" className="new-project-inline-action" onClick={() => toggleNotApplicable('audience')}>{props.notApplicable.audience ? 'Adicionar público' : 'Não se aplica'}</button></label>
       <label className="new-project-field"><span>Tom e atmosfera</span><small>Como a comunicação deve ser percebida?</small><textarea value={props.tone} onChange={(event) => props.setTone(event.target.value)} disabled={props.notApplicable.tone} placeholder="Ex.: próximo, direto, calmo, premium..." /><button type="button" className="new-project-inline-action" onClick={() => toggleNotApplicable('tone')}>{props.notApplicable.tone ? 'Adicionar direcionamento' : 'Não se aplica'}</button></label>
-    </div>
-    {!isEligible && (
-      <div className="new-project-form-section">
-        <SectionTitle title="Direção criativa" description="Defina quanto de exploração o time deve aplicar." />
-        <div className="new-project-paths">
-          <button type="button" className={props.creativePath === 'new-direction' ? 'active' : ''} onClick={() => props.setCreativePath('new-direction')}>
-            <span>Explorar uma nova direção</span>
-            <small>O time propõe um caminho visual a partir do briefing e do Brand Kit.</small>
-          </button>
-          <button type="button" className={props.creativePath === 'follow-references' ? 'active' : ''} onClick={() => props.setCreativePath('follow-references')}>
-            <span>Partir das minhas referências</span>
-            <small>O time preserva o caminho das referências enviadas e adapta à marca.</small>
-          </button>
-        </div>
-      </div>
-    )}
-    <div
+    </div>}
+    {!isFileConversion && <div
       className={`new-project-form-section new-project-reference-section ${isDragging ? 'is-dragging' : ''}`}
       onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true) }}
       onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true) }}
@@ -1331,7 +1447,7 @@ function BriefStep(props: BriefStepProps) {
           )}
         </div>
       )}
-    </div>
+    </div>}
     <FlowFooter><button type="button" className="secondary-button" onClick={props.onCancel}><ArrowLeft size={15} /> Voltar ao catálogo</button><button type="button" className="primary-button" disabled={!props.ready} onClick={props.onNext}>Configurar entrega <ArrowRight size={15} /></button></FlowFooter>
   </>
 }
@@ -1644,7 +1760,7 @@ function ReviewStep(props: ReviewStepProps) {
       <header><div><span>Briefing</span><h2>{props.name}</h2></div><button type="button" onClick={props.onEditBrief}>Editar</button></header>
       <p>{props.overview}</p>
       <dl>
-        <div><dt>Caminho criativo</dt><dd>{isEligible ? ((props.creativePath === 'new-concept' || props.creativePath === 'new-direction') ? 'Quero um novo conceito visual (+3 créditos)' : 'Seguir exatamente minhas referências') : (props.creativePath === 'new-direction' ? 'Explorar nova direção' : 'Partir das referências')}</dd></div>
+        {isEligible && <div><dt>Caminho criativo</dt><dd>{(props.creativePath === 'new-concept' || props.creativePath === 'new-direction') ? 'Quero um novo conceito visual (+3 créditos)' : 'Seguir exatamente minhas referências'}</dd></div>}
         {!isEligible && <div><dt>Pedido</dt><dd>{props.objective}</dd></div>}
         <div><dt>Objetivo</dt><dd>{props.projectGoal}</dd></div>
         {props.audience && <div><dt>Público</dt><dd>{props.audience}</dd></div>}

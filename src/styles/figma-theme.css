@@ -2209,12 +2209,15 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .new-project-field > span b { padding: 3px 7px; border-radius: 5px; background: #edf4ed; color: #46704e; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
 .new-project-field > small { margin-top: -4px; color: #778078; font-size: 13px; font-weight: 450; line-height: 19px; }
 .new-project-field input,
+.new-project-field select,
 .new-project-field textarea { width: 100%; outline: 0; border: 1px solid transparent; border-radius: 9px; background: #f4f5f4; color: #131f15; font: 500 14px/21px 'Plus Jakarta Sans',sans-serif; transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease; }
-.new-project-field input { height: 47px; padding: 0 14px; }
+.new-project-field input, .new-project-field select { height: 47px; padding: 0 14px; }
 .new-project-field textarea { min-height: 124px; padding: 13px 14px; resize: vertical; }
 .new-project-context-grid .new-project-field textarea { min-height: 96px; padding-bottom: 35px; }
 .new-project-field input:focus,
+.new-project-field select:focus,
 .new-project-field textarea:focus { border-color: #6f968c; background: #fff; box-shadow: 0 0 0 3px rgba(0,76,70,.08); }
+.new-project-field select:disabled { opacity: .7; cursor: not-allowed; }
 .new-project-field textarea:disabled { opacity: .5; cursor: not-allowed; }
 .new-project-inline-action { position: absolute; right: 12px; bottom: 10px; padding: 0; border: 0; background: transparent; color: #004c46; font-size: 12px; font-weight: 700; }
 .new-project-context-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }

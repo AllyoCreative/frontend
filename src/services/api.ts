@@ -273,6 +273,7 @@ export interface ClientDashboardSummary {
 }
 
 export interface ProjectBriefingInput {
+  existingProjectId?: string
   objective?: string
   audience?: string
   tone?: string

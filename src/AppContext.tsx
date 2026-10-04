@@ -218,9 +218,11 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
   const addProject = useCallback(async (projectData: Partial<Project> & ProjectBriefingInput) => {
     try {
       const created = await api.createProject(projectData)
-      setProjects((current) => [created, ...current])
+      setProjects((current) => current.some((project) => project.id === created.id)
+        ? current.map((project) => project.id === created.id ? created : project)
+        : [created, ...current])
       void refreshAccount()
-      notify('Projeto criado com sucesso!')
+      notify(projectData.existingProjectId ? 'Tarefa adicionada ao projeto!' : 'Projeto criado com sucesso!')
       return created
     } catch (error: unknown) {
       notify(error instanceof Error ? error.message : 'Não foi possível criar o projeto')

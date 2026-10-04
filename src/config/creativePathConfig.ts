@@ -96,7 +96,10 @@ export const CONCEPT_VISUAL_NAMES = new Set([
 export const CONCEPT_VISUAL_EXTRA_CREDITS = 3
 export const CONCEPT_VISUAL_EXTRA_DEADLINE_DAYS = 3
 
-export function isConceptVisualEligible(item: { code?: string | null; name?: string | null } | string | null | undefined): boolean {
+export function isConceptVisualEligible(item: { code?: string | null; name?: string | null; category?: string | null } | string | null | undefined): boolean {
   if (typeof item === 'string') return item.trim().length > 0
+  const category = normalizeTaskName(item?.category || '')
+  const name = normalizeTaskName(item?.name || '')
+  if (category === 'copywriting' || name.includes('conversaodearquivo')) return false
   return Boolean(item?.code?.trim() || item?.name?.trim())
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { NavLink, useParams } from 'react-router-dom'
+import { NavLink, useNavigate, useParams } from 'react-router-dom'
 import { ChevronUp, Circle, Download, ExternalLink, Eye, FileText, Flag, Image as ImageIcon, MessageSquareText, Pencil, Play, Plus, Rocket, Upload } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
@@ -343,7 +343,8 @@ function DeliveryPreview({ delivery }: { delivery: DesignSummary }) {
 
 export function ProjectDetailPage() {
   const { id = '', tab = 'visao-geral' } = useParams()
-  const { projects, currentUser, createTask, notify } = useApp()
+  const navigate = useNavigate()
+  const { projects, currentUser, notify } = useApp()
   const project = useMemo(() => projects.find((item) => item.id === id), [id, projects])
   const [messageList, setMessageList] = useState<ChatMessage[]>([])
   const [designList, setDesignList] = useState<DesignSummary[]>([])
@@ -416,11 +417,6 @@ export function ProjectDetailPage() {
   const [reviewOrigin, setReviewOrigin] = useState<ReviewOrigin | null>(null)
   const projectFileInputRef = useRef<HTMLInputElement>(null)
 
-  // Task creation state
-  const [newTaskTitle, setNewTaskTitle] = useState('')
-  const [newTaskTeam, setNewTaskTeam] = useState('Design team')
-  const [isSubmittingTask, setIsSubmittingTask] = useState(false)
-  const [showTaskForm, setShowTaskForm] = useState(false)
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [taskBriefingDraft, setTaskBriefingDraft] = useState<TaskBriefing | null>(null)
@@ -476,22 +472,6 @@ export function ProjectDetailPage() {
       socket.off('MESSAGE_SENT', handleNewMessage)
     }
   }, [project])
-
-  const handleCreateTask = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!project || !newTaskTitle.trim()) return
-    setIsSubmittingTask(true)
-    try {
-      const task = await createTask(project.id, newTaskTitle.trim(), newTaskTeam)
-      setProjectTasks((current) => current.some((item) => item.id === task.id) ? current : [...current, task])
-      setNewTaskTitle('')
-      setShowTaskForm(false)
-    } catch {
-      // O contexto global já apresenta a mensagem de erro.
-    } finally {
-      setIsSubmittingTask(false)
-    }
-  }
 
   const startEditingTaskBriefing = (task: ProjectTask) => {
     setExpandedTaskId(task.id)
@@ -676,19 +656,8 @@ export function ProjectDetailPage() {
                   })}
                 </div>
               </div>
-              <button className="project-task-add-trigger" type="button" onClick={() => setShowTaskForm((current) => !current)}><Plus size={15} /> Nova tarefa</button>
+              <button className="project-task-add-trigger" type="button" onClick={() => navigate(`/novo-projeto?projectId=${encodeURIComponent(project.id)}`)}><Plus size={15} /> Nova tarefa</button>
             </header>
-
-            {showTaskForm && <form className="project-task-form" onSubmit={handleCreateTask}>
-              <label className="project-task-field"><span>Nova tarefa</span><input value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="Ex.: Ajuste final do carrossel" /></label>
-              <label className="project-task-field project-task-field--team"><span>Especialidade</span><select value={newTaskTeam} onChange={(e) => setNewTaskTeam(e.target.value)}>
-                <option value="Design team">Design team</option>
-                <option value="Copy team">Copy team</option>
-                <option value="Video team">Video team</option>
-                <option value="Dev team">Dev team</option>
-              </select></label>
-              <button className="project-task-submit" type="submit" disabled={!newTaskTitle.trim() || isSubmittingTask}><Plus size={15} />{isSubmittingTask ? 'Adicionando...' : 'Adicionar tarefa'}</button>
-            </form>}
 
             <div className="project-task-stack">
               {projectTasks.length === 0 ? (
