@@ -132,8 +132,6 @@
 
 .format-sidebar-item:hover {
   border-color: #aebeb2;
-  transform: translateY(-1px);
-  box-shadow: 0 5px 14px rgba(26, 46, 31, 0.06);
 }
 
 .format-sidebar-item.is-active {
@@ -378,7 +376,6 @@
 
 .format-configurator__cta-btn:hover {
   background: #2d2d2a;
-  transform: translateY(-1px);
 }
 
 .format-configurator__editor {
@@ -1130,7 +1127,6 @@
 .format-tab-btn:hover {
   border-color: #cbd2cc;
   color: #171717;
-  transform: translateY(-1px);
 }
 
 .format-tab-btn.is-active {
@@ -1225,8 +1221,6 @@
 
 .format-card-item:hover {
   border-color: #cbd2cc;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
-  transform: translateY(-2px);
 }
 
 .format-card-mockup-area {
@@ -1284,7 +1278,6 @@
 
 .format-card-add-btn:hover {
   background: #333330;
-  transform: translateY(-1px);
 }
 
 .format-card-add-btn.is-added {
