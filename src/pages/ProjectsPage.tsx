@@ -219,18 +219,18 @@ function StatusGroup({ title, projects, collapsed, onToggle }: {
 
 function AllocationPanel() {
   const { account } = useApp()
-  const allowance = account?.workspace.creditAllowance ?? 0
   const availableCredits = account?.workspace.creditsAvailable ?? 0
   const creditsUsed = account?.workspace.creditsUsed ?? 0
   const teams = account?.teams ?? []
-  const percentUsed = allowance > 0 ? Math.min(100, Math.round((creditsUsed / allowance) * 100)) : 0
+  const totalCredits = Math.max(0, availableCredits + creditsUsed)
+  const percentAvailable = totalCredits > 0 ? Math.min(100, Math.round((availableCredits / totalCredits) * 100)) : 0
 
   return (
     <aside className="home-allocation-stack projects-allocation-panel">
       <section className="home-allocation-card home-allocation-card--subscription">
         <header><FigmaIcon asset="projects.imgGroup1410119714" /><h2>Assinatura</h2></header>
-        <div className="home-allocation-progress"><i style={{ width: `${percentUsed}%` }} /></div>
-        <footer><span>Disponível</span><strong>{availableCredits} <FigmaIcon asset="projects.imgBasilArrowRightOutline" /> {allowance}</strong></footer>
+        <div className="home-allocation-progress" title={`${availableCredits} de ${totalCredits} créditos disponíveis`}><i style={{ width: `${percentAvailable}%` }} /></div>
+        <footer><span>Disponível</span><strong>{availableCredits} de {totalCredits} créditos</strong></footer>
       </section>
 
       {teams.map((team) => <section className="home-allocation-card" key={team.id}>

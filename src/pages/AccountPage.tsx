@@ -69,6 +69,11 @@ export function AccountPage({ onLogout }: { onLogout: () => void }) {
   const boosters = accountWorkspace?.boosters ?? 0
   const plan = accountWorkspace?.plan ?? workspace?.plan ?? 'Sem plano'
   const planUsage = allowance > 0 ? Math.min(100, Math.round((creditsUsed / allowance) * 100)) : 0
+  const statementMovement = creditEntries.reduce((total, entry) => total + entry.amount, 0)
+  const statementOpeningBalance = credits - statementMovement
+  const statementPeriod = accountWorkspace?.cycleStart && accountWorkspace?.cycleEnd
+    ? `Período atual: ${formatDate(accountWorkspace.cycleStart)} a ${formatDate(accountWorkspace.cycleEnd)}`
+    : 'Movimentações exibidas'
   const currentContract = contracts.find((contract) => contract.status === 'Vigente') ?? contracts[0]
   const editingTeam = teams.find((team) => team.id === editingTeamId)
   const assignedMembers = useMemo(() => new Set(teams.flatMap((team) => team.memberIds)).size, [teams])
@@ -198,7 +203,7 @@ export function AccountPage({ onLogout }: { onLogout: () => void }) {
       <header className="account-section__header"><div><h2>Controle de créditos</h2><p>Consulte o saldo, o banco de créditos e toda movimentação do ciclo.</p></div><button type="button" className="primary-button" onClick={() => setShowCredits(true)} disabled={creditPackages.length === 0}><ShoppingBag size={16} /> Comprar créditos</button></header>
       <div className="credits-layout">
         <aside className="credits-summary"><span className="plan-badge">{plan}</span><small>Saldo disponível para a empresa</small><strong>{credits}</strong><p>Saldo efetivo registrado no workspace</p><div><span><b>Banco de créditos</b><em>{creditBank} créditos</em></span><span><b>Booster</b><em>{boosters} disponível(is)</em></span></div></aside>
-        <div className="credit-statement"><header><div><h3>Extrato</h3><p>Período atual: {formatDate(accountWorkspace?.cycleStart)} a {formatDate(accountWorkspace?.cycleEnd)}</p></div><button type="button" className="secondary-button" onClick={downloadStatement}><Download size={15} /> Baixar extrato</button></header>
+        <div className="credit-statement"><header><div><h3>Extrato</h3><p>{statementPeriod} · Saldo: {statementOpeningBalance} → {credits} créditos</p></div><button type="button" className="secondary-button" onClick={downloadStatement}><Download size={15} /> Baixar extrato</button></header>
           <div className="statement-head"><span>Atividade</span><span>Tipo</span><span>Status</span><span>Valor</span></div>
           {creditEntries.map((entry) => <div className="statement-row" key={entry.id}><span><b>{entry.description}</b><small>{formatDate(entry.createdAt, true)}</small></span><span>{entry.type}</span><span>{entry.status}</span><strong className={entry.amount < 0 ? 'is-negative' : ''}>{entry.amount > 0 ? '+' : ''} {entry.amount} créditos</strong></div>)}
           {creditEntries.length === 0 && <div className="account-empty-row">Nenhuma movimentação registrada neste ciclo.</div>}
