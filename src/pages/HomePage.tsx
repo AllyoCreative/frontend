@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ChevronRight } from 'lucide-react'
 import { useApp, type ProjectWithTasks } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
 import { api, type ClientDashboardSummary } from '../services/api'
@@ -226,8 +227,15 @@ export function HomePage() {
           </section>
 
           <div className="home-allocation-stack">
-            <section className="home-allocation-card home-allocation-card--subscription">
-              <header><FigmaIcon asset="home.imgGroup1410119714" /><h2>Assinatura</h2></header>
+            <section
+              className="home-allocation-card home-allocation-card--subscription is-clickable"
+              role="link"
+              tabIndex={0}
+              aria-label="Abrir créditos da conta"
+              onClick={() => navigate('/conta?tab=creditos')}
+              onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') navigate('/conta?tab=creditos') }}
+            >
+              <header><FigmaIcon asset="home.imgGroup1410119714" /><h2>Assinatura</h2><ChevronRight className="home-allocation-card__arrow" size={20} /></header>
               <div className="home-allocation-progress" title={`${availableCredits} de ${totalCredits} créditos disponíveis`}><i style={{ width: `${percentAvailable}%` }} /></div>
               <footer><span>Disponível</span><strong>{availableCredits} de {totalCredits} créditos</strong></footer>
             </section>
@@ -236,10 +244,6 @@ export function HomePage() {
               <header><i className="home-team-color" style={{ background: team.color }} /><h2>{team.name}</h2></header>
               <footer><span>Usado</span><strong>{team.creditsUsed}</strong></footer>
             </section>)}
-            {teams.length === 0 && <section className="home-allocation-card home-allocation-card--empty">
-              <header><h2>Nenhuma equipe criada</h2></header>
-              <footer><span>Crie equipes em Conta</span></footer>
-            </section>}
           </div>
         </aside>
       </div>

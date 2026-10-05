@@ -219,6 +219,7 @@ function StatusGroup({ title, projects, collapsed, onToggle }: {
 
 function AllocationPanel() {
   const { account } = useApp()
+  const navigate = useNavigate()
   const availableCredits = account?.workspace.creditsAvailable ?? 0
   const creditsUsed = account?.workspace.creditsUsed ?? 0
   const teams = account?.teams ?? []
@@ -227,8 +228,15 @@ function AllocationPanel() {
 
   return (
     <aside className="home-allocation-stack projects-allocation-panel">
-      <section className="home-allocation-card home-allocation-card--subscription">
-        <header><FigmaIcon asset="projects.imgGroup1410119714" /><h2>Assinatura</h2></header>
+      <section
+        className="home-allocation-card home-allocation-card--subscription is-clickable"
+        role="link"
+        tabIndex={0}
+        aria-label="Abrir créditos da conta"
+        onClick={() => navigate('/conta?tab=creditos')}
+        onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') navigate('/conta?tab=creditos') }}
+      >
+        <header><FigmaIcon asset="projects.imgGroup1410119714" /><h2>Assinatura</h2><ChevronRight className="home-allocation-card__arrow" size={20} /></header>
         <div className="home-allocation-progress" title={`${availableCredits} de ${totalCredits} créditos disponíveis`}><i style={{ width: `${percentAvailable}%` }} /></div>
         <footer><span>Disponível</span><strong>{availableCredits} de {totalCredits} créditos</strong></footer>
       </section>
@@ -237,10 +245,6 @@ function AllocationPanel() {
         <header><i className="home-team-color" style={{ background: team.color }} /><h2>{team.name}</h2></header>
         <footer><span>Usado</span><strong>{team.creditsUsed}</strong></footer>
       </section>)}
-      {teams.length === 0 && <section className="home-allocation-card home-allocation-card--empty">
-        <header><h2>Nenhuma equipe criada</h2></header>
-        <footer><span>Crie equipes em Conta</span></footer>
-      </section>}
     </aside>
   )
 }

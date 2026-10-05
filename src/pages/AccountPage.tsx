@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import { Building2, Check, ChevronRight, CircleDollarSign, Download, Eye, FileText, Layers3, LogOut, Plus, ReceiptText, ShoppingBag, Sparkles, UserPlus, Users, X } from 'lucide-react'
 import { useApp } from '../AppContext'
@@ -39,8 +39,10 @@ function Modal({ children, className = '', onClose, labelId }: { children: React
 
 export function AccountPage({ onLogout }: { onLogout: () => void }) {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { workspace, members, brands, account, addMember, addBrand, refreshAccount, notify } = useApp()
-  const [tab, setTab] = useState<AccountTab>('visao')
+  const requestedTab = searchParams.get('tab')
+  const tab: AccountTab = accountNav.some((item) => item.id === requestedTab) ? requestedTab as AccountTab : 'visao'
   const [showInvite, setShowInvite] = useState(false)
   const [showBrand, setShowBrand] = useState(false)
   const [showTeam, setShowTeam] = useState(false)
@@ -78,6 +80,10 @@ export function AccountPage({ onLogout }: { onLogout: () => void }) {
   const editingTeam = teams.find((team) => team.id === editingTeamId)
   const assignedMembers = useMemo(() => new Set(teams.flatMap((team) => team.memberIds)).size, [teams])
   const hasOpenModal = showInvite || showBrand || showTeam || showCredits || Boolean(editingTeam)
+
+  const openTab = (nextTab: AccountTab) => {
+    setSearchParams(nextTab === 'visao' ? {} : { tab: nextTab }, { replace: true })
+  }
 
   useEffect(() => {
     if (!hasOpenModal) return
@@ -183,15 +189,15 @@ export function AccountPage({ onLogout }: { onLogout: () => void }) {
     </header>
 
     <nav className="account-tabs" aria-label="Seções da conta">
-      {accountNav.map(({ id, icon: Icon, label }) => <button type="button" key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}><Icon size={17} /> {label}</button>)}
+      {accountNav.map(({ id, icon: Icon, label }) => <button type="button" key={id} className={tab === id ? 'active' : ''} onClick={() => openTab(id)}><Icon size={17} /> {label}</button>)}
     </nav>
 
     {tab === 'visao' && <section className="account-overview">
       <div className="account-metric-grid">
-        <article><span>Plano atual</span><strong>{plan}</strong><small>{currentContract?.endsAt ? `Contrato ativo até ${formatDate(currentContract.endsAt)}` : 'Sem vigência cadastrada'}</small><button type="button" onClick={() => setTab('contratos')}>Ver contrato <ChevronRight size={14} /></button></article>
-        <article><span>Saldo disponível</span><strong>{credits}</strong><small>{allowance} contratados · {creditBank} no banco</small><button type="button" onClick={() => setTab('creditos')}>Gerenciar créditos <ChevronRight size={14} /></button></article>
-        <article><span>Pessoas</span><strong>{members.length}</strong><small>{assignedMembers} distribuídas em {teams.length} equipe(s)</small><button type="button" onClick={() => setTab('time')}>Gerenciar time <ChevronRight size={14} /></button></article>
-        <article><span>Marcas</span><strong>{brands.length}</strong><small>Brand Kits disponíveis</small><button type="button" onClick={() => setTab('marcas')}>Gerenciar marcas <ChevronRight size={14} /></button></article>
+        <article><span>Plano atual</span><strong>{plan}</strong><small>{currentContract?.endsAt ? `Contrato ativo até ${formatDate(currentContract.endsAt)}` : 'Sem vigência cadastrada'}</small><button type="button" onClick={() => openTab('contratos')}>Ver contrato <ChevronRight size={14} /></button></article>
+        <article><span>Saldo disponível</span><strong>{credits}</strong><small>{allowance} contratados · {creditBank} no banco</small><button type="button" onClick={() => openTab('creditos')}>Gerenciar créditos <ChevronRight size={14} /></button></article>
+        <article><span>Pessoas</span><strong>{members.length}</strong><small>{assignedMembers} distribuídas em {teams.length} equipe(s)</small><button type="button" onClick={() => openTab('time')}>Gerenciar time <ChevronRight size={14} /></button></article>
+        <article><span>Marcas</span><strong>{brands.length}</strong><small>Brand Kits disponíveis</small><button type="button" onClick={() => openTab('marcas')}>Gerenciar marcas <ChevronRight size={14} /></button></article>
       </div>
       <div className="contract-highlight">
         <div><span className="plan-badge">{plan}</span><h2>{currentContract ? 'Contrato vigente' : 'Nenhum contrato vigente'}</h2><p>Você utilizou {creditsUsed} de {allowance} créditos neste ciclo.</p></div>

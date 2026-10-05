@@ -567,6 +567,10 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .home-allocation-card header { height: 25px; display: flex; align-items: center; gap: 10px; }
 .home-allocation-card header > img, .home-team-color { width: 25px; height: 25px; flex: none; }
 .home-allocation-card header h2 { margin: 0; font-size: 18px; font-weight: 600; line-height: normal; }
+.home-allocation-card__arrow { margin-left: auto; color: #53605a; }
+.home-allocation-card.is-clickable { cursor: pointer; transition: background-color .16s ease; }
+.home-allocation-card.is-clickable:hover { background: #f7f9f6; }
+.home-allocation-card.is-clickable:focus-visible { outline: 2px solid #004c46; outline-offset: 2px; }
 .home-allocation-progress { width: 318px; height: 16px; overflow: hidden; border-radius: 55px; background: #e2e5de; }
 .home-allocation-progress i { display: block; width: 89.25%; height: 100%; border-radius: inherit; background: #42b784; }
 .home-allocation-card footer { display: flex; align-items: center; justify-content: space-between; color: #7f7f7f; font-size: 14px; font-weight: 600; }
