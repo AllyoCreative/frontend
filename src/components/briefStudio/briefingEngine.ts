@@ -490,6 +490,11 @@ export function buildInitialBriefState(params: {
   }
 
   const normalizedPrompt = normalize(cleanPrompt)
+  const isVideoProduct = Boolean(
+    selectedProduct &&
+      (normalize(selectedProduct.category).includes('video') ||
+        /\b(video|motion|animacao|reels|dooh animado|gif)\b/.test(normalize(selectedProduct.name)))
+  )
 
   // Detect addons from prompt
   if (/\b(copy|texto|headline|chamada|variacoes|ab test|a\/b|roteiro)\b/.test(normalizedPrompt)) {
@@ -498,7 +503,7 @@ export function buildInitialBriefState(params: {
   if (/\b(legenda|caption|hashtags)\b/.test(normalizedPrompt)) {
     scope.addons['legenda-para-redes-sociais'] = 1
   }
-  if (/\b(animar|animacao|motion|video curto|short video|movimento)\b/.test(normalizedPrompt)) {
+  if (!isVideoProduct && /\b(animar|animacao|motion|video curto|short video|movimento)\b/.test(normalizedPrompt)) {
     scope.addons['animacao-de-imagem-estatica-via-ia'] = 1
   }
 
@@ -511,12 +516,13 @@ export function buildInitialBriefState(params: {
     scope.resizeCount = configuredFormats.length - 1
   }
 
-  // Creative path
-  let creativePath: 'new-direction' | 'new-concept' | 'follow-references' = 'follow-references'
-  if (linkedProject || /\b(mesma linha|match|mesmo estilo|referencia|look and feel)\b/.test(normalizedPrompt)) {
+  // Creative path: new campaigns default to 'new-concept' (Conceito visual for design / Storyboard for video)
+  let creativePath: 'new-direction' | 'new-concept' | 'follow-references' = 'new-concept'
+  if (
+    linkedProject ||
+    /\b(mesma linha|match|mesmo estilo|referencia|look and feel|sem conceito|sem storyboard)\b/.test(normalizedPrompt)
+  ) {
     creativePath = 'follow-references'
-  } else if (/\b(conceito|conceitos|concepts|key visual|kv|do zero|inedito)\b/.test(normalizedPrompt)) {
-    creativePath = 'new-concept'
   } else if (/\b(nova direcao|explorar|reformular)\b/.test(normalizedPrompt)) {
     creativePath = 'new-direction'
   }
@@ -602,18 +608,36 @@ export function computePlannedDeliverables(state: BriefDraftState): PlannedDeliv
   const product = state.selectedProduct
   const baseSla = product?.slaHours || 12
   const baseCredits = product?.credits.original || 1
+  const isVideoProduct = Boolean(
+    product &&
+      (normalize(product.category).includes('video') ||
+        /\b(video|motion|animacao|reels|dooh animado|gif)\b/.test(normalize(product.name)))
+  )
 
   if (state.creativePath === 'new-concept' || state.creativePath === 'new-direction') {
-    items.push({
-      id: 'deliv-concept',
-      title: 'Conceito visual e Direção de Arte da Campanha',
-      subtitle: 'Definição da linha criativa e peça-mãe para aprovação prévia antes dos desdobramentos',
-      team: 'Design team',
-      slaHours: 12,
-      deadlineDays: 2,
-      credits: 3,
-      kind: 'concept',
-    })
+    items.push(
+      isVideoProduct
+        ? {
+            id: 'deliv-storyboard',
+            title: 'Storyboard e Direção de Cenas (Roteiro Visual)',
+            subtitle: 'Definição das cenas e narrativa visual para aprovação prévia antes da edição e motion',
+            team: 'Video team',
+            slaHours: 12,
+            deadlineDays: 2,
+            credits: 2,
+            kind: 'concept',
+          }
+        : {
+            id: 'deliv-concept',
+            title: 'Conceito visual e Direção de Arte da Campanha',
+            subtitle: 'Definição da linha criativa e peça-mãe para aprovação prévia antes dos desdobramentos',
+            team: 'Design team',
+            slaHours: 12,
+            deadlineDays: 2,
+            credits: 3,
+            kind: 'concept',
+          }
+    )
   }
 
   const count = Math.max(1, state.scope.taskRepeats)
@@ -847,13 +871,13 @@ export function applyChatRefinement(
     changes.push('Arquivo editável definido como Illustrator (.AI)')
   }
 
-  // 6. Creative path changes
-  if (/\b(novo conceito|conceito visual|key visual)\b/.test(clean)) {
-    next.creativePath = 'new-concept'
-    changes.push('Etapa de Conceito Visual adicionada ao escopo')
-  } else if (/\b(seguir referencia|mesma linha)\b/.test(clean)) {
+  // 6. Creative path changes (Conceito visual / Storyboard)
+  if (/\b(sem conceito|sem storyboard|remover conceito|remover storyboard|tirar conceito|tirar storyboard|seguir referencia|mesma linha)\b/.test(clean)) {
     next.creativePath = 'follow-references'
-    changes.push('Caminho criativo ajustado para Seguir Referências')
+    changes.push('Etapa prévia (Conceito / Storyboard) removida do escopo')
+  } else if (/\b(novo conceito|conceito visual|key visual|storyboard|roteiro visual)\b/.test(clean)) {
+    next.creativePath = 'new-concept'
+    changes.push('Etapa de aprovação prévia (Conceito / Storyboard) incluída no escopo')
   }
 
   // 7. Switch product if explicitly requested (e.g., "mudar serviço para carrossel" or "landing page")
