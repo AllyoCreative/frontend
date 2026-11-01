@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -10,6 +10,7 @@ import {
   FolderKanban,
   Link2,
   Loader2,
+  Mic,
   Minus,
   Pencil,
   Plus,
@@ -28,6 +29,7 @@ import {
   initialScopeForProduct,
   type BriefDraftState,
 } from './briefingEngine'
+import { useSpeechToText } from './useSpeechToText'
 
 interface AllyoBriefStudioProps {
   initialPrompt: string
@@ -36,10 +38,22 @@ interface AllyoBriefStudioProps {
 }
 
 const PROCESSING_STEPS = [
-  'Analisando solicitação...',
-  'Reunindo contexto da marca...',
-  'Identificando formatos e ativos no catálogo...',
-  'Estruturando o briefing e escopo...',
+  {
+    label: 'Analisando solicitação...',
+    detail: 'Interpretando objetivo, campanha e entregáveis pedidos',
+  },
+  {
+    label: 'Reunindo contexto da marca...',
+    detail: 'Consultando diretrizes visuais, paleta e tom de voz do Brand Kit',
+  },
+  {
+    label: 'Identificando formatos e ativos no catálogo...',
+    detail: 'Cruzando dimensões, canais e prazos SLA em horas úteis',
+  },
+  {
+    label: 'Estruturando o briefing e escopo...',
+    detail: 'Distribuindo tarefas entre Design, Copywriting e Motion',
+  },
 ]
 
 const QUICK_FORMAT_PRESETS = [
@@ -85,6 +99,7 @@ export function AllyoBriefStudio({
   const [quoteLoading, setQuoteLoading] = useState(false)
 
   const [chatInput, setChatInput] = useState('')
+  const [speechBaseChat, setSpeechBaseChat] = useState('')
   const [showGapsDrawer, setShowGapsDrawer] = useState(true)
   const [showFormatPicker, setShowFormatPicker] = useState(false)
   const [showProductPicker, setShowProductPicker] = useState(false)
@@ -97,6 +112,24 @@ export function AllyoBriefStudio({
   const [lastUpdatedBadge, setLastUpdatedBadge] = useState<string | null>(null)
 
   const chatInputRef = useRef<HTMLInputElement>(null)
+
+  const handleChatSpeech = useCallback(
+    (transcript: string, isFinal: boolean) => {
+      setChatInput((current) => {
+        const base = speechBaseChat || current
+        const sep = base && !base.endsWith(' ') ? ' ' : ''
+        const combined = `${base}${sep}${transcript}`
+        if (isFinal) setSpeechBaseChat(combined)
+        return combined
+      })
+    },
+    [speechBaseChat]
+  )
+
+  const { isListening: isChatListening, toggleListening: toggleChatMic } = useSpeechToText({
+    onTranscript: handleChatSpeech,
+    onError: (msg) => notify(msg),
+  })
 
   // Load catalog products
   useEffect(() => {
@@ -130,15 +163,15 @@ export function AllyoBriefStudio({
     setDraft(nextDraft)
   }, [brands, catalogLoaded, draft, initialPrompt, linkedProjectId, products, projects])
 
-  // Step-by-step animation (like Superside Image 3)
+  // Organic step-by-step animation (Superside Image 3)
   useEffect(() => {
     if (!isGenerating) return
     const timers = [
-      window.setTimeout(() => setProcessingStep(1), 320),
-      window.setTimeout(() => setProcessingStep(2), 680),
-      window.setTimeout(() => setProcessingStep(3), 1050),
-      window.setTimeout(() => setProcessingStep(4), 1400),
-      window.setTimeout(() => setIsGenerating(false), 1750),
+      window.setTimeout(() => setProcessingStep(1), 850),
+      window.setTimeout(() => setProcessingStep(2), 1750),
+      window.setTimeout(() => setProcessingStep(3), 2680),
+      window.setTimeout(() => setProcessingStep(4), 3480),
+      window.setTimeout(() => setIsGenerating(false), 3920),
     ]
     return () => timers.forEach((t) => window.clearTimeout(t))
   }, [isGenerating])
@@ -633,15 +666,32 @@ export function AllyoBriefStudio({
           <div className="brief-studio-user-bubble-row">
             <div className="brief-studio-user-bubble">
               <p>
-                {initialPrompt}
-                {linkedProject && (
-                  <>
-                    {' '}
-                    <span className="brief-studio-linked-ref">
-                      {linkedProject.name} <Link2 size={13} />
-                    </span>
-                  </>
-                )}
+                {(() => {
+                  if (!linkedProject) return initialPrompt
+                  const idx = initialPrompt.toLowerCase().indexOf(linkedProject.name.toLowerCase())
+                  if (idx !== -1) {
+                    const before = initialPrompt.slice(0, idx)
+                    const matchedText = initialPrompt.slice(idx, idx + linkedProject.name.length)
+                    const after = initialPrompt.slice(idx + linkedProject.name.length)
+                    return (
+                      <>
+                        {before}
+                        <span className="brief-studio-linked-ref">
+                          {matchedText} <Link2 size={13} />
+                        </span>
+                        {after}
+                      </>
+                    )
+                  }
+                  return (
+                    <>
+                      {initialPrompt}{' '}
+                      <span className="brief-studio-linked-ref">
+                        {linkedProject.name} <Link2 size={13} />
+                      </span>
+                    </>
+                  )
+                })()}
               </p>
             </div>
           </div>
@@ -649,19 +699,27 @@ export function AllyoBriefStudio({
           {/* Phase 1: Animated Step-by-Step Checklist (Superside Image 3) */}
           {isGenerating ? (
             <div className="brief-studio-processing">
+              <div className="brief-studio-processing__progress">
+                <span style={{ width: `${Math.min(100, (processingStep + 1) * 24)}%` }} />
+              </div>
               <ul className="brief-studio-steps">
-                {PROCESSING_STEPS.map((label, idx) => {
+                {PROCESSING_STEPS.map((stepObj, idx) => {
                   const done = processingStep > idx
                   const active = processingStep === idx
+                  const visible = processingStep >= idx
+                  if (!visible) return null
                   return (
                     <li
-                      key={label}
+                      key={stepObj.label}
                       className={`brief-studio-step ${done ? 'is-done' : ''} ${active ? 'is-active' : ''}`}
                     >
                       <span className="brief-studio-step__icon">
-                        <Check size={13} />
+                        {done ? <Check size={13} /> : <Loader2 size={13} className="spin" />}
                       </span>
-                      <span className="brief-studio-step__text">{label}</span>
+                      <div className="brief-studio-step__body">
+                        <span className="brief-studio-step__text">{stepObj.label}</span>
+                        <small className="brief-studio-step__detail">{stepObj.detail}</small>
+                      </div>
                     </li>
                   )
                 })}
@@ -671,7 +729,7 @@ export function AllyoBriefStudio({
                 className="brief-studio-skip-btn"
                 onClick={() => setIsGenerating(false)}
               >
-                Ver briefing agora →
+                Pular animação →
               </button>
             </div>
           ) : draft?.mode === 'insights' || draft?.mode === 'about' ? (
@@ -1183,7 +1241,10 @@ export function AllyoBriefStudio({
               </div>
             )}
 
-            <form className="brief-studio-chat-form" onSubmit={(e) => handleSendRefinement(e)}>
+            <form
+              className={`brief-studio-chat-form ${isChatListening ? 'is-listening' : ''}`}
+              onSubmit={(e) => handleSendRefinement(e)}
+            >
               <input
                 ref={chatInputRef}
                 value={chatInput}
@@ -1192,10 +1253,25 @@ export function AllyoBriefStudio({
                 placeholder={
                   isGenerating
                     ? 'A Allyo está preparando o seu briefing...'
-                    : 'Edite seu briefing com a Allyo (ex: "mudar para 5 peças", "incluir stories e copywriting", "arquivo em Figma")...'
+                    : isChatListening
+                      ? 'Ouvindo sua instrução por voz...'
+                      : 'Edite seu briefing com a Allyo (ex: "mudar para 5 peças", "incluir stories e copywriting", "arquivo em Figma")...'
                 }
                 aria-label="Edite seu briefing com a Allyo"
               />
+              <button
+                type="button"
+                className={`brief-studio-chat-mic ${isChatListening ? 'is-active' : ''}`}
+                disabled={isGenerating}
+                onClick={() => {
+                  if (!isChatListening) setSpeechBaseChat(chatInput.trim())
+                  toggleChatMic()
+                }}
+                title={isChatListening ? 'Parar gravação' : 'Falar comando por voz'}
+                aria-label="Usar microfone"
+              >
+                <Mic size={18} strokeWidth={2} />
+              </button>
               <button
                 type="submit"
                 className="brief-studio-chat-send"

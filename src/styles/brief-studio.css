@@ -280,8 +280,25 @@
 
 /* Step-by-step Processing View (Superside Image 3) */
 .brief-studio-processing {
-  padding: 18px 12px 42px;
-  max-width: 560px;
+  padding: 24px 16px 42px;
+  max-width: 580px;
+}
+
+.brief-studio-processing__progress {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: #edf1ee;
+  overflow: hidden;
+  margin-bottom: 26px;
+}
+
+.brief-studio-processing__progress > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #42786a, #7cc4a6);
+  transition: width 0.65s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .brief-studio-steps {
@@ -289,54 +306,85 @@
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 20px;
+  gap: 22px;
 }
 
 .brief-studio-step {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 14px;
-  opacity: 0.35;
-  transform: translateY(4px);
-  transition: opacity 0.28s ease, transform 0.28s ease;
+  animation: briefStepEnter 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.brief-studio-step.is-active,
-.brief-studio-step.is-done {
-  opacity: 1;
-  transform: translateY(0);
+@keyframes briefStepEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .brief-studio-step__icon {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
+  margin-top: 1px;
   border-radius: 50%;
-  border: 1.5px solid #bfe0d1;
+  border: 1.5px solid #9ad3ba;
   background: #f2faf6;
-  color: #63b191;
+  color: #3d8e6c;
   display: grid;
   place-items: center;
   flex-shrink: 0;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.25s ease, border-color 0.25s ease;
 }
 
 .brief-studio-step.is-done .brief-studio-step__icon {
-  border-color: #7cc4a6;
-  background: #eaf7f1;
-  color: #2f8564;
+  border-color: #6bc09b;
+  background: #e3f6ed;
+  color: #1f7a56;
+  transform: scale(1.06);
+}
+
+.brief-studio-step__body {
+  display: grid;
+  gap: 3px;
 }
 
 .brief-studio-step__text {
   font-size: 16px;
-  color: #9ba39e;
-  font-weight: 500;
+  color: #7d8882;
+  font-weight: 600;
+  transition: color 0.25s ease;
 }
 
 .brief-studio-step.is-active .brief-studio-step__text {
-  color: #4f5d56;
+  color: #1c2c25;
+}
+
+.brief-studio-step__detail {
+  font-size: 13px;
+  color: #8f9993;
+  font-weight: 500;
+}
+
+.spin {
+  animation: studioSpin 0.9s linear infinite;
+}
+
+@keyframes studioSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .brief-studio-skip-btn {
-  margin-top: 24px;
+  margin-top: 28px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -357,7 +405,20 @@
   margin: 0 auto;
   width: 100%;
   padding: 6px 12px 28px;
-  animation: briefFadeIn 0.35s ease both;
+  animation: briefFadeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.brief-studio-doc > .brief-studio-section:nth-of-type(1) {
+  animation: briefFadeIn 0.42s 0.06s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.brief-studio-doc > .brief-studio-section:nth-of-type(2) {
+  animation: briefFadeIn 0.42s 0.14s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.brief-studio-doc > .brief-studio-section:nth-of-type(3) {
+  animation: briefFadeIn 0.42s 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.brief-studio-doc > .brief-studio-section:nth-of-type(4) {
+  animation: briefFadeIn 0.42s 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes briefFadeIn {
@@ -885,6 +946,37 @@
   color: #96a09a;
 }
 
+.brief-studio-chat-form.is-listening {
+  border-color: #d94e34;
+  background: #fffafa;
+  box-shadow: 0 0 0 3px rgba(217, 78, 52, 0.12);
+}
+
+.brief-studio-chat-mic {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #5b6760;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.brief-studio-chat-mic:hover:not(:disabled) {
+  background: #eff2ef;
+  color: #131f15;
+}
+
+.brief-studio-chat-mic.is-active {
+  background: #fdeceb;
+  color: #d93829;
+  animation: micPulse 1.4s ease-in-out infinite;
+}
+
 .brief-studio-chat-send {
   width: 38px;
   height: 38px;
@@ -1033,43 +1125,175 @@
   gap: 12px;
 }
 
-/* Home Hero Reference Project Pill (Superside Image 2 style) */
-.home-prompt-context-row {
+/* Home Hero Prompt Box: Crisp Mic, Inline @ Project Mention & Organic Launch */
+.prompt-box-wrap {
+  position: relative;
   width: min(706px, 100%);
-  margin: 10px auto 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  margin: 40px auto 0;
 }
 
-.home-prompt-ref-select {
+.prompt-box-wrap .prompt-box {
+  margin: 0;
+  gap: 8px;
+  transition: box-shadow 0.22s ease, transform 0.22s ease;
+}
+
+.prompt-box.is-listening {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35);
+}
+
+.prompt-box.is-submitting {
+  transform: scale(0.99);
+}
+
+.prompt-box .prompt-mic,
+.prompt-box .prompt-mention-trigger {
+  width: 34px !important;
+  height: 34px !important;
+  margin-right: 0 !important;
+  border-radius: 50%;
+  display: grid !important;
+  place-items: center;
+  color: #2c3831;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.prompt-box .prompt-mention-trigger {
+  color: #6b7670;
+}
+
+.prompt-box .prompt-mic:hover,
+.prompt-box .prompt-mention-trigger:hover {
+  background: #f0f2ef;
+  color: #004c46;
+}
+
+.prompt-box .prompt-mic.is-active {
+  background: #fdeceb !important;
+  color: #d93829 !important;
+  animation: micPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes micPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(217, 56, 41, 0.32);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(217, 56, 41, 0);
+  }
+}
+
+.prompt-inline-project-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   height: 28px;
-  padding: 0 12px;
+  max-width: 190px;
+  padding: 0 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  color: #fff;
+  background: #e7f3ee;
+  color: #004c46;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 
-.home-prompt-ref-select select {
-  border: 0;
-  outline: 0;
-  background: transparent;
+.prompt-send__spinner {
+  width: 37px;
+  height: 37px;
+  border-radius: 50%;
+  background: #274a43;
   color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
+  display: grid;
+  place-items: center;
 }
 
-.home-prompt-ref-select select option {
+.prompt-mention-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 60;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 8px;
+  box-shadow: 0 16px 40px rgba(13, 30, 29, 0.24);
+  text-align: left;
   color: #131f15;
-  background: #fff;
+  animation: briefFadeIn 0.18s ease both;
+}
+
+.prompt-mention-popover__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #778078;
+  border-bottom: 1px solid #eef1ee;
+  margin-bottom: 4px;
+}
+
+.prompt-mention-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #131f15;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+
+.prompt-mention-item:hover,
+.prompt-mention-item.is-highlighted {
+  background: #eef4f1;
+  color: #004c46;
+}
+
+.prompt-mention-item strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 650;
+}
+
+.prompt-mention-item small {
+  display: block;
+  font-size: 11.5px;
+  color: #6b7670;
+}
+
+.home-hero {
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), filter 0.45s ease;
+}
+
+.home-hero.is-launching {
+  transform: scale(0.992);
+}
+
+.home-launch-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(13, 30, 29, 0.38);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  animation: briefFadeIn 0.22s ease both;
 }
 

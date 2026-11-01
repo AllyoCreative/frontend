@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, Link2 } from 'lucide-react'
+import { AtSign, ChevronRight, Link2, Loader2, Mic } from 'lucide-react'
 import { useApp, type ProjectWithTasks } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
 import { StatusPill } from '../components/StatusPill'
 import { AllyoBriefStudio } from '../components/briefStudio/AllyoBriefStudio'
+import { useSpeechToText } from '../components/briefStudio/useSpeechToText'
 import { api, type ClientDashboardSummary } from '../services/api'
 
 type AssetName = Parameters<typeof figmaAsset>[0]
@@ -25,9 +26,47 @@ export function HomePage() {
   const { projects, currentUser, account, allyoTeam, notify } = useApp()
   const navigate = useNavigate()
   const [prompt, setPrompt] = useState('')
+  const [speechBasePrompt, setSpeechBasePrompt] = useState('')
   const [linkedRefProjectId, setLinkedRefProjectId] = useState('')
   const [activeStudioPrompt, setActiveStudioPrompt] = useState<string | null>(null)
+  const [isLaunchingStudio, setIsLaunchingStudio] = useState(false)
+  const [launchStatusText, setLaunchStatusText] = useState('Iniciando o Allyo Brief Studio...')
+  const [mentionMatch, setMentionMatch] = useState<{
+    triggerStart: number
+    cursorEnd: number
+    prefix: string
+    query: string
+  } | null>(null)
+  const [mentionIndex, setMentionIndex] = useState(0)
   const [dashboard, setDashboard] = useState<ClientDashboardSummary | null>(null)
+  const promptInputRef = useRef<HTMLInputElement>(null)
+
+  const handleSpeechTranscript = useCallback(
+    (transcript: string, isFinal: boolean) => {
+      setPrompt((current) => {
+        const base = speechBasePrompt || current
+        const separator = base && !base.endsWith(' ') ? ' ' : ''
+        const combined = `${base}${separator}${transcript}`
+        if (isFinal) {
+          setSpeechBasePrompt(combined)
+        }
+        return combined
+      })
+    },
+    [speechBasePrompt]
+  )
+
+  const { isListening, toggleListening, stopListening } = useSpeechToText({
+    onTranscript: handleSpeechTranscript,
+    onError: (msg) => notify(msg),
+  })
+
+  const handleToggleMic = () => {
+    if (!isListening) {
+      setSpeechBasePrompt(prompt.trim())
+    }
+    toggleListening()
+  }
 
   const projectTasks = useMemo(() => {
     return projects.flatMap((p) => {
@@ -74,10 +113,162 @@ export function HomePage() {
   const totalCredits = Math.max(0, availableCredits + creditsUsed)
   const percentAvailable = totalCredits > 0 ? Math.min(100, Math.round((availableCredits / totalCredits) * 100)) : 0
 
+  const detectInlineMention = (value: string, cursor: number) => {
+    const slice = value.slice(0, cursor)
+    const atMatch = slice.match(/(^|\s)@([A-Za-zÀ-ú0-9\s\-_]{0,32})$/)
+    if (atMatch) {
+      const fullMatch = atMatch[0]
+      const leadingSpace = atMatch[1] || ''
+      const triggerStart = slice.length - fullMatch.length + leadingSpace.length
+      return {
+        triggerStart,
+        cursorEnd: cursor,
+        prefix: '',
+        query: (atMatch[2] || '').trim(),
+      }
+    }
+
+    const phraseMatch = slice.match(
+      /\b(projeto|refer[eê]ncia|mesma linha d[eo]|igual ao)\s+([A-Za-zÀ-ú0-9\-_]{1,28})$/i
+    )
+    if (phraseMatch) {
+      const triggerWord = phraseMatch[1]
+      const queryPart = phraseMatch[2] || ''
+      const triggerStart = slice.length - queryPart.length
+      return {
+        triggerStart,
+        cursorEnd: cursor,
+        prefix: `${triggerWord} `,
+        query: queryPart.trim(),
+      }
+    }
+
+    return null
+  }
+
+  const handlePromptChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextValue = event.target.value
+    const cursor = event.target.selectionStart ?? nextValue.length
+    setPrompt(nextValue)
+
+    if (projects.length > 0) {
+      const detected = detectInlineMention(nextValue, cursor)
+      setMentionMatch(detected)
+      setMentionIndex(0)
+    } else {
+      setMentionMatch(null)
+    }
+
+    // Clear linkedRefProjectId if the project name was deleted from the text
+    if (linkedRefProjectId) {
+      const linkedProj = projects.find((p) => p.id === linkedRefProjectId)
+      if (linkedProj && !nextValue.toLowerCase().includes(linkedProj.name.toLowerCase())) {
+        setLinkedRefProjectId('')
+      }
+    }
+  }
+
+  const mentionCandidates = useMemo(() => {
+    if (!mentionMatch || projects.length === 0) return []
+    const q = mentionMatch.query.toLowerCase()
+    return projects
+      .filter((p) => !q || p.name.toLowerCase().includes(q) || p.service?.toLowerCase().includes(q))
+      .slice(0, 5)
+  }, [mentionMatch, projects])
+
+  const insertProjectMention = (project: (typeof projects)[number]) => {
+    if (!mentionMatch) return
+    const before = prompt.slice(0, mentionMatch.triggerStart)
+    const after = prompt.slice(mentionMatch.cursorEnd)
+    const trailingSpace = after.startsWith(' ') ? '' : ' '
+    const nextPrompt = `${before}${project.name}${trailingSpace}${after}`
+    setPrompt(nextPrompt)
+    setLinkedRefProjectId(project.id)
+    setMentionMatch(null)
+    window.requestAnimationFrame(() => {
+      promptInputRef.current?.focus()
+    })
+  }
+
+  const handleTriggerMentionAtCursor = () => {
+    const input = promptInputRef.current
+    if (!input) return
+    const start = input.selectionStart ?? prompt.length
+    const before = prompt.slice(0, start)
+    const after = prompt.slice(start)
+    const needsSpace = before.length > 0 && !before.endsWith(' ')
+    const inserted = `${before}${needsSpace ? ' ' : ''}@${after}`
+    const nextCursor = start + (needsSpace ? 2 : 1)
+    setPrompt(inserted)
+    setMentionMatch({
+      triggerStart: nextCursor - 1,
+      cursorEnd: nextCursor,
+      prefix: '',
+      query: '',
+    })
+    setMentionIndex(0)
+    window.requestAnimationFrame(() => {
+      input.focus()
+      input.setSelectionRange(nextCursor, nextCursor)
+    })
+  }
+
+  const resolvedLinkedProjectId = useMemo(() => {
+    if (linkedRefProjectId) return linkedRefProjectId
+    const lower = prompt.toLowerCase()
+    const matched = projects.find((p) => p.name.length >= 3 && lower.includes(p.name.toLowerCase()))
+    return matched?.id || ''
+  }, [linkedRefProjectId, projects, prompt])
+
+  const linkedProjectObj = useMemo(
+    () => projects.find((p) => p.id === resolvedLinkedProjectId) || null,
+    [projects, resolvedLinkedProjectId]
+  )
+
+  const launchStudioWithTransition = (targetPrompt: string) => {
+    if (isLaunchingStudio) return
+    stopListening()
+    setMentionMatch(null)
+    setIsLaunchingStudio(true)
+    setLaunchStatusText('Interpretando sua solicitação...')
+    window.setTimeout(() => {
+      setLaunchStatusText('Abrindo o Allyo Brief Studio...')
+    }, 340)
+    window.setTimeout(() => {
+      setIsLaunchingStudio(false)
+      setActiveStudioPrompt(targetPrompt)
+    }, 680)
+  }
+
   const submitPrompt = (event: React.FormEvent) => {
     event.preventDefault()
-    if (!prompt.trim()) return
-    setActiveStudioPrompt(prompt.trim())
+    if (!prompt.trim() || isLaunchingStudio) return
+    launchStudioWithTransition(prompt.trim())
+  }
+
+  const handlePromptKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (mentionMatch && mentionCandidates.length > 0) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        setMentionIndex((prev) => (prev + 1) % mentionCandidates.length)
+        return
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        setMentionIndex((prev) => (prev - 1 + mentionCandidates.length) % mentionCandidates.length)
+        return
+      }
+      if (event.key === 'Enter' || event.key === 'Tab') {
+        event.preventDefault()
+        insertProjectMention(mentionCandidates[mentionIndex] || mentionCandidates[0])
+        return
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setMentionMatch(null)
+        return
+      }
+    }
   }
 
   const handleSuggestionClick = (label: string) => {
@@ -85,10 +276,10 @@ export function HomePage() {
     if (cleanLabel === 'Elaborar um briefing') {
       const text = prompt.trim() || 'Me ajude a escrever o briefing para novos anúncios de redes sociais com variações de copy'
       setPrompt(text)
-      setActiveStudioPrompt(text)
+      launchStudioWithTransition(text)
       return
     }
-    setActiveStudioPrompt(cleanLabel)
+    launchStudioWithTransition(cleanLabel)
   }
 
   return (
@@ -96,12 +287,12 @@ export function HomePage() {
       {activeStudioPrompt && (
         <AllyoBriefStudio
           initialPrompt={activeStudioPrompt}
-          linkedProjectId={linkedRefProjectId || undefined}
+          linkedProjectId={resolvedLinkedProjectId || undefined}
           onClose={() => setActiveStudioPrompt(null)}
         />
       )}
 
-      <section className="home-hero" data-node-id="9:12">
+      <section className={`home-hero ${isLaunchingStudio ? 'is-launching' : ''}`} data-node-id="9:12">
         <button className="home-catalog-link" onClick={() => navigate('/novo-projeto')}>
           Briefing do catálogo
           <FigmaIcon asset="home.imgEvaDiagonalArrowRightUpFill" />
@@ -110,39 +301,103 @@ export function HomePage() {
         <div className="home-hero__content">
           <h1>Vamos arrasar nessa campanha, {firstName}.</h1>
 
-          <form className="prompt-box" onSubmit={submitPrompt}>
-            <input
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              placeholder="O que eu posso fazer por você?"
-              aria-label="Converse com a Allyo"
-            />
-            <button type="button" className="prompt-mic" aria-label="Usar microfone">
-              <FigmaIcon asset="home.imgGroup2" />
-            </button>
-            <button type="submit" className="prompt-send" disabled={!prompt.trim()} aria-label="Enviar">
-              <FigmaIcon asset="home.imgFrame1410119641" />
-            </button>
-          </form>
+          <div className="prompt-box-wrap">
+            <form
+              className={`prompt-box ${isListening ? 'is-listening' : ''} ${isLaunchingStudio ? 'is-submitting' : ''}`}
+              onSubmit={submitPrompt}
+            >
+              <input
+                ref={promptInputRef}
+                value={prompt}
+                onChange={handlePromptChange}
+                onKeyDown={handlePromptKeyDown}
+                placeholder={
+                  isListening
+                    ? 'Ouvindo você... pode falar o que precisa para a campanha'
+                    : 'O que eu posso fazer por você? (use @ para citar um projeto)'
+                }
+                aria-label="Converse com a Allyo"
+              />
 
-          {projects.length > 0 && (
-            <div className="home-prompt-context-row">
-              <label className="home-prompt-ref-select" title="Usar a identidade visual e referência de um projeto existente">
-                <Link2 size={13} />
-                <select
-                  value={linkedRefProjectId}
-                  onChange={(event) => setLinkedRefProjectId(event.target.value)}
+              {linkedProjectObj && (
+                <span className="prompt-inline-project-badge" title={`Projeto referenciado: ${linkedProjectObj.name}`}>
+                  <Link2 size={12} />
+                  {linkedProjectObj.name}
+                </span>
+              )}
+
+              {projects.length > 0 && (
+                <button
+                  type="button"
+                  className="prompt-mention-trigger"
+                  onClick={handleTriggerMentionAtCursor}
+                  title="Referenciar um projeto existente no meio do texto (@)"
+                  aria-label="Referenciar projeto"
                 >
-                  <option value="">Seguir linha visual de um projeto (opcional)...</option>
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      Seguir referência: {project.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          )}
+                  <AtSign size={17} strokeWidth={2} />
+                </button>
+              )}
+
+              <button
+                type="button"
+                className={`prompt-mic ${isListening ? 'is-active' : ''}`}
+                onClick={handleToggleMic}
+                title={isListening ? 'Parar gravação de voz' : 'Falar por voz (transcrição automática)'}
+                aria-label="Usar microfone"
+              >
+                <Mic size={19} strokeWidth={2} />
+              </button>
+
+              <button
+                type="submit"
+                className="prompt-send"
+                disabled={!prompt.trim() || isLaunchingStudio}
+                aria-label="Enviar"
+              >
+                {isLaunchingStudio ? (
+                  <span className="prompt-send__spinner">
+                    <Loader2 size={18} className="spin" />
+                  </span>
+                ) : (
+                  <FigmaIcon asset="home.imgFrame1410119641" />
+                )}
+              </button>
+            </form>
+
+            {/* Inline Project Autocomplete Popover when typing @ or "projeto ..." */}
+            {mentionMatch && mentionCandidates.length > 0 && (
+              <div className="prompt-mention-popover" role="listbox" aria-label="Projetos para referenciar">
+                <div className="prompt-mention-popover__header">
+                  <span>Referenciar projeto no texto</span>
+                  <small>Enter para inserir</small>
+                </div>
+                {mentionCandidates.map((proj, idx) => (
+                  <button
+                    type="button"
+                    key={proj.id}
+                    className={`prompt-mention-item ${idx === mentionIndex ? 'is-highlighted' : ''}`}
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      insertProjectMention(proj)
+                    }}
+                  >
+                    <Link2 size={14} />
+                    <div>
+                      <strong>{proj.name}</strong>
+                      <small>{proj.service}</small>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {isLaunchingStudio && (
+              <div className="home-launch-pill" role="status">
+                <Loader2 size={14} className="spin" />
+                <span>{launchStatusText}</span>
+              </div>
+            )}
+          </div>
 
           <div className="home-suggestions">
             <span className="suggestion-label">Sugestões de prompts:</span>
