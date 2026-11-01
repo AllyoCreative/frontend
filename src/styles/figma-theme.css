@@ -3291,3 +3291,18 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .file-review-review-in-alteracao svg {
   color: #ff7a45;
 }
+
+/* Brand Kit: gestão de pastas, cores e arquivos */
+.brand-folder--new { border: 1.5px dashed rgba(0,76,70,.28); background: rgba(255,255,255,.35); }
+.brand-folder--new:hover, .brand-folder--new:focus-visible { border-color: #004c46; background: rgba(255,255,255,.85); }
+.brand-folder--new .brand-folder__meta { opacity: 1; transform: none; }
+.brand-folder__new-art { width: 96px; height: 96px; display: grid; place-items: center; border-radius: 22px; background: #e7f0ea; color: #004c46; transition: transform .22s ease, background-color .22s ease; }
+.brand-folder--new:hover .brand-folder__new-art { transform: translateY(-4px) rotate(-3deg); background: #d6e8dd; }
+.brand-folder-view__actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.brand-resource-wrap { position: relative; min-width: 0; }
+.brand-resource-wrap > .brand-resource { width: 100%; }
+.brand-resource__remove { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid #d8dcd5; border-radius: 50%; background: #fff; color: #7a847d; opacity: 0; transition: opacity .16s ease, color .16s ease, border-color .16s ease; }
+.brand-resource-wrap:hover .brand-resource__remove, .brand-resource__remove:focus-visible { opacity: 1; }
+.brand-resource__remove:hover { color: #c93326; border-color: #e7b8b3; }
+.brand-kit-empty .primary-button { margin-top: 10px; }
+@media (max-width: 900px) { .brand-folder-view__header { grid-template-columns: 1fr; } .brand-folder-view__actions { justify-content: flex-start; } .brand-resource__remove { opacity: 1; } }

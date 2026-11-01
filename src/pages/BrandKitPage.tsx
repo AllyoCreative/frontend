@@ -1,6 +1,6 @@
-import { type CSSProperties, useEffect, useRef, useState } from 'react'
-import { flushSync } from 'react-dom'
-import { ArrowLeft, ChevronRight, Download, Plus, Upload } from 'lucide-react'
+import { type CSSProperties, type FormEvent, useEffect, useRef, useState } from 'react'
+import { createPortal, flushSync } from 'react-dom'
+import { ArrowLeft, ChevronRight, Download, FolderPlus, Palette, Trash2, Upload, X } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
@@ -11,6 +11,13 @@ type FolderPreview = 'logos' | 'colors' | 'type' | 'images' | 'ui'
 type BrandResource = ApiBrandKitFolder['resources'][number]
 type BrandFolder = Omit<ApiBrandKitFolder, 'preview'> & { preview: FolderPreview }
 const folderPreviews: FolderPreview[] = ['logos', 'colors', 'type', 'images', 'ui']
+const folderTypeOptions: Array<{ value: FolderPreview; label: string }> = [
+  { value: 'images', label: 'Imagens e referências' },
+  { value: 'logos', label: 'Logotipos' },
+  { value: 'colors', label: 'Cores' },
+  { value: 'type', label: 'Tipografias' },
+  { value: 'ui', label: 'Componentes de UI' },
+]
 
 function BrandFolderArt({ preview, shared = false }: { preview: FolderPreview; shared?: boolean }) {
   const style = shared ? ({ viewTransitionName: `brand-folder-${preview}` } as CSSProperties) : undefined
@@ -62,15 +69,22 @@ function ResourcePreview({ folder, resource }: { folder: BrandFolder; resource: 
 export function BrandKitPage() {
   const { notify, brands } = useApp()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [folderState, setFolderState] = useState<{ brandId: string; folder: FolderPreview } | null>(null)
+  const [folderState, setFolderState] = useState<{ brandId: string; folder: string } | null>(null)
   const [folderResult, setFolderResult] = useState<{ brandId: string; items: BrandFolder[] } | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [showNewFolder, setShowNewFolder] = useState(false)
+  const [newFolderName, setNewFolderName] = useState('')
+  const [newFolderType, setNewFolderType] = useState<FolderPreview>('images')
+  const [showNewColor, setShowNewColor] = useState(false)
+  const [newColorName, setNewColorName] = useState('')
+  const [newColorHex, setNewColorHex] = useState('#004c46')
+  const [saving, setSaving] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
   const selectedBrandId = searchParams.get('marca')
   const folders = folderResult?.brandId === selectedBrandId ? folderResult.items : []
   const loadingFolders = Boolean(selectedBrandId && folderResult?.brandId !== selectedBrandId)
   const activeFolder = folderState?.brandId === selectedBrandId ? folderState.folder : null
-  const selectedFolder = folders.find((folder) => folder.preview === activeFolder)
+  const selectedFolder = folders.find((folder) => folder.id === activeFolder)
   const selectedBrand = brands.find((brand) => brand.id === selectedBrandId)
 
   useEffect(() => {
@@ -98,7 +112,78 @@ export function BrandKitPage() {
     setSearchParams(brandId ? { marca: brandId } : {})
   }
 
-  const changeFolder = (folder: FolderPreview | null) => {
+  const reloadFolders = async (brandId: string) => {
+    const items = await api.getBrandKit(brandId)
+    setFolderResult({
+      brandId,
+      items: items.filter((item) => folderPreviews.includes(item.preview as FolderPreview)) as BrandFolder[],
+    })
+  }
+
+  const createFolder = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!selectedBrandId || !newFolderName.trim()) return
+    setSaving(true)
+    try {
+      await api.createBrandKitFolder({ brandId: selectedBrandId, name: newFolderName.trim(), preview: newFolderType })
+      await reloadFolders(selectedBrandId)
+      setNewFolderName('')
+      setNewFolderType('images')
+      setShowNewFolder(false)
+      notify('Pasta criada no Brand Kit')
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : 'Não foi possível criar a pasta')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const addColor = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!selectedFolder || !selectedBrandId || !newColorName.trim()) return
+    setSaving(true)
+    try {
+      await api.addBrandKitResource({
+        folderId: selectedFolder.id,
+        name: newColorName.trim(),
+        meta: newColorHex.toUpperCase(),
+        tone: newColorHex,
+      })
+      await reloadFolders(selectedBrandId)
+      setNewColorName('')
+      setShowNewColor(false)
+      notify('Cor adicionada ao Brand Kit')
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : 'Não foi possível adicionar a cor')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const removeResource = async (resource: BrandResource) => {
+    if (!selectedBrandId || !window.confirm(`Remover "${resource.name}" do Brand Kit?`)) return
+    try {
+      await api.deleteBrandKitResource(resource.id)
+      await reloadFolders(selectedBrandId)
+      notify('Item removido')
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : 'Não foi possível remover o item')
+    }
+  }
+
+  const removeFolder = async (folder: BrandFolder) => {
+    if (!selectedBrandId || !window.confirm(`Excluir a pasta "${folder.name}" e todos os itens dela?`)) return
+    try {
+      await api.deleteBrandKitFolder(folder.id)
+      setFolderState(null)
+      await reloadFolders(selectedBrandId)
+      notify('Pasta excluída')
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : 'Não foi possível excluir a pasta')
+    }
+  }
+
+  const changeFolder = (folder: string | null) => {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const startViewTransition = (document as Document & {
       startViewTransition?: (update: () => void) => unknown
@@ -128,11 +213,7 @@ export function BrandKitPage() {
         contentType: uploaded.contentType,
         sizeBytes: uploaded.sizeBytes,
       })
-      const items = await api.getBrandKit(selectedBrandId)
-      setFolderResult({
-        brandId: selectedBrandId,
-        items: items.filter((item) => folderPreviews.includes(item.preview as FolderPreview)) as BrandFolder[],
-      })
+      await reloadFolders(selectedBrandId)
       notify('Arquivo adicionado ao Brand Kit')
     } catch (error: unknown) {
       notify(error instanceof Error ? error.message : 'Não foi possível enviar o arquivo')
@@ -167,18 +248,23 @@ export function BrandKitPage() {
       <div className="brand-folder-grid" aria-label="Pastas do Brand Kit">
         {folders.map((folder) => <button
           type="button"
-          key={folder.preview}
+          key={folder.id}
           className={`brand-folder brand-folder--${folder.preview}`}
-          onClick={() => changeFolder(folder.preview)}
+          onClick={() => changeFolder(folder.id)}
           aria-label={`Abrir ${folder.name}: ${folder.description}`}
         >
-          <BrandFolderArt preview={folder.preview} shared />
+          <BrandFolderArt preview={folder.preview} shared={folders.find((item) => item.preview === folder.preview)?.id === folder.id} />
           <span className="brand-folder__label">{folder.name}</span>
           <span className="brand-folder__meta">{folder.count}</span>
         </button>)}
+        {!loadingFolders && <button type="button" className="brand-folder brand-folder--new" onClick={() => setShowNewFolder(true)} aria-label="Criar nova pasta">
+          <span className="brand-folder__new-art"><FolderPlus size={34} strokeWidth={1.6} /></span>
+          <span className="brand-folder__label">Nova pasta</span>
+          <span className="brand-folder__meta">Organize seus arquivos</span>
+        </button>}
       </div>
       {loadingFolders && <div className="brand-kit-empty">Carregando recursos...</div>}
-      {!loadingFolders && folders.length === 0 && <div className="brand-kit-empty"><strong>Brand Kit vazio</strong><span>Esta marca ainda não possui coleções ou arquivos.</span></div>}
+      {!loadingFolders && folders.length === 0 && <div className="brand-kit-empty"><strong>Brand Kit vazio</strong><span>Crie a primeira pasta para começar a organizar os recursos desta marca.</span><button type="button" className="primary-button" onClick={() => setShowNewFolder(true)}><FolderPlus size={17} /> Nova pasta</button></div>}
     </> : <section className="brand-folder-view" aria-labelledby="brand-folder-title">
       <button type="button" className="brand-back" onClick={() => changeFolder(null)}>
         <ArrowLeft size={18} /> Voltar ao Brand Kit
@@ -191,24 +277,50 @@ export function BrandKitPage() {
           <h1 id="brand-folder-title">{selectedFolder.name}</h1>
           <p>{selectedFolder.description} · {selectedFolder.count}</p>
         </div>
-        <button type="button" className="primary-button" disabled={uploading} onClick={() => fileInput.current?.click()}>
-          <Upload size={17} /> {uploading ? 'Enviando...' : 'Adicionar arquivo'}
-        </button>
+        <div className="brand-folder-view__actions">
+          {selectedFolder.preview === 'colors' && <button type="button" className="secondary-button" onClick={() => setShowNewColor(true)}><Palette size={17} /> Adicionar cor</button>}
+          <button type="button" className="primary-button" disabled={uploading} onClick={() => fileInput.current?.click()}>
+            <Upload size={17} /> {uploading ? 'Enviando...' : 'Adicionar arquivo'}
+          </button>
+        </div>
         <input ref={fileInput} type="file" hidden accept="image/*,video/*,.pdf,.zip,.ai,.eps,.svg,.woff,.woff2,.txt" onChange={(event) => uploadResource(event.target.files?.[0])} />
       </header>
 
       <div className="brand-folder-view__toolbar">
-        <div><h2>Recursos</h2><span>{selectedFolder.resources.length} itens recentes</span></div>
-        <button type="button" className="secondary-button" onClick={() => notify(`Nova coleção criada em ${selectedFolder.name}`)}><Plus size={17} /> Nova coleção</button>
+        <div><h2>Recursos</h2><span>{selectedFolder.resources.length === 0 ? 'Nenhum item ainda' : `${selectedFolder.resources.length} ${selectedFolder.resources.length === 1 ? 'item' : 'itens'}`}</span></div>
+        <button type="button" className="secondary-button" onClick={() => void removeFolder(selectedFolder)}><Trash2 size={17} /> Excluir pasta</button>
       </div>
 
+      {selectedFolder.resources.length === 0 && <div className="brand-kit-empty"><strong>Pasta vazia</strong><span>{selectedFolder.preview === 'colors' ? 'Adicione cores da marca ou envie arquivos de paleta.' : 'Envie arquivos para esta pasta com o botão "Adicionar arquivo".'}</span></div>}
+
       <div className={`brand-resource-grid brand-resource-grid--${selectedFolder.preview}`}>
-        {selectedFolder.resources.map((resource) => <button type="button" className="brand-resource" key={resource.id} disabled={!resource.fileUrl} onClick={() => resource.fileUrl && window.open(resource.fileUrl, '_blank', 'noopener,noreferrer')}>
-          <span className="brand-resource__preview"><ResourcePreview folder={selectedFolder} resource={resource} /></span>
-          <span className="brand-resource__copy"><strong>{resource.name}</strong><small>{resource.meta}</small></span>
-          <Download size={18} aria-hidden="true" />
-        </button>)}
+        {selectedFolder.resources.map((resource) => <div className="brand-resource-wrap" key={resource.id}>
+          <button type="button" className="brand-resource" disabled={!resource.fileUrl} onClick={() => resource.fileUrl && window.open(resource.fileUrl, '_blank', 'noopener,noreferrer')}>
+            <span className="brand-resource__preview"><ResourcePreview folder={selectedFolder} resource={resource} /></span>
+            <span className="brand-resource__copy"><strong>{resource.name}</strong><small>{resource.meta}</small></span>
+            <Download size={18} aria-hidden="true" />
+          </button>
+          <button type="button" className="brand-resource__remove" onClick={() => void removeResource(resource)} aria-label={`Remover ${resource.name}`} title="Remover"><Trash2 size={14} /></button>
+        </div>)}
       </div>
     </section>}
+
+    {showNewFolder && createPortal(<div className="account-modal" role="dialog" aria-modal="true" aria-labelledby="new-folder-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowNewFolder(false) }}>
+      <form onSubmit={createFolder}>
+        <header><div><h2 id="new-folder-title">Nova pasta</h2><p>Crie uma pasta para organizar os recursos de {selectedBrand?.name}.</p></div><button type="button" onClick={() => setShowNewFolder(false)} aria-label="Fechar"><X size={18} /></button></header>
+        <label>Nome da pasta<input value={newFolderName} onChange={(event) => setNewFolderName(event.target.value)} placeholder="Ex.: Campanhas 2026" required autoFocus /></label>
+        <label>Tipo de conteúdo<select value={newFolderType} onChange={(event) => setNewFolderType(event.target.value as FolderPreview)}>{folderTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+        <footer><button type="button" className="secondary-button" onClick={() => setShowNewFolder(false)}>Cancelar</button><button type="submit" className="primary-button" disabled={saving || !newFolderName.trim()}>{saving ? 'Criando...' : 'Criar pasta'}</button></footer>
+      </form>
+    </div>, document.body)}
+
+    {showNewColor && selectedFolder && createPortal(<div className="account-modal" role="dialog" aria-modal="true" aria-labelledby="new-color-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowNewColor(false) }}>
+      <form onSubmit={addColor}>
+        <header><div><h2 id="new-color-title">Adicionar cor</h2><p>Registre uma cor oficial em {selectedFolder.name}.</p></div><button type="button" onClick={() => setShowNewColor(false)} aria-label="Fechar"><X size={18} /></button></header>
+        <label>Nome da cor<input value={newColorName} onChange={(event) => setNewColorName(event.target.value)} placeholder="Ex.: Verde principal" required autoFocus /></label>
+        <label>Cor<div className="color-field"><input type="color" value={newColorHex} onChange={(event) => setNewColorHex(event.target.value)} /><span>{newColorHex.toUpperCase()}</span></div></label>
+        <footer><button type="button" className="secondary-button" onClick={() => setShowNewColor(false)}>Cancelar</button><button type="submit" className="primary-button" disabled={saving || !newColorName.trim()}>{saving ? 'Salvando...' : 'Adicionar cor'}</button></footer>
+      </form>
+    </div>, document.body)}
   </div>
 }

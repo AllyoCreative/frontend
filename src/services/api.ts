@@ -557,14 +557,30 @@ export const api = {
     folderId: string
     name: string
     meta: string
-    fileKey: string
-    contentType: string
-    sizeBytes: number
+    tone?: string
+    fileKey?: string
+    contentType?: string
+    sizeBytes?: number
   }) {
     return request<BrandKitFolder['resources'][number]>('/brand-kit/resources', {
       method: 'POST',
       body: JSON.stringify(data),
     })
+  },
+
+  async createBrandKitFolder(data: { brandId: string; name: string; description?: string; preview: string }) {
+    return request<BrandKitFolder>('/brand-kit/folders', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  async deleteBrandKitFolder(folderId: string) {
+    return request<{ success: boolean }>(`/brand-kit/folders/${folderId}`, { method: 'DELETE' })
+  },
+
+  async deleteBrandKitResource(resourceId: string) {
+    return request<{ success: boolean }>(`/brand-kit/resources/${resourceId}`, { method: 'DELETE' })
   },
 
   // Storage
