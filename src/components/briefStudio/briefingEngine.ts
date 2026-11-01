@@ -617,6 +617,8 @@ export function computePlannedDeliverables(state: BriefDraftState): PlannedDeliv
   }
 
   const count = Math.max(1, state.scope.taskRepeats)
+  const uniqueChannels = Array.from(new Set(state.configuredFormats.map((f) => f.channel)))
+  const channelsLabel = uniqueChannels.join(' e ') || 'redes sociais'
   const channelsSummary =
     state.configuredFormats.map((f) => `${f.channel} ${f.formatName}`).join(', ') || 'Formatos digitais'
   const perTaskCredits = Math.max(
@@ -626,10 +628,16 @@ export function computePlannedDeliverables(state: BriefDraftState): PlannedDeliv
   const totalPrimaryCredits = Math.round(perTaskCredits * count * 100) / 100
   const deadlineDays = Math.max(1, Math.ceil((Math.ceil(perTaskCredits) * baseSla) / 9))
 
+  const rawProdName = product?.name || 'Criativos da Campanha'
+  const naturalPrimaryTitle =
+    normalize(rawProdName) === 'estatico'
+      ? `${count} ${count === 1 ? 'criativo estático' : 'criativos estáticos'} para ${channelsLabel}`
+      : `${count}x ${rawProdName} (${channelsLabel})`
+
   items.push({
     id: 'deliv-primary',
-    title: `${count}x ${product?.name || 'Criativos da Campanha'}${state.scope.quantity > 1 ? ` (${state.scope.quantity} ${product?.billing.unit || 'itens'} cada)` : ''}`,
-    subtitle: `Desenvolvimento completo para ${channelsSummary}${state.configuredFormats.length > 1 ? ` com ${state.configuredFormats.length - 1} desdobramento(s) de formato` : ''}`,
+    title: naturalPrimaryTitle,
+    subtitle: `Desenvolvimento completo para ${channelsSummary}`,
     team: product?.specialistRole || 'Design team',
     slaHours: baseSla,
     deadlineDays,

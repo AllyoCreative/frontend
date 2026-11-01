@@ -5,28 +5,21 @@ import {
   ArrowRight,
   Check,
   CheckCircle2,
-  ChevronDown,
   Clock3,
-  FolderKanban,
   Link2,
   Loader2,
   Mic,
-  Minus,
-  Pencil,
-  Plus,
   Sparkles,
   SlidersHorizontal,
   X,
 } from 'lucide-react'
 import { useApp } from '../../AppContext'
-import { CHANNEL_FORMATS } from '../formats/channelData'
 import { api, type CatalogProduct, type CatalogQuote } from '../../services/api'
 import {
   applyChatRefinement,
   buildInitialBriefState,
   computeBriefGaps,
   computePlannedDeliverables,
-  initialScopeForProduct,
   type BriefDraftState,
 } from './briefingEngine'
 import { useSpeechToText } from './useSpeechToText'
@@ -55,18 +48,6 @@ const PROCESSING_STEPS = [
     detail: 'Distribuindo tarefas entre Design, Copywriting e Motion',
   },
 ]
-
-const QUICK_FORMAT_PRESETS = [
-  { label: 'Instagram Post (1080×1350)', optionId: 'ig-post' },
-  { label: 'Instagram Stories (1080×1920)', optionId: 'ig-stories' },
-  { label: 'LinkedIn Anúncio (1200×627)', optionId: 'li-single-ad' },
-  { label: 'TikTok Vertical (1080×1920)', optionId: 'tt-in-feed' },
-  { label: 'YouTube Thumbnail (1280×720)', optionId: 'yt-thumb' },
-  { label: 'Meta Ads Variados (1:1 / 4:5)', optionId: 'ig-meta-variados' },
-]
-
-const EDITABLE_SOFTWARES = ['Figma', 'Photoshop', 'Illustrator', 'After Effects', 'Canva']
-const FINAL_EXTENSIONS = ['.PNG', '.JPG', '.MP4', '.PDF', '.SVG']
 
 const categoryAccent: Record<string, string> = {
   'Redes Sociais': '#bde8e1',
@@ -100,13 +81,9 @@ export function AllyoBriefStudio({
 
   const [chatInput, setChatInput] = useState('')
   const [speechBaseChat, setSpeechBaseChat] = useState('')
-  const [showGapsDrawer, setShowGapsDrawer] = useState(true)
-  const [showFormatPicker, setShowFormatPicker] = useState(false)
-  const [showProductPicker, setShowProductPicker] = useState(false)
+  const [showGapsDrawer, setShowGapsDrawer] = useState(false)
   const [editingOverview, setEditingOverview] = useState(false)
   const [editingName, setEditingName] = useState(false)
-  const [newDirectionInput, setNewDirectionInput] = useState('')
-  const [addingDirection, setAddingDirection] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null)
   const [lastUpdatedBadge, setLastUpdatedBadge] = useState<string | null>(null)
@@ -277,110 +254,6 @@ export function AllyoBriefStudio({
     }
   }
 
-  const handleAdjustQuantity = (delta: number) => {
-    if (!draft) return
-    const nextRepeats = Math.max(1, Math.min(30, draft.scope.taskRepeats + delta))
-    setDraft({
-      ...draft,
-      scope: { ...draft.scope, taskRepeats: nextRepeats },
-    })
-    triggerUpdateFeedback(`Escopo ajustado para ${nextRepeats}x entregáveis`)
-  }
-
-  const handleToggleAddon = (addonCode: string, label: string) => {
-    if (!draft) return
-    const currentQty = draft.scope.addons[addonCode] || 0
-    const nextAddons = { ...draft.scope.addons }
-    if (currentQty > 0) {
-      delete nextAddons[addonCode]
-      triggerUpdateFeedback(`${label} removido do escopo`)
-    } else {
-      nextAddons[addonCode] = 1
-      triggerUpdateFeedback(`${label} incluído no escopo`)
-    }
-    setDraft({
-      ...draft,
-      scope: { ...draft.scope, addons: nextAddons },
-    })
-  }
-
-  const handleAddPresetFormat = (optionId: string) => {
-    if (!draft) return
-    const opt =
-      CHANNEL_FORMATS.find((item) => item.id === optionId) ||
-      CHANNEL_FORMATS.find((item) => item.channel.toLowerCase() === optionId.toLowerCase())
-    if (!opt) return
-
-    const exists = draft.configuredFormats.some(
-      (f) => f.channel === opt.channel && f.formatName === opt.name
-    )
-    if (exists) {
-      setShowFormatPicker(false)
-      return
-    }
-
-    const nextFormats = [
-      ...draft.configuredFormats,
-      {
-        id: `studio-fmt-${Date.now()}`,
-        channel: opt.channel,
-        formatName: opt.name,
-        dimension: opt.defaultProportion.dimension,
-        proportionLabel: opt.defaultProportion.label,
-        isPrincipal: draft.configuredFormats.length === 0,
-        exclusiveDirection: '',
-        software: draft.selectedEditableFormat,
-        extension: draft.selectedFinalFormat,
-      },
-    ]
-
-    setDraft({
-      ...draft,
-      configuredFormats: nextFormats,
-      scope: {
-        ...draft.scope,
-        resizeCount: draft.selectedProduct?.credits.resizeAllowed
-          ? Math.max(0, nextFormats.length - 1)
-          : 0,
-      },
-    })
-    setShowFormatPicker(false)
-    triggerUpdateFeedback(`Formato ${opt.channel} ${opt.name} adicionado`)
-  }
-
-  const handleRemoveFormat = (id: string) => {
-    if (!draft || draft.configuredFormats.length <= 1) return
-    const nextFormats = draft.configuredFormats.filter((f) => f.id !== id)
-    if (nextFormats.length > 0 && !nextFormats.some((f) => f.isPrincipal)) {
-      nextFormats[0].isPrincipal = true
-    }
-    setDraft({
-      ...draft,
-      configuredFormats: nextFormats,
-      scope: {
-        ...draft.scope,
-        resizeCount: draft.selectedProduct?.credits.resizeAllowed
-          ? Math.max(0, nextFormats.length - 1)
-          : 0,
-      },
-    })
-  }
-
-  const handleSelectProduct = (product: CatalogProduct) => {
-    if (!draft) return
-    const nextScope = initialScopeForProduct(product)
-    nextScope.taskRepeats = draft.scope.taskRepeats
-    nextScope.addons = { ...draft.scope.addons }
-    setDraft({
-      ...draft,
-      selectedProduct: product,
-      scope: nextScope,
-      objective: `Criar ${product.name.toLocaleLowerCase('pt-BR')}`,
-    })
-    setShowProductPicker(false)
-    triggerUpdateFeedback(`Serviço alterado para ${product.name}`)
-  }
-
   const handleOpenInFullConfigurator = () => {
     if (!draft || !draft.selectedProduct) {
       navigate('/novo-projeto')
@@ -528,7 +401,7 @@ export function AllyoBriefStudio({
   return createPortal(
     <div className="brief-studio-shell" role="dialog" aria-modal="true" aria-label="Allyo Brief Studio">
       <div className="brief-studio-frame">
-        {/* Top Action Bar (Superside Image 5 style) */}
+        {/* Clean Minimal Top Bar (Superside Image 5 style) */}
         <header className="brief-studio-topbar">
           <div className="brief-studio-topbar__left">
             <span className="brief-studio-brand-pill">
@@ -537,99 +410,39 @@ export function AllyoBriefStudio({
             </span>
 
             {!isGenerating && draft?.mode === 'brief' && (
-              <>
-                <div className="brief-studio-product-selector">
-                  <button
-                    type="button"
-                    className="brief-studio-chip-btn"
-                    onClick={() => setShowProductPicker((v) => !v)}
-                    title="Alterar serviço base do catálogo"
-                  >
-                    <span>Serviço:</span>
-                    <strong>{draft.selectedProduct?.name || 'Campanha Criativa'}</strong>
-                    <ChevronDown size={14} />
-                  </button>
-                  {showProductPicker && (
-                    <div className="brief-studio-dropdown">
-                      <div className="brief-studio-dropdown__title">Trocar serviço base do catálogo</div>
-                      <div className="brief-studio-dropdown__list">
-                        {products.slice(0, 18).map((prod) => (
-                          <button
-                            type="button"
-                            key={prod.code}
-                            className={prod.code === draft.selectedProduct?.code ? 'is-active' : ''}
-                            onClick={() => handleSelectProduct(prod)}
-                          >
-                            <span>{prod.name}</span>
-                            <small>
-                              {prod.category} · {formatCredits(prod.credits.original)} cr.
-                            </small>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {availableProjects.length > 0 && (
-                  <label className="brief-studio-project-target">
-                    <FolderKanban size={13} />
-                    <select
-                      value={draft.creatingNewProject ? '__new__' : draft.targetProjectId}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        if (val === '__new__') {
-                          setDraft({ ...draft, creatingNewProject: true, targetProjectId: '' })
-                        } else {
-                          const target = availableProjects.find((p) => p.id === val)
-                          setDraft({
-                            ...draft,
-                            creatingNewProject: false,
-                            targetProjectId: val,
-                            campaignName: target ? target.name : draft.campaignName,
-                            nameConfirmed: true,
-                          })
-                        }
-                      }}
-                    >
-                      <option value="__new__">Criar novo projeto</option>
-                      {availableProjects.map((proj) => (
-                        <option key={proj.id} value={proj.id}>
-                          Adicionar em: {proj.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-              </>
+              <span className="brief-studio-meta-summary">
+                <Clock3 size={13} />
+                ~{totalEstimatedDays} dias úteis · {deliverables.length} tarefas ·{' '}
+                {quoteLoading ? 'Calculando...' : `${formatCredits(totalEstimatedCredits)} créditos`}
+              </span>
             )}
           </div>
 
           <div className="brief-studio-topbar__right">
             {!isGenerating && draft?.mode === 'brief' && (
               <>
-                <button
-                  type="button"
-                  className={`brief-studio-gaps-toggle ${showGapsDrawer ? 'is-active' : ''}`}
-                  onClick={() => {
-                    setShowGapsDrawer((v) => !v)
-                    chatInputRef.current?.focus()
-                  }}
-                >
-                  Preencher lacunas
-                  {unresolvedGaps.length > 0 && (
+                {unresolvedGaps.length > 0 && (
+                  <button
+                    type="button"
+                    className={`brief-studio-gaps-toggle ${showGapsDrawer ? 'is-active' : ''}`}
+                    onClick={() => {
+                      setShowGapsDrawer((v) => !v)
+                      chatInputRef.current?.focus()
+                    }}
+                  >
+                    Preencher lacunas
                     <span className="brief-studio-gaps-badge">{unresolvedGaps.length}</span>
-                  )}
-                </button>
+                  </button>
+                )}
 
                 <button
                   type="button"
                   className="brief-studio-configurator-btn"
                   onClick={handleOpenInFullConfigurator}
-                  title="Abrir este rascunho no configurador visual detalhado"
+                  title="Personalizar formatos e configurações detalhadas"
                 >
                   <SlidersHorizontal size={14} />
-                  Configurador
+                  Personalizar escopo
                 </button>
 
                 <button
@@ -740,7 +553,7 @@ export function AllyoBriefStudio({
                   <div className="brief-studio-doc__header">
                     <h1>Insights do seu espaço</h1>
                     <p className="brief-studio-doc__subtitle">
-                      Resumo operacional atualizado em tempo real sem custo de IA
+                      Resumo operacional atualizado em tempo real
                     </p>
                   </div>
 
@@ -841,10 +654,9 @@ export function AllyoBriefStudio({
               )}
             </div>
           ) : (
-            /* Phase 2: The Live Brief Document (Superside Image 4 style) */
+            /* Phase 2: Pure Editorial Brief Document (Superside Image 4 style) */
             draft && (
               <div className="brief-studio-doc">
-                {/* Document Title & Campaign Name */}
                 <div className="brief-studio-doc__header">
                   <div className="brief-studio-doc__title-row">
                     <span className="brief-studio-doc__eyebrow">Brief</span>
@@ -869,229 +681,59 @@ export function AllyoBriefStudio({
                         }}
                         autoFocus
                       />
-                      <button type="button" onClick={() => setEditingName(false)}>
-                        OK
-                      </button>
                     </div>
                   ) : (
                     <h1
                       className="brief-studio-doc__campaign-title"
                       onClick={() => setEditingName(true)}
-                      title="Clique para editar o nome da campanha"
+                      title="Clique no título para renomear"
                     >
                       {draft.campaignName}
-                      <Pencil size={15} className="brief-studio-edit-hint" />
                     </h1>
                   )}
-
-                  {/* Scope & SLA Summary Pill Bar */}
-                  <div className="brief-studio-doc__metrics">
-                    <span>
-                      <Clock3 size={13} /> Prazo estimado: <strong>~{totalEstimatedDays} dia(s) úteis</strong>
-                    </span>
-                    <span>
-                      Tarefas no escopo: <strong>{deliverables.length}</strong>
-                    </span>
-                    <span>
-                      Investimento estimado:{' '}
-                      <strong>
-                        {quoteLoading ? 'Calculando...' : `${formatCredits(totalEstimatedCredits)} créditos`}
-                      </strong>
-                    </span>
-                  </div>
                 </div>
 
-                {/* 1. Project Overview */}
+                {/* 1. Visão geral do projeto */}
                 <section className="brief-studio-section">
-                  <div className="brief-studio-section__head">
-                    <h2>Visão geral do projeto</h2>
-                    <button
-                      type="button"
-                      className="brief-studio-text-action"
-                      onClick={() => setEditingOverview((v) => !v)}
-                    >
-                      <Pencil size={12} /> {editingOverview ? 'Concluir edição' : 'Editar'}
-                    </button>
-                  </div>
-
+                  <h2>Visão geral do projeto</h2>
                   {editingOverview ? (
                     <textarea
                       className="brief-studio-overview-textarea"
                       rows={3}
                       value={draft.overview}
                       onChange={(e) => setDraft({ ...draft, overview: e.target.value })}
+                      onBlur={() => setEditingOverview(false)}
+                      autoFocus
                     />
                   ) : (
                     <p
                       className="brief-studio-overview-text"
                       onClick={() => setEditingOverview(true)}
-                      title="Clique para editar a visão geral"
+                      title="Clique no texto para editar"
                     >
                       {draft.overview}
                     </p>
                   )}
                 </section>
 
-                {/* 2. Deliverable (Tasks that will be created in the project) */}
+                {/* 2. Entregáveis */}
                 <section className="brief-studio-section">
-                  <div className="brief-studio-section__head">
-                    <h2>Entregáveis e Tarefas do Escopo</h2>
-                    <div className="brief-studio-qty-control">
-                      <span>Peças principais:</span>
-                      <button
-                        type="button"
-                        onClick={() => handleAdjustQuantity(-1)}
-                        disabled={draft.scope.taskRepeats <= 1}
-                        aria-label="Diminuir quantidade"
-                      >
-                        <Minus size={12} />
-                      </button>
-                      <strong>{draft.scope.taskRepeats}</strong>
-                      <button
-                        type="button"
-                        onClick={() => handleAdjustQuantity(1)}
-                        aria-label="Aumentar quantidade"
-                      >
-                        <Plus size={12} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <ul className="brief-studio-bullet-list brief-studio-bullet-list--deliverables">
+                  <h2>Entregáveis</h2>
+                  <ul className="brief-studio-bullet-list">
                     {deliverables.map((item) => (
-                      <li key={item.id}>
-                        <div className="brief-studio-deliverable-line">
-                          <strong>{item.title}</strong>
-                          <span className="brief-studio-deliverable-meta">
-                            <b>{item.team}</b> · SLA {item.slaHours}h (~{item.deadlineDays}d úteis) ·{' '}
-                            {formatCredits(item.credits)} cr.
-                          </span>
-                        </div>
-                        <small>{item.subtitle}</small>
-                      </li>
+                      <li key={item.id}>{item.title}</li>
                     ))}
                   </ul>
-
-                  {/* Quick toggles to add/remove scope tasks */}
-                  <div className="brief-studio-quick-toggles">
-                    <button
-                      type="button"
-                      className={
-                        draft.scope.addons['criacao-de-conteudo-publicitario'] ? 'is-selected' : ''
-                      }
-                      onClick={() =>
-                        handleToggleAddon('criacao-de-conteudo-publicitario', 'Copywriting (Headline + Body)')
-                      }
-                    >
-                      {draft.scope.addons['criacao-de-conteudo-publicitario'] ? (
-                        <Check size={12} />
-                      ) : (
-                        <Plus size={12} />
-                      )}
-                      Variações de Copy (Headline + Body)
-                    </button>
-
-                    <button
-                      type="button"
-                      className={draft.scope.addons['legenda-para-redes-sociais'] ? 'is-selected' : ''}
-                      onClick={() =>
-                        handleToggleAddon('legenda-para-redes-sociais', 'Legendas para redes sociais')
-                      }
-                    >
-                      {draft.scope.addons['legenda-para-redes-sociais'] ? (
-                        <Check size={12} />
-                      ) : (
-                        <Plus size={12} />
-                      )}
-                      Legendas para post
-                    </button>
-
-                    <button
-                      type="button"
-                      className={
-                        draft.scope.addons['animacao-de-imagem-estatica-via-ia'] ? 'is-selected' : ''
-                      }
-                      onClick={() =>
-                        handleToggleAddon('animacao-de-imagem-estatica-via-ia', 'Vídeo curto / Motion')
-                      }
-                    >
-                      {draft.scope.addons['animacao-de-imagem-estatica-via-ia'] ? (
-                        <Check size={12} />
-                      ) : (
-                        <Plus size={12} />
-                      )}
-                      Versão em Vídeo / Motion (15–30s)
-                    </button>
-
-                    <button
-                      type="button"
-                      className={draft.creativePath === 'new-concept' ? 'is-selected' : ''}
-                      onClick={() => {
-                        const nextPath =
-                          draft.creativePath === 'new-concept' ? 'follow-references' : 'new-concept'
-                        setDraft({ ...draft, creativePath: nextPath })
-                        triggerUpdateFeedback(
-                          nextPath === 'new-concept'
-                            ? 'Conceito Visual incluído no escopo'
-                            : 'Caminho criativo: Seguir referências'
-                        )
-                      }}
-                    >
-                      {draft.creativePath === 'new-concept' ? <Check size={12} /> : <Plus size={12} />}
-                      Etapa de Conceito Visual
-                    </button>
-                  </div>
                 </section>
 
-                {/* 3. Formats & File Specs */}
+                {/* 3. Formatos */}
                 <section className="brief-studio-section">
-                  <div className="brief-studio-section__head">
-                    <h2>Formatos e Arquivos</h2>
-                    <div className="brief-studio-format-add-wrap">
-                      <button
-                        type="button"
-                        className="brief-studio-text-action"
-                        onClick={() => setShowFormatPicker((v) => !v)}
-                      >
-                        <Plus size={12} /> Adicionar formato
-                      </button>
-                      {showFormatPicker && (
-                        <div className="brief-studio-dropdown brief-studio-dropdown--right">
-                          <div className="brief-studio-dropdown__title">Incluir formato no escopo</div>
-                          <div className="brief-studio-dropdown__list">
-                            {QUICK_FORMAT_PRESETS.map((preset) => (
-                              <button
-                                type="button"
-                                key={preset.optionId}
-                                onClick={() => handleAddPresetFormat(preset.optionId)}
-                              >
-                                <span>{preset.label}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
+                  <h2>Formatos</h2>
                   <ul className="brief-studio-bullet-list">
                     {draft.configuredFormats.map((fmt) => (
-                      <li key={fmt.id} className="brief-studio-format-bullet">
-                        <span>
-                          <strong>{fmt.channel}:</strong> {fmt.dimension} ({fmt.formatName} —{' '}
-                          {fmt.proportionLabel})
-                          {fmt.isPrincipal && <em className="brief-studio-principal-tag">Peça-mãe</em>}
-                        </span>
-                        {draft.configuredFormats.length > 1 && (
-                          <button
-                            type="button"
-                            className="brief-studio-remove-inline"
-                            onClick={() => handleRemoveFormat(fmt.id)}
-                            title="Remover formato"
-                          >
-                            <X size={12} />
-                          </button>
-                        )}
+                      <li key={fmt.id}>
+                        <strong>{fmt.channel}:</strong> {fmt.dimension} ({fmt.formatName} —{' '}
+                        {fmt.proportionLabel})
                       </li>
                     ))}
 
@@ -1102,131 +744,33 @@ export function AllyoBriefStudio({
                       </li>
                     )}
 
-                    <li className="brief-studio-file-specs-row">
-                      <span>
-                        <strong>Entrega de arquivos:</strong> Final em{' '}
-                        <select
-                          value={draft.selectedFinalFormat}
-                          onChange={(e) =>
-                            setDraft({ ...draft, selectedFinalFormat: e.target.value })
-                          }
-                        >
-                          {FINAL_EXTENSIONS.map((ext) => (
-                            <option key={ext} value={ext}>
-                              {ext}
-                            </option>
-                          ))}
-                        </select>{' '}
-                        · Arquivo editável aberto em{' '}
-                        <select
-                          value={draft.selectedEditableFormat}
-                          onChange={(e) =>
-                            setDraft({
-                              ...draft,
-                              selectedEditableFormat: e.target.value,
-                              configuredFormats: draft.configuredFormats.map((f) => ({
-                                ...f,
-                                software: e.target.value,
-                              })),
-                            })
-                          }
-                        >
-                          {EDITABLE_SOFTWARES.map((sw) => (
-                            <option key={sw} value={sw}>
-                              {sw}
-                            </option>
-                          ))}
-                        </select>
-                      </span>
+                    <li>
+                      <strong>Arquivos:</strong> Final em {draft.selectedFinalFormat} · Editável aberto em{' '}
+                      {draft.selectedEditableFormat}
                     </li>
                   </ul>
                 </section>
 
-                {/* 4. Design Direction */}
+                {/* 4. Direção Criativa */}
                 <section className="brief-studio-section">
-                  <div className="brief-studio-section__head">
-                    <h2>Direção Criativa</h2>
-                    <button
-                      type="button"
-                      className="brief-studio-text-action"
-                      onClick={() => setAddingDirection((v) => !v)}
-                    >
-                      <Plus size={12} /> Adicionar diretriz
-                    </button>
-                  </div>
-
+                  <h2>Direção Criativa</h2>
                   <ul className="brief-studio-bullet-list">
                     {draft.designDirection.map((dir, index) => (
-                      <li key={`${dir}-${index}`} className="brief-studio-format-bullet">
-                        <span>{dir}</span>
-                        {draft.designDirection.length > 1 && (
-                          <button
-                            type="button"
-                            className="brief-studio-remove-inline"
-                            onClick={() =>
-                              setDraft({
-                                ...draft,
-                                designDirection: draft.designDirection.filter((_, i) => i !== index),
-                              })
-                            }
-                            title="Remover diretriz"
-                          >
-                            <X size={12} />
-                          </button>
-                        )}
-                      </li>
+                      <li key={`${dir}-${index}`}>{dir}</li>
                     ))}
                   </ul>
-
-                  {addingDirection && (
-                    <div className="brief-studio-add-direction-row">
-                      <input
-                        type="text"
-                        value={newDirectionInput}
-                        onChange={(e) => setNewDirectionInput(e.target.value)}
-                        placeholder="Ex: Priorizar fotos reais de clientes e tipografia em caixa alta..."
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && newDirectionInput.trim()) {
-                            setDraft({
-                              ...draft,
-                              designDirection: [...draft.designDirection, newDirectionInput.trim()],
-                            })
-                            setNewDirectionInput('')
-                            setAddingDirection(false)
-                          }
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!newDirectionInput.trim()) return
-                          setDraft({
-                            ...draft,
-                            designDirection: [...draft.designDirection, newDirectionInput.trim()],
-                          })
-                          setNewDirectionInput('')
-                          setAddingDirection(false)
-                        }}
-                      >
-                        Incluir
-                      </button>
-                    </div>
-                  )}
                 </section>
               </div>
             )
           )}
 
-          {/* Bottom Interactive "Fill in the Gaps" + Conversational Edit Bar */}
+          {/* Bottom Conversational Bar */}
           <div className="brief-studio-footer">
             {!isGenerating && draft?.mode === 'brief' && showGapsDrawer && unresolvedGaps.length > 0 && (
               <div className="brief-studio-gaps-bar">
-                <span className="brief-studio-gaps-bar__label">
-                  Sugestões rápidas para completar o escopo:
-                </span>
                 <div className="brief-studio-gaps-chips">
                   {unresolvedGaps.flatMap((gap) =>
-                    gap.options.slice(0, 2).map((opt) => (
+                    gap.options.slice(0, 1).map((opt) => (
                       <button
                         type="button"
                         key={`${gap.id}-${opt.label}`}
@@ -1255,7 +799,7 @@ export function AllyoBriefStudio({
                     ? 'A Allyo está preparando o seu briefing...'
                     : isChatListening
                       ? 'Ouvindo sua instrução por voz...'
-                      : 'Edite seu briefing com a Allyo (ex: "mudar para 5 peças", "incluir stories e copywriting", "arquivo em Figma")...'
+                      : 'Edite seu briefing com a Allyo (ex: "mudar para 5 peças", "incluir stories", "arquivo em PSD")...'
                 }
                 aria-label="Edite seu briefing com a Allyo"
               />
