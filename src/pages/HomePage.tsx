@@ -440,7 +440,7 @@ export function HomePage() {
                   <button
                     key={task.id}
                     className="home-notification"
-                    onClick={() => navigate(`/projetos/${task.projectId}${task.reviewDesignId ? '/entregas' : ''}`)}
+                    onClick={() => navigate(`/projetos/${task.projectId}/${task.reviewDesignId ? 'entregas' : 'visao-geral'}?task=${encodeURIComponent(task.id)}`)}
                   >
                     <span>
                       <strong>{task.title}</strong>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { NavLink, useNavigate, useParams } from 'react-router-dom'
+import { NavLink, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ChevronUp, Circle, Download, ExternalLink, Eye, FileText, Flag, Image as ImageIcon, MessageSquareText, Pencil, Play, Plus, Rocket, Upload } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
@@ -346,6 +346,7 @@ function DeliveryPreview({ delivery }: { delivery: DesignSummary }) {
 export function ProjectDetailPage() {
   const { id = '', tab = 'visao-geral' } = useParams()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { projects, currentUser, allyoTeam, notify } = useApp()
   const project = useMemo(() => projects.find((item) => item.id === id), [id, projects])
   const [messageList, setMessageList] = useState<ChatMessage[]>([])
@@ -419,10 +420,22 @@ export function ProjectDetailPage() {
   const [reviewOrigin, setReviewOrigin] = useState<ReviewOrigin | null>(null)
   const projectFileInputRef = useRef<HTMLInputElement>(null)
 
-  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
+  const requestedTaskId = searchParams.get('task')
+  const expandedTaskId = requestedTaskId
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [taskBriefingDraft, setTaskBriefingDraft] = useState<TaskBriefing | null>(null)
   const [savingTaskBriefing, setSavingTaskBriefing] = useState(false)
+
+  const selectTask = (taskId: string | null) => {
+    if (editingTaskId && editingTaskId !== taskId) {
+      setEditingTaskId(null)
+      setTaskBriefingDraft(null)
+    }
+    const nextSearchParams = new URLSearchParams(searchParams)
+    if (taskId) nextSearchParams.set('task', taskId)
+    else nextSearchParams.delete('task')
+    setSearchParams(nextSearchParams, { replace: true })
+  }
 
   useEffect(() => {
     const raf = window.requestAnimationFrame(() => {
@@ -430,6 +443,10 @@ export function ProjectDetailPage() {
         // Força invalidação de tiles GPU dos scrollers horizontais ao recolher/expandir o painel de escopo
         void el.offsetHeight
       })
+      if (expandedTaskId) {
+        document.querySelector<HTMLElement>(`[data-project-task-id="${CSS.escape(expandedTaskId)}"]`)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+      }
     })
     return () => window.cancelAnimationFrame(raf)
   }, [expandedTaskId])
@@ -532,7 +549,7 @@ export function ProjectDetailPage() {
   }, [project])
 
   const startEditingTaskBriefing = (task: ProjectTask) => {
-    setExpandedTaskId(task.id)
+    selectTask(task.id)
     setEditingTaskId(task.id)
     setTaskBriefingDraft({
       inheritedFromProject: false,
@@ -727,14 +744,22 @@ export function ProjectDetailPage() {
               ) : (
                 projectTasks.map((task) => {
                   const expanded = expandedTaskId === task.id
+                  const assignedToCurrentUser = Boolean(currentUser && (
+                    task.members?.some((member) => member.userId === currentUser.id)
+                    || task.assigneeName?.trim().toLocaleLowerCase('pt-BR') === currentUser.name.trim().toLocaleLowerCase('pt-BR')
+                    || task.assignee?.trim().toLocaleLowerCase('pt-BR') === currentUser.name.trim().toLocaleLowerCase('pt-BR')
+                  ))
+                  const taskContext = expanded
+                    ? assignedToCurrentUser ? 'Sua tarefa · aberta agora' : 'Tarefa aberta agora'
+                    : assignedToCurrentUser ? 'Sua tarefa' : `Tarefa #${task.publicId}`
                   const hoverDetails = [
                     `Tarefa #${task.publicId}`,
                     `${task.deadlineDays || 2} dias úteis`,
                     (task.status === 'Bloqueada' || task.dependencyBlocked) ? 'Possui dependência pendente' : '',
                   ].filter(Boolean).join(' · ')
-                  return <article className={`project-task-stack-card${expanded ? ' is-active' : ''}`} key={task.id}>
-                    <button className="project-task-card-open" type="button" title={hoverDetails} aria-label={`${task.title}. ${task.status}. ${hoverDetails}`} onClick={() => setExpandedTaskId(expanded ? null : task.id)} aria-expanded={expanded}>
-                      <span className="project-task-card-copy"><h3>{task.title}</h3></span>
+                  return <article className={`project-task-stack-card${expanded ? ' is-active' : ''}${assignedToCurrentUser ? ' is-yours' : ''}`} data-project-task-id={task.id} key={task.id}>
+                    <button className="project-task-card-open" type="button" title={hoverDetails} aria-label={`${task.title}. ${task.status}. ${hoverDetails}`} onClick={() => selectTask(expanded ? null : task.id)} aria-expanded={expanded} aria-current={expanded ? 'step' : undefined}>
+                      <span className="project-task-card-copy"><small>{taskContext}</small><h3>{task.title}</h3></span>
                       <StatusPill status={task.status} className="project-task-status" />
                     </button>
                   </article>
@@ -742,8 +767,8 @@ export function ProjectDetailPage() {
               )}
             </div>
 
-            {expandedTask && <section className="project-task-detail">
-              <header><div><span>Tarefa #{expandedTask.publicId}</span><h3>{expandedTask.title}</h3></div><div className="project-task-detail-actions">{!editingExpandedTask && <button className="project-task-detail-edit" type="button" onClick={() => startEditingTaskBriefing(expandedTask)}><Pencil size={14} /> Editar briefing</button>}<button type="button" onClick={() => setExpandedTaskId(null)} aria-label="Fechar tarefa"><ChevronUp size={18} /></button></div></header>
+            {expandedTask && <section className="project-task-detail" id="tarefa-aberta">
+              <header><div><span><b>Você está aqui</b>Tarefa #{expandedTask.publicId}</span><h3>{expandedTask.title}</h3></div><div className="project-task-detail-actions">{!editingExpandedTask && <button className="project-task-detail-edit" type="button" onClick={() => startEditingTaskBriefing(expandedTask)}><Pencil size={14} /> Editar briefing</button>}<button type="button" onClick={() => selectTask(null)} aria-label="Fechar tarefa"><ChevronUp size={18} /></button></div></header>
               {editingExpandedTask && taskBriefingDraft ? <div className="project-task-briefing-editor">
                 <label><span>Objetivo desta tarefa</span><textarea value={taskBriefingDraft.objective || ''} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, objective: event.target.value })} /></label>
                 <label><span>Contexto</span><textarea value={taskBriefingDraft.overview || ''} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, overview: event.target.value })} /></label>

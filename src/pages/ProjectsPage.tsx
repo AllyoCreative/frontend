@@ -193,7 +193,7 @@ function TaskRow({ project, task, separated = false }: { project: Project; task:
   return (
     <button
       className={`projects-figma-row projects-figma-row--task ${separated ? 'is-separated' : ''}`}
-      onClick={() => navigate(`/projetos/${project.id}`)}
+      onClick={() => navigate(`/projetos/${project.id}/visao-geral?task=${encodeURIComponent(task.id)}`)}
     >
       <span className="projects-row-name">
         <strong>{task.title || 'Tarefa do projeto'}</strong>
@@ -341,7 +341,7 @@ function ProjectsCalendar({ projects, cursor, showWeekends, onCursorChange, onSh
                     type="button"
                     className={`projects-calendar__event projects-calendar__event--range${visualStart ? ' is-range-start' : ''}${visualEnd ? ' is-range-end' : ''}${visualStart && visualEnd ? ' is-range-single' : ''}${task.status === 'Concluído' ? ' is-concluido' : ''}`}
                     style={{ '--project-accent': project.accent } as CSSProperties}
-                    onClick={() => navigate(`/projetos/${project.id}`)}
+                    onClick={() => navigate(`/projetos/${project.id}/visao-geral?task=${encodeURIComponent(task.id)}`)}
                     title={`${task.title} · ${project.name} · prazo ${new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(end)}`}
                     aria-label={`${task.title} · ${new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(day)}`}
                     key={task.id}
@@ -358,7 +358,7 @@ function ProjectsCalendar({ projects, cursor, showWeekends, onCursorChange, onSh
 
       {unscheduledTasks.length > 0 && <div className="projects-calendar__unscheduled">
         <div><strong>Tarefas sem data</strong><span>Sem criação ou deadline definido</span></div>
-        <div>{unscheduledTasks.map(({ project, task }) => <button type="button" onClick={() => navigate(`/projetos/${project.id}`)} key={task.id}><i style={{ background: project.accent }} /><span>{task.title}</span><small>{project.name}</small></button>)}</div>
+        <div>{unscheduledTasks.map(({ project, task }) => <button type="button" onClick={() => navigate(`/projetos/${project.id}/visao-geral?task=${encodeURIComponent(task.id)}`)} key={task.id}><i style={{ background: project.accent }} /><span>{task.title}</span><small>{project.name}</small></button>)}</div>
       </div>}
     </section>
   )

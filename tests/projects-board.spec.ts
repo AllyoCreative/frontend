@@ -8,7 +8,7 @@ const completedProject = {
 const activeProject = {
   id: 'project-active', name: 'Campanha em produção', service: 'Carrossel', status: 'Em andamento', deadline: '2026-09-30T18:30:00.000Z', progress: 30, tasks: 2, unread: 2, accent: '#d7ff70', team: [], description: '', favorite: false, createdAt: '2026-09-27T12:00:00.000Z',
   tasksList: [
-    { id: 'task-copy', publicId: '100002', projectId: 'project-active', title: 'Legenda para redes sociais', team: 'Copy team', status: 'Em andamento', deadlineAt: '2026-09-29T17:30:00.000Z', deadlineDays: 2, createdAt: '2026-09-27T12:00:00.000Z', briefing: { inheritedFromProject: true, deliverables: [], formats: [], creativeDirection: [] } },
+    { id: 'task-copy', publicId: '100002', projectId: 'project-active', title: 'Legenda para redes sociais', team: 'Copy team', assigneeName: 'Levy', assigneeRole: 'Copywriter', status: 'Em andamento', deadlineAt: '2026-09-29T17:30:00.000Z', deadlineDays: 2, createdAt: '2026-09-27T12:00:00.000Z', briefing: { inheritedFromProject: true, deliverables: [], formats: [], creativeDirection: [] } },
     { id: 'task-design', publicId: '100003', projectId: 'project-active', title: 'Carrossel principal', team: 'Design team', status: 'Bloqueada', deadlineAt: '2026-09-30T18:30:00.000Z', deadlineDays: 3, createdAt: '2026-09-27T12:00:00.000Z', briefing: { inheritedFromProject: true, deliverables: [], formats: [], creativeDirection: [] } },
   ],
 }
@@ -20,6 +20,8 @@ test('lista e calendário refletem status, favorito, prazos e faixas das tarefas
     const request = route.request()
     const path = new URL(request.url()).pathname
     if (path === '/api/projects') return route.fulfill({ json: [completedProject, activeProject] })
+    if (path === '/api/projects/project-active') return route.fulfill({ json: { ...activeProject, briefing: null, designs: [] } })
+    if (/^\/api\/projects\/project-active\/(messages|designs|files)$/.test(path)) return route.fulfill({ json: [] })
     if (path === '/api/projects/project-done/favorite' && request.method() === 'PATCH') {
       favoriteRequest += 1
       return route.fulfill({ json: { id: 'project-done', favorite: true } })
@@ -38,6 +40,13 @@ test('lista e calendário refletem status, favorito, prazos e faixas das tarefas
   await expect(page.getByRole('button', { name: 'Concluído 1' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Abrir projeto Projeto encerrado' })).toBeVisible()
   await expect(page.getByText('Prazo: 28 de set, 07:55').first()).toBeVisible()
+
+  await page.getByRole('button', { name: /Legenda para redes sociais/ }).click()
+  await expect(page).toHaveURL(/\/projetos\/project-active\/visao-geral\?task=task-copy$/)
+  await expect(page.locator('[data-project-task-id="task-copy"]')).toHaveClass(/is-active.*is-yours|is-yours.*is-active/)
+  await expect(page.getByText('Sua tarefa · aberta agora')).toBeVisible()
+  await expect(page.getByText('Você está aqui')).toBeVisible()
+  await page.goBack()
 
   const completedSection = page.locator('.projects-group').filter({ has: page.getByRole('button', { name: 'Concluído 1' }) })
   await completedSection.getByRole('button', { name: 'Concluído 1' }).click()
