@@ -356,7 +356,9 @@ export class ApiError extends Error {
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken()
   const headers = new Headers(options.headers || {})
-  headers.set('Content-Type', 'application/json')
+  if (options.body !== undefined && options.body !== null && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
   if (token) {
     headers.set('Authorization', `Bearer ${token}`)
   }

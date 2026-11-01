@@ -1,5 +1,5 @@
-import { type CSSProperties, type FormEvent, useEffect, useRef, useState } from 'react'
-import { createPortal, flushSync } from 'react-dom'
+import { type FormEvent, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ArrowLeft, ChevronRight, Download, FolderPlus, Palette, Trash2, Upload, X } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { useApp } from '../AppContext'
@@ -19,10 +19,8 @@ const folderTypeOptions: Array<{ value: FolderPreview; label: string }> = [
   { value: 'ui', label: 'Componentes de UI' },
 ]
 
-function BrandFolderArt({ preview, shared = false }: { preview: FolderPreview; shared?: boolean }) {
-  const style = shared ? ({ viewTransitionName: `brand-folder-${preview}` } as CSSProperties) : undefined
-
-  return <div className={`brand-art brand-art--${preview}`} style={style} aria-hidden="true">
+function BrandFolderArt({ preview }: { preview: FolderPreview }) {
+  return <div className={`brand-art brand-art--${preview}`} aria-hidden="true">
     {preview === 'logos' && <div className="brand-art__logo-files">
       <img className="brand-art__logo-file brand-art__logo-file--ai" src={figmaAsset('brand.imgGroup1410119722')} alt="" />
       <img className="brand-art__logo-file brand-art__logo-file--png" src={figmaAsset('brand.imgGroup1410119721')} alt="" />
@@ -184,19 +182,7 @@ export function BrandKitPage() {
   }
 
   const changeFolder = (folder: string | null) => {
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const startViewTransition = (document as Document & {
-      startViewTransition?: (update: () => void) => unknown
-    }).startViewTransition
-
-    if (!startViewTransition || reducedMotion) {
-      setFolderState(folder && selectedBrandId ? { brandId: selectedBrandId, folder } : null)
-      return
-    }
-
-    startViewTransition.call(document, () => {
-      flushSync(() => setFolderState(folder && selectedBrandId ? { brandId: selectedBrandId, folder } : null))
-    })
+    setFolderState(folder && selectedBrandId ? { brandId: selectedBrandId, folder } : null)
   }
 
   const uploadResource = async (file?: File) => {
@@ -253,7 +239,7 @@ export function BrandKitPage() {
           onClick={() => changeFolder(folder.id)}
           aria-label={`Abrir ${folder.name}: ${folder.description}`}
         >
-          <BrandFolderArt preview={folder.preview} shared={folders.find((item) => item.preview === folder.preview)?.id === folder.id} />
+          <BrandFolderArt preview={folder.preview} />
           <span className="brand-folder__label">{folder.name}</span>
           <span className="brand-folder__meta">{folder.count}</span>
         </button>)}
@@ -271,7 +257,7 @@ export function BrandKitPage() {
       </button>
 
       <header className="brand-folder-view__header">
-        <BrandFolderArt preview={selectedFolder.preview} shared />
+        <BrandFolderArt preview={selectedFolder.preview} />
         <div>
           <span className="brand-folder-view__eyebrow">Brand Kit · {selectedBrand.name}</span>
           <h1 id="brand-folder-title">{selectedFolder.name}</h1>
