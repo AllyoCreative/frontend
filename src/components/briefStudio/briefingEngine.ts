@@ -1,5 +1,6 @@
 import { CHANNEL_FORMATS, STANDARD_ADDONS } from '../formats/channelData'
 import { buildCatalogFormatOptions } from '../formats/catalogFormatOptions'
+import { isConceptVisualEligible, isStoryboardEligible } from '../../config/creativePathConfig'
 import type { ChannelFormatOption, ConfiguredFormatItem } from '../formats/formatTypes'
 import type { CatalogProduct, CatalogScope, ManagedBrandSummary } from '../../services/api'
 import type { Project } from '../../types'
@@ -481,7 +482,9 @@ export function buildInitialBriefState(params: {
   const requestedCount = extractRequestedCount(cleanPrompt)
   if (requestedCount) {
     if (selectedProduct && selectedProduct.billing.countablePieces && selectedProduct.billing.unit !== 'pecas') {
-      scope.quantity = requestedCount
+      scope.quantity = selectedProduct.billing.maxQuantity
+        ? Math.min(requestedCount, selectedProduct.billing.maxQuantity)
+        : requestedCount
     } else {
       scope.taskRepeats = requestedCount
     }
@@ -490,14 +493,11 @@ export function buildInitialBriefState(params: {
   }
 
   const normalizedPrompt = normalize(cleanPrompt)
-  const isVideoProduct = Boolean(
-    selectedProduct &&
-      (normalize(selectedProduct.category).includes('video') ||
-        /\b(video|motion|animacao|reels|dooh animado|gif)\b/.test(normalize(selectedProduct.name)))
-  )
+  const isVideoProduct = isStoryboardEligible(selectedProduct)
+  const isCopywritingPrimary = selectedProduct?.category === 'Copywriting' || selectedProduct?.code === '178'
 
   // Detect addons from prompt
-  if (/\b(copy|texto|headline|chamada|variacoes|ab test|a\/b|roteiro)\b/.test(normalizedPrompt)) {
+  if (!isCopywritingPrimary && /\b(copy|texto|headline|chamada|variacoes|ab test|a\/b|roteiro)\b/.test(normalizedPrompt)) {
     scope.addons['criacao-de-conteudo-publicitario'] = 1
   }
   if (/\b(legenda|caption|hashtags)\b/.test(normalizedPrompt)) {
@@ -608,36 +608,33 @@ export function computePlannedDeliverables(state: BriefDraftState): PlannedDeliv
   const product = state.selectedProduct
   const baseSla = product?.slaHours || 12
   const baseCredits = product?.credits.original || 1
-  const isVideoProduct = Boolean(
-    product &&
-      (normalize(product.category).includes('video') ||
-        /\b(video|motion|animacao|reels|dooh animado|gif)\b/.test(normalize(product.name)))
-  )
+  const isVideoProduct = isStoryboardEligible(product)
+  const isConceptEligible = isConceptVisualEligible(product)
 
   if (state.creativePath === 'new-concept' || state.creativePath === 'new-direction') {
-    items.push(
-      isVideoProduct
-        ? {
-            id: 'deliv-storyboard',
-            title: 'Storyboard e Direção de Cenas (Roteiro Visual)',
-            subtitle: 'Definição das cenas e narrativa visual para aprovação prévia antes da edição e motion',
-            team: 'Video team',
-            slaHours: 12,
-            deadlineDays: 2,
-            credits: 2,
-            kind: 'concept',
-          }
-        : {
-            id: 'deliv-concept',
-            title: 'Conceito visual e Direção de Arte da Campanha',
-            subtitle: 'Definição da linha criativa e peça-mãe para aprovação prévia antes dos desdobramentos',
-            team: 'Design team',
-            slaHours: 12,
-            deadlineDays: 2,
-            credits: 3,
-            kind: 'concept',
-          }
-    )
+    if (isVideoProduct && product?.code !== '179') {
+      items.push({
+        id: 'deliv-storyboard',
+        title: 'Storyboard e Direção de Cenas (Roteiro Visual)',
+        subtitle: 'Definição das cenas e narrativa visual para aprovação prévia antes da edição e motion',
+        team: 'Video team',
+        slaHours: 12,
+        deadlineDays: 2,
+        credits: 2,
+        kind: 'concept',
+      })
+    } else if (!isVideoProduct && isConceptEligible && product?.code !== '188') {
+      items.push({
+        id: 'deliv-concept',
+        title: 'Conceito visual e Direção de Arte da Campanha',
+        subtitle: 'Definição da linha criativa e peça-mãe para aprovação prévia antes dos desdobramentos',
+        team: 'Design team',
+        slaHours: 12,
+        deadlineDays: 2,
+        credits: 3,
+        kind: 'concept',
+      })
+    }
   }
 
   const count = Math.max(1, state.scope.taskRepeats)
@@ -881,10 +878,17 @@ export function applyChatRefinement(
   }
 
   // 7. Switch product if explicitly requested (e.g., "mudar serviço para carrossel" or "landing page")
-  if (/\b(carrossel|landing page|apresentacao|identidade visual)\b/.test(clean)) {
+  if (/\b(carrossel|landing page|apresentacao|identidade visual|video|reels|estatico|logo|artigo)\b/.test(clean)) {
     const newProd = matchCatalogProduct(input, products)
     if (newProd && newProd.code !== next.selectedProduct?.code) {
       next.selectedProduct = newProd
+      next.scope.resizeCount = newProd.credits.resizeAllowed
+        ? Math.max(0, next.configuredFormats.length - 1)
+        : 0
+      next.scope.variationCount = newProd.credits.variationAllowed ? next.scope.variationCount : 0
+      if (newProd.billing.maxQuantity) {
+        next.scope.quantity = Math.min(next.scope.quantity, newProd.billing.maxQuantity)
+      }
       changes.push(`Serviço principal alterado para ${newProd.name}`)
     }
   }

@@ -2,6 +2,7 @@ export const CONCEPT_VISUAL_CODES = new Set([
   '168', // Estático
   '169', // Carrossel
   '159', // Banner para site
+  '160', // Banner para e-mail marketing
   '162', // Apresentação de slides
   '163', // E-book
   '164', // Catálogo digital
@@ -39,7 +40,19 @@ export const CONCEPT_VISUAL_CODES = new Set([
   '219', // Embalagem
   '221', // Wobbler
   '241', // OOH Impresso
+  '156', // Ilustração
   '161', // Infográfico
+])
+
+export const VIDEO_STORYBOARD_CODES = new Set([
+  '170', // Animado (Redes Sociais)
+  '171', // Redes sociais (Vídeo & Áudio)
+  '172', // Vídeo Institucional
+  '175', // GIF animado
+  '176', // Edição de vídeo
+  '222', // Edição de vídeo Lite
+  '225', // Geração de vídeo via IA
+  '242', // DOOH Animado
 ])
 
 export const normalizeTaskName = (name: string): string => {
@@ -53,6 +66,7 @@ export const CONCEPT_VISUAL_NAMES = new Set([
   'estatico',
   'carrossel',
   'bannerparasite',
+  'bannerparaemailmarketing',
   'apresentacaodeslides',
   'ebook',
   'catalogodigital',
@@ -90,16 +104,48 @@ export const CONCEPT_VISUAL_NAMES = new Set([
   'embalagem',
   'wobbler',
   'oohimpresso',
+  'ilustracao',
   'infografico',
+])
+
+export const VIDEO_STORYBOARD_NAMES = new Set([
+  'animado',
+  'redessociais',
+  'videoinstitucional',
+  'gifanimado',
+  'edicaodevideo',
+  'edicaodevideolite',
+  'geracaodevideoviaia',
+  'doohanimado',
 ])
 
 export const CONCEPT_VISUAL_EXTRA_CREDITS = 3
 export const CONCEPT_VISUAL_EXTRA_DEADLINE_DAYS = 3
 
+export function isStoryboardEligible(item: { code?: string | null; name?: string | null; category?: string | null } | string | null | undefined): boolean {
+  if (!item) return false
+  if (typeof item === 'string') {
+    const trimmed = item.trim()
+    return VIDEO_STORYBOARD_CODES.has(trimmed) || VIDEO_STORYBOARD_NAMES.has(normalizeTaskName(trimmed))
+  }
+  const code = item.code?.trim() || ''
+  if (code && VIDEO_STORYBOARD_CODES.has(code)) return true
+  const name = normalizeTaskName(item.name || '')
+  return Boolean(name && VIDEO_STORYBOARD_NAMES.has(name))
+}
+
 export function isConceptVisualEligible(item: { code?: string | null; name?: string | null; category?: string | null } | string | null | undefined): boolean {
-  if (typeof item === 'string') return item.trim().length > 0
-  const category = normalizeTaskName(item?.category || '')
-  const name = normalizeTaskName(item?.name || '')
-  if (category === 'copywriting' || name.includes('conversaodearquivo')) return false
-  return Boolean(item?.code?.trim() || item?.name?.trim())
+  if (!item) return false
+  if (typeof item === 'string') {
+    const trimmed = item.trim()
+    if (!trimmed) return false
+    if (VIDEO_STORYBOARD_CODES.has(trimmed) || VIDEO_STORYBOARD_NAMES.has(normalizeTaskName(trimmed))) return false
+    return CONCEPT_VISUAL_CODES.has(trimmed) || CONCEPT_VISUAL_NAMES.has(normalizeTaskName(trimmed)) || trimmed === 'Campanha Integrada'
+  }
+  const code = item.code?.trim() || ''
+  if (code && VIDEO_STORYBOARD_CODES.has(code)) return false
+  if (code && CONCEPT_VISUAL_CODES.has(code)) return true
+  const name = normalizeTaskName(item.name || '')
+  if (name && VIDEO_STORYBOARD_NAMES.has(name)) return false
+  return Boolean(name && CONCEPT_VISUAL_NAMES.has(name))
 }
