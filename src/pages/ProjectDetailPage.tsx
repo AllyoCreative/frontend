@@ -423,6 +423,16 @@ export function ProjectDetailPage() {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [taskBriefingDraft, setTaskBriefingDraft] = useState<TaskBriefing | null>(null)
   const [savingTaskBriefing, setSavingTaskBriefing] = useState(false)
+
+  useEffect(() => {
+    const raf = window.requestAnimationFrame(() => {
+      document.querySelectorAll<HTMLElement>('.project-task-stack, .overview-timeline-viewport').forEach((el) => {
+        // Força invalidação de tiles GPU dos scrollers horizontais ao recolher/expandir o painel de escopo
+        void el.offsetHeight
+      })
+    })
+    return () => window.cancelAnimationFrame(raf)
+  }, [expandedTaskId])
   const projectAssignees = useMemo(() => {
     const taskAssignees = projectTasks.flatMap((task) => task.members?.map((member) => member.name) || [task.assigneeName || task.assignee]).filter((name): name is string => Boolean(name))
     return taskAssignees.length > 0 ? taskAssignees : project?.team || []

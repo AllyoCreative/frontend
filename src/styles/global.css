@@ -31,8 +31,8 @@ h1, h2, h3, .logo { font-family: 'Manrope', system-ui, sans-serif; }
 
 .app-shell { min-height: 100vh; }
 .app-main { margin-left: 250px; min-height: 100vh; }
-.page { max-width: 1560px; min-height: 100vh; padding: 48px 54px 72px; margin: 0 auto; animation: page-in .36s ease both; }
-@keyframes page-in { from { opacity: 0; transform: translateY(7px); } }
+.page { max-width: 1560px; min-height: 100vh; padding: 48px 54px 72px; margin: 0 auto; animation: page-in .28s ease-out; }
+@keyframes page-in { from { opacity: 0; } to { opacity: 1; } }
 .mobile-header { display: none; }
 .sidebar-scrim { display: none; }
 
