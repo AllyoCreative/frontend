@@ -1,13 +1,27 @@
-import { useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CalendarDays, ChevronLeft, ChevronRight, List, Star } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
+import { StatusPill } from '../components/StatusPill'
 import type { Project, ProjectStatus, ProjectTask } from '../types'
 
 type AssetName = Parameters<typeof figmaAsset>[0]
 
 type ProjectsView = 'list' | 'calendar'
+type ProjectCollapseOverrides = Record<string, boolean>
+
+function readProjectCollapseOverrides(storageKey: string | null): ProjectCollapseOverrides {
+  if (!storageKey) return {}
+  try {
+    const stored = window.localStorage.getItem(storageKey)
+    if (!stored) return {}
+    const parsed = JSON.parse(stored)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+  } catch {
+    return {}
+  }
+}
 
 const monthNumbers: Record<string, number> = {
   jan: 0,
@@ -135,11 +149,10 @@ function DeliveryCard({ state }: { state: 'Aprovado' | 'Aguardando aprovação' 
 }
 
 function ProjectStatusBadge({ status }: { status: string }) {
-  const isDone = status === 'Concluído'
-  return <b className={isDone ? 'is-done' : 'is-progress'}>{status}</b>
+  return <StatusPill status={status} />
 }
 
-function ProjectRow({ project }: { project: Project }) {
+function ProjectRow({ project, collapsed, onToggleCollapsed }: { project: Project; collapsed: boolean; onToggleCollapsed: () => void }) {
   const navigate = useNavigate()
   const { toggleProjectFavorite } = useApp()
   const [savingFavorite, setSavingFavorite] = useState(false)
@@ -161,6 +174,7 @@ function ProjectRow({ project }: { project: Project }) {
       <button type="button" className="projects-project-open" onClick={() => navigate(`/projetos/${project.id}`)} aria-label={`Abrir projeto ${project.name}`} />
       <span className="projects-row-name projects-row-name--project">
         <FigmaIcon asset="projects.imgVector11" />
+        <button type="button" className="projects-project-collapse" onClick={(event) => { event.stopPropagation(); onToggleCollapsed() }} aria-label={collapsed ? `Expandir tarefas de ${project.name}` : `Recolher tarefas de ${project.name}`} aria-expanded={!collapsed}><ChevronRight size={16} /></button>
         <button type="button" className={`projects-favorite${project.favorite ? ' is-favorite' : ''}`} disabled={savingFavorite} onClick={(event) => void toggleFavorite(event)} aria-label={project.favorite ? `Remover ${project.name} dos favoritos` : `Adicionar ${project.name} aos favoritos`} aria-pressed={Boolean(project.favorite)}><Star size={17} fill={project.favorite ? 'currentColor' : 'none'} /></button>
         <h3>{project.name}</h3>
         <small>{project.tasksList?.length || project.tasks}</small>
@@ -169,7 +183,6 @@ function ProjectRow({ project }: { project: Project }) {
         <small>Prazo: {formatDeadline(project.deadline)}</small>
         <ProjectStatusBadge status={status} />
       </span>
-      <span className="projects-delivery-spacer" />
     </article>
   )
 }
@@ -184,7 +197,7 @@ function TaskRow({ project, task, separated = false }: { project: Project; task:
     >
       <span className="projects-row-name">
         <strong>{task.title || 'Tarefa do projeto'}</strong>
-        <small><i /> {task.team || 'Sem equipe'}</small>
+        <small>{task.team || 'Sem especialidade definida'}</small>
       </span>
       <span className="projects-row-meta">
         <small>{task.deadlineAt ? `Prazo: ${formatDeadline(task.deadlineAt)}` : task.deadlineDays !== undefined ? `Prazo estimado: ${task.deadlineDays} ${task.deadlineDays === 1 ? 'dia' : 'dias'}` : 'Sem prazo definido'}</small>
@@ -195,11 +208,13 @@ function TaskRow({ project, task, separated = false }: { project: Project; task:
   )
 }
 
-function StatusGroup({ title, projects, collapsed, onToggle }: {
+function StatusGroup({ title, projects, collapsed, onToggle, isProjectCollapsed, onToggleProject }: {
   title: string
   projects: Project[]
   collapsed: boolean
   onToggle: () => void
+  isProjectCollapsed: (project: Project) => boolean
+  onToggleProject: (project: Project) => void
 }) {
   return (
     <section className={`projects-group${collapsed ? ' is-collapsed' : ''}`}>
@@ -208,10 +223,13 @@ function StatusGroup({ title, projects, collapsed, onToggle }: {
         <FigmaIcon asset="projects.imgWeuiArrowOutlined1" />
       </button>
       {!collapsed && <div className="projects-group__rows">
-        {projects.map((project) => <div className="projects-project-stack" key={project.id}>
-          <ProjectRow project={project} />
-          {(project.tasksList || []).map((task) => <TaskRow key={task.id} project={project} task={task} />)}
-        </div>)}
+        {projects.map((project) => {
+          const projectCollapsed = isProjectCollapsed(project)
+          return <div className={`projects-project-stack${projectCollapsed ? ' is-collapsed' : ''}`} key={project.id}>
+            <ProjectRow project={project} collapsed={projectCollapsed} onToggleCollapsed={() => onToggleProject(project)} />
+            {!projectCollapsed && (project.tasksList || []).map((task) => <TaskRow key={task.id} project={project} task={task} />)}
+          </div>
+        })}
       </div>}
     </section>
   )
@@ -347,7 +365,7 @@ function ProjectsCalendar({ projects, cursor, showWeekends, onCursorChange, onSh
 }
 
 export function ProjectsPage() {
-  const { projects, members } = useApp()
+  const { projects, members, currentUser, workspace } = useApp()
   const [view, setView] = useState<ProjectsView>('list')
   const [calendarCursor, setCalendarCursor] = useState(() => {
     const today = new Date()
@@ -364,6 +382,12 @@ export function ProjectsPage() {
   const [sortBy, setSortBy] = useState('status')
   const [reverse, setReverse] = useState(false)
   const [collapsedStatuses, setCollapsedStatuses] = useState<Set<string>>(() => new Set())
+  const collapseStorageKey = workspace?.id && currentUser?.id ? `allyo-space:collapsed-projects:${workspace.id}:${currentUser.id}` : null
+  const [projectCollapseOverrides, setProjectCollapseOverrides] = useState<ProjectCollapseOverrides>({})
+
+  useEffect(() => {
+    setProjectCollapseOverrides(readProjectCollapseOverrides(collapseStorageKey))
+  }, [collapseStorageKey])
 
   const displayProjects = useMemo(() => projects.map((project) => ({ ...project, status: effectiveStatus(project) })), [projects])
 
@@ -373,10 +397,14 @@ export function ProjectsPage() {
   ], [displayProjects])
 
   const collaboratorOptions = useMemo(() => {
-    const projectInitials = new Set(displayProjects.flatMap((project) => project.team))
+    const projectMembers = new Set(displayProjects.flatMap((project) => project.team))
     return [
       { value: '', label: 'Todos os colaboradores' },
-      ...members.filter((member) => member.avatarInitials && projectInitials.has(member.avatarInitials)).map((member) => ({ value: member.avatarInitials!, label: member.name })),
+      ...members.flatMap((member) => {
+        if (projectMembers.has(member.name)) return [{ value: member.name, label: member.name }]
+        if (member.avatarInitials && projectMembers.has(member.avatarInitials)) return [{ value: member.avatarInitials, label: member.name }]
+        return []
+      }),
     ]
   }, [displayProjects, members])
 
@@ -436,6 +464,25 @@ export function ProjectsPage() {
     return next
   })
 
+  const isProjectCollapsed = (project: Project) => Object.prototype.hasOwnProperty.call(projectCollapseOverrides, project.id)
+    ? projectCollapseOverrides[project.id]
+    : effectiveStatus(project) === 'Concluído'
+
+  const toggleProject = (project: Project) => setProjectCollapseOverrides((current) => {
+    const currentlyCollapsed = Object.prototype.hasOwnProperty.call(current, project.id)
+      ? current[project.id]
+      : effectiveStatus(project) === 'Concluído'
+    const next = { ...current, [project.id]: !currentlyCollapsed }
+    if (collapseStorageKey) {
+      try {
+        window.localStorage.setItem(collapseStorageKey, JSON.stringify(next))
+      } catch {
+        // A interface continua funcional mesmo se o navegador bloquear o armazenamento local.
+      }
+    }
+    return next
+  })
+
   return (
     <div className="page projects-page" data-node-id="1:395">
       <div className="projects-screen">
@@ -474,7 +521,7 @@ export function ProjectsPage() {
             <ProjectsCalendar projects={visible} cursor={calendarCursor} showWeekends={showWeekends} onCursorChange={setCalendarCursor} onShowWeekendsChange={setShowWeekends} />
           ) : visible.length > 0 ? (
             <div className="projects-groups">
-              {statusGroups.map(([status, groupedProjects]) => <StatusGroup key={status} title={status} projects={groupedProjects} collapsed={collapsedStatuses.has(status)} onToggle={() => toggleStatus(status)} />)}
+              {statusGroups.map(([status, groupedProjects]) => <StatusGroup key={status} title={status} projects={groupedProjects} collapsed={collapsedStatuses.has(status)} onToggle={() => toggleStatus(status)} isProjectCollapsed={isProjectCollapsed} onToggleProject={toggleProject} />)}
             </div>
           ) : projects.length === 0 ? (
             <div className="projects-empty-state">

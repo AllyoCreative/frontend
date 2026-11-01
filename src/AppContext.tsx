@@ -22,6 +22,7 @@ interface AppContextValue {
   currentUser: UserSummary | null
   workspace: WorkspaceSummary | null
   members: UserSummary[]
+  allyoTeam: UserSummary[]
   brands: ManagedBrand[]
   account: AccountOverview | null
   isLoading: boolean
@@ -45,6 +46,7 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
   const [currentUser, setCurrentUser] = useState<UserSummary | null>(null)
   const [workspace, setWorkspace] = useState<WorkspaceSummary | null>(null)
   const [members, setMembers] = useState<UserSummary[]>([])
+  const [allyoTeam, setAllyoTeam] = useState<UserSummary[]>([])
   const [brands, setBrands] = useState<ManagedBrand[]>([])
   const [account, setAccount] = useState<AccountOverview | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -98,6 +100,7 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
       setAccount(data)
       setBrands(data.brands)
       setMembers(data.members)
+      setAllyoTeam(data.allyoTeam || [])
       setWorkspace((current) => current ? {
         ...current,
         plan: data.workspace.plan,
@@ -140,6 +143,7 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
         setAccount(accountResult.value)
         setBrands(accountResult.value.brands)
         setMembers(accountResult.value.members)
+        setAllyoTeam(accountResult.value.allyoTeam || [])
       }
 
       setIsLoading(false)
@@ -174,6 +178,21 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
       }
     }
 
+    const handleTaskUpsert = (event: SocketEventPayload) => {
+      const task = event.data?.task as ProjectTask | undefined
+      if (!event.projectId || !task?.id) return
+      setProjects((current) => current.map((project) => {
+        if (project.id !== event.projectId || !project.tasksList) return project
+        const taskExists = project.tasksList.some((item) => item.id === task.id)
+        return {
+          ...project,
+          tasksList: taskExists
+            ? project.tasksList.map((item) => item.id === task.id ? { ...item, ...task } : item)
+            : [...project.tasksList, task],
+        }
+      }))
+    }
+
     const handleProjectDeleted = (event: SocketEventPayload) => {
       if (event.projectId) {
         setProjects((current) => current.filter((project) => project.id !== event.projectId))
@@ -201,17 +220,30 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
       }
     }
 
+    const handleAllyoTeamUpdated = (payload: SocketEventPayload) => {
+      if (!Array.isArray(payload.data?.allyoTeam)) return
+      const nextTeam = payload.data.allyoTeam as UserSummary[]
+      setAllyoTeam(nextTeam)
+      setAccount((current) => current ? { ...current, allyoTeam: nextTeam } : current)
+    }
+
     socket.on('STATUS_UPDATED', handleStatusUpdate)
     socket.on('TEAM_ASSIGNED', handleTeamAssigned)
+    socket.on('TASK_CREATED', handleTaskUpsert)
+    socket.on('TASK_UPDATED', handleTaskUpsert)
     socket.on('PROJECT_DELETED', handleProjectDeleted)
     socket.on('CREDITS_UPDATED', handleCreditsUpdated)
+    socket.on('ALLYO_TEAM_UPDATED', handleAllyoTeamUpdated)
 
     return () => {
       isMounted = false
       socket.off('STATUS_UPDATED', handleStatusUpdate)
       socket.off('TEAM_ASSIGNED', handleTeamAssigned)
+      socket.off('TASK_CREATED', handleTaskUpsert)
+      socket.off('TASK_UPDATED', handleTaskUpsert)
       socket.off('PROJECT_DELETED', handleProjectDeleted)
       socket.off('CREDITS_UPDATED', handleCreditsUpdated)
+      socket.off('ALLYO_TEAM_UPDATED', handleAllyoTeamUpdated)
     }
   }, [notify, logout, refreshAccount])
 
@@ -340,6 +372,7 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
     currentUser,
     workspace,
     members,
+    allyoTeam,
     brands,
     account,
     isLoading,
@@ -361,6 +394,7 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
     currentUser,
     workspace,
     members,
+    allyoTeam,
     brands,
     account,
     isLoading,

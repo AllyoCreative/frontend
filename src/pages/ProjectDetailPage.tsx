@@ -5,6 +5,8 @@ import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
 import { DesignReviewModal, type ReviewCollectionItem, type ReviewOrigin } from '../components/DesignReviewModal'
 import { FilePreviewModal, type PreviewableFile } from '../components/FilePreviewModal'
+import { ResponsibleAvatarStack } from '../components/ResponsibleAvatarStack'
+import { StatusPill } from '../components/StatusPill'
 import { api, resolveStorageUrl, type DesignSummary, type ProjectBriefingSummary, type ProjectFileSummary } from '../services/api'
 import { socket, type SocketEventPayload } from '../services/socket'
 import type { Project, ProjectTask, TaskBriefing } from '../types'
@@ -344,7 +346,7 @@ function DeliveryPreview({ delivery }: { delivery: DesignSummary }) {
 export function ProjectDetailPage() {
   const { id = '', tab = 'visao-geral' } = useParams()
   const navigate = useNavigate()
-  const { projects, currentUser, notify } = useApp()
+  const { projects, currentUser, allyoTeam, notify } = useApp()
   const project = useMemo(() => projects.find((item) => item.id === id), [id, projects])
   const [messageList, setMessageList] = useState<ChatMessage[]>([])
   const [designList, setDesignList] = useState<DesignSummary[]>([])
@@ -421,6 +423,10 @@ export function ProjectDetailPage() {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
   const [taskBriefingDraft, setTaskBriefingDraft] = useState<TaskBriefing | null>(null)
   const [savingTaskBriefing, setSavingTaskBriefing] = useState(false)
+  const projectAssignees = useMemo(() => {
+    const taskAssignees = projectTasks.flatMap((task) => task.members?.map((member) => member.name) || [task.assigneeName || task.assignee]).filter((name): name is string => Boolean(name))
+    return taskAssignees.length > 0 ? taskAssignees : project?.team || []
+  }, [project?.team, projectTasks])
 
   useEffect(() => {
     if (!project) return
@@ -466,10 +472,52 @@ export function ProjectDetailPage() {
       }
     }
 
+    const handleDesignUploaded = (payload: SocketEventPayload) => {
+      if (payload.projectId !== project.id) return
+      const newDesign = payload.data?.design as DesignSummary | undefined
+      if (!newDesign) return
+      setDesignList((current) => {
+        const withoutDuplicate = current.filter((design) => design.id !== newDesign.id)
+        return [newDesign, ...withoutDuplicate]
+      })
+      if (newDesign.approved) {
+        setApproved((current) => Array.from(new Set([...current, newDesign.id])))
+      }
+    }
+
+    const handleTaskStatusUpdated = (payload: SocketEventPayload) => {
+      if (payload.projectId !== project.id) return
+      const data = payload.data as {
+        task?: ProjectTask
+        taskId?: string
+        status?: ProjectTask['status']
+        delivery?: ProjectTask['delivery']
+      } | undefined
+      if (!data) return
+
+      const updatedTask = data.task
+      if (updatedTask?.id) {
+        setProjectTasks((current) => current.map((task) => task.id === updatedTask.id ? { ...task, ...updatedTask } : task))
+        return
+      }
+      if (!data.taskId || !data.status) return
+      setProjectTasks((current) => current.map((task) => task.id === data.taskId ? {
+        ...task,
+        status: data.status!,
+        delivery: data.delivery ?? task.delivery,
+      } : task))
+    }
+
     socket.on('MESSAGE_SENT', handleNewMessage)
+    socket.on('DESIGN_REVISION_UPLOADED', handleDesignUploaded)
+    socket.on('TASK_STATUS_UPDATED', handleTaskStatusUpdated)
+    socket.on('TASK_UPDATED', handleTaskStatusUpdated)
     return () => {
       isMounted = false
       socket.off('MESSAGE_SENT', handleNewMessage)
+      socket.off('DESIGN_REVISION_UPLOADED', handleDesignUploaded)
+      socket.off('TASK_STATUS_UPDATED', handleTaskStatusUpdated)
+      socket.off('TASK_UPDATED', handleTaskStatusUpdated)
     }
   }, [project])
 
@@ -632,7 +680,11 @@ export function ProjectDetailPage() {
       <header className="project-compact-header">
         <h1>{project.name}</h1>
         <span className="project-compact-deadline">com prazo de <strong>{formatProjectDeadline(project.deadline)}</strong></span>
-        <span className="project-compact-status">{projectStatus}</span>
+        <StatusPill status={projectStatus} className="project-compact-status" />
+        <span className="project-compact-team">
+          <ResponsibleAvatarStack names={projectAssignees} members={allyoTeam} label={`Equipe responsável por ${project.name}`} showEmpty />
+          <small>Equipe responsável</small>
+        </span>
       </header>
 
       <nav className="project-detail-tabs">
@@ -667,14 +719,13 @@ export function ProjectDetailPage() {
                   const expanded = expandedTaskId === task.id
                   const hoverDetails = [
                     `Tarefa #${task.publicId}`,
-                    task.team,
                     `${task.deadlineDays || 2} dias úteis`,
                     (task.status === 'Bloqueada' || task.dependencyBlocked) ? 'Possui dependência pendente' : '',
                   ].filter(Boolean).join(' · ')
                   return <article className={`project-task-stack-card${expanded ? ' is-active' : ''}`} key={task.id}>
                     <button className="project-task-card-open" type="button" title={hoverDetails} aria-label={`${task.title}. ${task.status}. ${hoverDetails}`} onClick={() => setExpandedTaskId(expanded ? null : task.id)} aria-expanded={expanded}>
-                      <h3>{task.title}</h3>
-                      <span className={`project-task-status project-task-status--${task.status.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '')}`}>{task.status}</span>
+                      <span className="project-task-card-copy"><h3>{task.title}</h3></span>
+                      <StatusPill status={task.status} className="project-task-status" />
                     </button>
                   </article>
                 })
@@ -691,6 +742,7 @@ export function ProjectDetailPage() {
                 <label><span>Formatos, separados por vírgula</span><input value={taskBriefingDraft.formats.join(', ')} onChange={(event) => setTaskBriefingDraft({ ...taskBriefingDraft, formats: event.target.value.split(',').map((item) => item.trim()).filter(Boolean) })} /></label>
                 <div className="project-task-briefing-editor__actions"><button type="button" onClick={() => { setEditingTaskId(null); setTaskBriefingDraft(null) }}>Cancelar</button><button type="button" disabled={savingTaskBriefing} onClick={() => void saveTaskBriefing(expandedTask)}>{savingTaskBriefing ? 'Salvando...' : 'Salvar briefing'}</button></div>
               </div> : <div className="project-task-briefing-content">
+                <div><span>Responsável</span><p><strong>{expandedTask.assigneeName || expandedTask.assignee || 'A definir'}</strong>{(expandedTask.assigneeName || expandedTask.assignee) && ` · ${expandedTask.assigneeRole || expandedTask.team}`}</p></div>
                 <div><span>Objetivo</span><p>{expandedTask.briefing?.objective || 'Mesmo objetivo geral do projeto.'}</p></div>
                 {expandedTask.briefing?.overview && <div><span>Contexto</span><p>{expandedTask.briefing.overview}</p></div>}
                 <div className="project-task-briefing-grid"><div><span>Público</span><p>{expandedTask.briefing?.audience || 'Herdado do projeto'}</p></div><div><span>Tom</span><p>{expandedTask.briefing?.tone || 'Herdado do projeto'}</p></div></div>

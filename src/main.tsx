@@ -11,6 +11,7 @@ import '@fontsource-variable/inter-tight'
 import './styles/global.css'
 import './styles/figma-theme.css'
 import './styles/format-configurator.css'
+import './styles/brief-studio.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

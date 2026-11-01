@@ -34,6 +34,19 @@ export interface ProjectTask {
   projectId: string
   title: string
   team: string
+  assignee?: string | null
+  assigneeName?: string | null
+  assigneeRole?: string | null
+  members?: Array<{
+    userId: string
+    name: string
+    jobTitle?: string | null
+    avatarUrl?: string | null
+    avatarInitials?: string
+    avatarColor?: string
+    role: 'RESPONSIBLE' | 'OBSERVER'
+    assignedAt: string
+  }>
   status: 'A iniciar' | 'Bloqueada' | 'Concluído' | 'Em andamento' | 'Em revisão' | 'Alteração' | 'Inativa'
   delivery?: 'Aprovado' | 'Aguardando aprovação' | 'Em alteração'
   deadlineAt?: string | null

@@ -1,0 +1,1146 @@
+/* Allyo Brief Studio — Conversational Brief & Scope Canvas */
+
+.brief-studio-shell {
+  width: 100%;
+  margin: 0 auto 28px;
+  animation: briefStudioReveal 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes briefStudioReveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.brief-studio-frame {
+  position: relative;
+  border-radius: 22px;
+  background: #274a43;
+  padding: 20px 26px 28px;
+  box-shadow: 0 20px 50px rgba(13, 30, 29, 0.16);
+  color: #131f15;
+}
+
+.brief-studio-frame--success {
+  padding: 44px 32px;
+}
+
+/* Topbar (Superside Image 5 style) */
+.brief-studio-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.brief-studio-topbar__left,
+.brief-studio-topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.brief-studio-brand-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 13px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #d0f08e;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.brief-studio-product-selector {
+  position: relative;
+}
+
+.brief-studio-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 13px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+
+.brief-studio-chip-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.brief-studio-chip-btn strong {
+  color: #fff;
+  font-weight: 700;
+}
+
+.brief-studio-project-target {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 12px;
+}
+
+.brief-studio-project-target select {
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.brief-studio-project-target select option {
+  color: #131f15;
+  background: #fff;
+}
+
+.brief-studio-gaps-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 15px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #131f15;
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.brief-studio-gaps-toggle:hover {
+  background: #fff;
+}
+
+.brief-studio-gaps-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #274a43;
+  color: #d0f08e;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.brief-studio-configurator-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 15px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.brief-studio-configurator-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.brief-studio-submit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: #42786a;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+  transition: background 0.16s ease, transform 0.16s ease;
+}
+
+.brief-studio-submit-btn:hover:not(:disabled) {
+  background: #4d8a7a;
+  transform: translateY(-1px);
+}
+
+.brief-studio-submit-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.brief-studio-close {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.brief-studio-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Main White Sheet (Superside Image 3 & 4) */
+.brief-studio-sheet {
+  position: relative;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 32px 48px 28px;
+  box-shadow: 0 12px 36px rgba(10, 24, 21, 0.18);
+  min-height: 440px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* User Message Bubble on top-right (Superside Image 3) */
+.brief-studio-user-bubble-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 22px;
+}
+
+.brief-studio-user-bubble {
+  max-width: min(520px, 90%);
+  padding: 14px 20px;
+  border-radius: 16px;
+  background: #eff1ec;
+  color: #1c2823;
+  font-size: 14.5px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.brief-studio-user-bubble p {
+  margin: 0;
+}
+
+.brief-studio-linked-ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-weight: 650;
+  color: #131f15;
+}
+
+/* Step-by-step Processing View (Superside Image 3) */
+.brief-studio-processing {
+  padding: 18px 12px 42px;
+  max-width: 560px;
+}
+
+.brief-studio-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 20px;
+}
+
+.brief-studio-step {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  opacity: 0.35;
+  transform: translateY(4px);
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.brief-studio-step.is-active,
+.brief-studio-step.is-done {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.brief-studio-step__icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid #bfe0d1;
+  background: #f2faf6;
+  color: #63b191;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.brief-studio-step.is-done .brief-studio-step__icon {
+  border-color: #7cc4a6;
+  background: #eaf7f1;
+  color: #2f8564;
+}
+
+.brief-studio-step__text {
+  font-size: 16px;
+  color: #9ba39e;
+  font-weight: 500;
+}
+
+.brief-studio-step.is-active .brief-studio-step__text {
+  color: #4f5d56;
+}
+
+.brief-studio-skip-btn {
+  margin-top: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #42786a;
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.brief-studio-skip-btn:hover {
+  text-decoration: underline;
+}
+
+/* Generated Brief Document (Superside Image 4) */
+.brief-studio-doc {
+  position: relative;
+  max-width: 780px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 6px 12px 24px;
+  animation: briefFadeIn 0.35s ease both;
+}
+
+@keyframes briefFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.brief-studio-doc__header {
+  margin-bottom: 26px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #e6eae5;
+}
+
+.brief-studio-doc__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.brief-studio-doc__eyebrow {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7670;
+}
+
+.brief-studio-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: #e3f4ec;
+  color: #1f6b4c;
+  font-size: 11.5px;
+  font-weight: 700;
+  animation: briefFadeIn 0.2s ease both;
+}
+
+.brief-studio-doc__campaign-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  color: #131f15;
+  letter-spacing: -0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.brief-studio-edit-hint {
+  opacity: 0.35;
+  transition: opacity 0.15s ease;
+}
+
+.brief-studio-doc__campaign-title:hover .brief-studio-edit-hint {
+  opacity: 0.9;
+}
+
+.brief-studio-inline-name-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.brief-studio-inline-name-edit input {
+  flex: 1;
+  height: 40px;
+  padding: 0 12px;
+  border: 1.5px solid #42786a;
+  border-radius: 10px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #131f15;
+}
+
+.brief-studio-inline-name-edit button {
+  height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: #274a43;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.brief-studio-doc__metrics {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  font-size: 12.5px;
+  color: #5a665f;
+}
+
+.brief-studio-doc__metrics span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: #f4f6f3;
+}
+
+.brief-studio-doc__metrics strong {
+  color: #131f15;
+}
+
+/* Sections */
+.brief-studio-section {
+  margin-bottom: 26px;
+}
+
+.brief-studio-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.brief-studio-section h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #131f15;
+  letter-spacing: -0.01em;
+}
+
+.brief-studio-text-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid #d8dcd5;
+  border-radius: 999px;
+  background: #fff;
+  color: #34423b;
+  font-size: 11.5px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.brief-studio-text-action:hover {
+  background: #f2f5f2;
+}
+
+.brief-studio-overview-text {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: #2c3831;
+  cursor: pointer;
+  padding: 6px 8px;
+  margin-left: -8px;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.brief-studio-overview-text:hover {
+  background: #f7f9f7;
+}
+
+.brief-studio-overview-textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1.5px solid #42786a;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #131f15;
+  resize: vertical;
+}
+
+/* Bullet Lists */
+.brief-studio-bullet-list {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 10px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: #25312a;
+}
+
+.brief-studio-bullet-list--deliverables li {
+  padding: 6px 0;
+}
+
+.brief-studio-deliverable-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.brief-studio-deliverable-meta {
+  font-size: 12px;
+  color: #526159;
+  background: #f2f5f2;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.brief-studio-deliverable-meta b {
+  color: #004c46;
+}
+
+.brief-studio-bullet-list small {
+  display: block;
+  margin-top: 2px;
+  color: #6b7670;
+  font-size: 12.5px;
+}
+
+.brief-studio-qty-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #536059;
+}
+
+.brief-studio-qty-control button {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d2d8d2;
+  border-radius: 6px;
+  background: #fff;
+  color: #131f15;
+  cursor: pointer;
+}
+
+.brief-studio-qty-control button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.brief-studio-qty-control strong {
+  min-width: 18px;
+  text-align: center;
+  font-size: 13px;
+  color: #131f15;
+}
+
+/* Quick Scope Addon Toggles */
+.brief-studio-quick-toggles {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-left: 4px;
+}
+
+.brief-studio-quick-toggles button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px dashed #c5cdc6;
+  border-radius: 999px;
+  background: #fafbfa;
+  color: #46544d;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.brief-studio-quick-toggles button:hover {
+  border-color: #42786a;
+  color: #004c46;
+}
+
+.brief-studio-quick-toggles button.is-selected {
+  border-style: solid;
+  border-color: #274a43;
+  background: #e6f2ee;
+  color: #004c46;
+}
+
+.brief-studio-format-bullet {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.brief-studio-principal-tag {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef4fb;
+  color: #365d7b;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.brief-studio-remove-inline {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #88928c;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.brief-studio-remove-inline:hover {
+  background: #f2e8e8;
+  color: #ad3e4b;
+  opacity: 1;
+}
+
+.brief-studio-file-specs-row select {
+  margin: 0 4px;
+  padding: 2px 8px;
+  border: 1px solid #cfd6d0;
+  border-radius: 6px;
+  background: #f8faf8;
+  color: #004c46;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.brief-studio-add-direction-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.brief-studio-add-direction-row input {
+  flex: 1;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #c9d1ca;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.brief-studio-add-direction-row button {
+  height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: #274a43;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+/* Floating Team Reviewer Avatars with Pointer Arrows (Superside Image 4) */
+.brief-studio-floating-avatar {
+  position: absolute;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: auto;
+}
+
+.brief-studio-floating-avatar--top {
+  top: 108px;
+  right: 120px;
+}
+
+.brief-studio-floating-avatar--left {
+  top: 230px;
+  left: -32px;
+}
+
+.brief-studio-floating-avatar--mid {
+  top: 390px;
+  left: 245px;
+}
+
+.brief-studio-avatar-ring {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 3px solid #6ec3e6;
+  background: #fff;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 6px 16px rgba(13, 30, 29, 0.16);
+}
+
+.brief-studio-avatar-ring img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.brief-studio-avatar-ring span {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: #131f15;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.brief-studio-cursor-arrow {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 10px solid currentColor;
+  transform: rotate(-42deg);
+}
+
+.brief-studio-cursor-arrow--right {
+  transform: rotate(125deg);
+}
+
+.brief-studio-avatar-tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: #131f15;
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.brief-studio-floating-avatar:hover .brief-studio-avatar-tooltip {
+  opacity: 1;
+}
+
+@media (max-width: 1100px) {
+  .brief-studio-floating-avatar {
+    display: none;
+  }
+}
+
+/* Dropdowns */
+.brief-studio-format-add-wrap {
+  position: relative;
+}
+
+.brief-studio-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  width: 290px;
+  background: #fff;
+  border: 1px solid #d8dcd5;
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(13, 30, 29, 0.16);
+  padding: 10px;
+}
+
+.brief-studio-dropdown--right {
+  left: auto;
+  right: 0;
+}
+
+.brief-studio-dropdown__title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #778078;
+  padding: 4px 8px 8px;
+}
+
+.brief-studio-dropdown__list {
+  max-height: 240px;
+  overflow-y: auto;
+  display: grid;
+  gap: 3px;
+}
+
+.brief-studio-dropdown__list button {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #131f15;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.brief-studio-dropdown__list button:hover,
+.brief-studio-dropdown__list button.is-active {
+  background: #eef3ef;
+  color: #004c46;
+}
+
+.brief-studio-dropdown__list button small {
+  font-size: 11px;
+  color: #6b7670;
+  font-weight: 500;
+}
+
+/* Bottom Footer: Fill in the Gaps + Conversational Bar */
+.brief-studio-footer {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #ecefec;
+}
+
+.brief-studio-gaps-bar {
+  margin-bottom: 12px;
+}
+
+.brief-studio-gaps-bar__label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #68726c;
+  margin-bottom: 8px;
+}
+
+.brief-studio-gaps-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.brief-studio-gap-chip {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid #d5ddd6;
+  border-radius: 999px;
+  background: #f5f7f5;
+  color: #1e2d26;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.brief-studio-gap-chip:hover {
+  background: #274a43;
+  border-color: #274a43;
+  color: #fff;
+}
+
+.brief-studio-chat-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 6px 8px 6px 18px;
+  border: 1.5px solid #dfe4de;
+  border-radius: 999px;
+  background: #fafbfa;
+  transition: border-color 0.16s ease, background 0.16s ease;
+}
+
+.brief-studio-chat-form:focus-within {
+  border-color: #42786a;
+  background: #fff;
+}
+
+.brief-studio-chat-form input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #131f15;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.brief-studio-chat-form input::placeholder {
+  color: #96a09a;
+}
+
+.brief-studio-chat-send {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  background: #42786a;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.brief-studio-chat-send:hover:not(:disabled) {
+  background: #274a43;
+  transform: scale(1.04);
+}
+
+.brief-studio-chat-send:disabled {
+  background: #d8dcd5;
+  color: #8b948e;
+  cursor: not-allowed;
+}
+
+/* Insights & About Assistant View */
+.brief-studio-doc__subtitle {
+  margin: 6px 0 0;
+  color: #68726c;
+  font-size: 14px;
+}
+
+.brief-studio-insights-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.brief-studio-insight-card {
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: #f5f7f5;
+  border: 1px solid #e3e8e3;
+  display: grid;
+  gap: 4px;
+}
+
+.brief-studio-insight-card span {
+  font-size: 12px;
+  color: #68726c;
+  font-weight: 600;
+}
+
+.brief-studio-insight-card strong {
+  font-size: 22px;
+  color: #004c46;
+}
+
+.brief-studio-insight-card small {
+  font-size: 11.5px;
+  color: #778078;
+}
+
+.brief-studio-mode-switch {
+  margin-top: 20px;
+}
+
+/* Success State */
+.brief-studio-success {
+  max-width: 560px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 18px;
+  padding: 36px 32px;
+  text-align: center;
+}
+
+.brief-studio-success__icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: #d0f08e;
+  color: #131f15;
+  display: grid;
+  place-items: center;
+}
+
+.brief-studio-success__tag {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #eef4f1;
+  color: #004c46;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.brief-studio-success h2 {
+  margin: 12px 0 8px;
+  font-size: 24px;
+}
+
+.brief-studio-success p {
+  margin: 0 0 20px;
+  color: #536059;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.brief-studio-success__tasks {
+  text-align: left;
+  display: grid;
+  gap: 8px;
+  margin-bottom: 24px;
+  padding: 14px;
+  border-radius: 12px;
+  background: #f6f8f6;
+}
+
+.brief-studio-success__task-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #004c46;
+}
+
+.brief-studio-success__task-row strong {
+  display: block;
+  font-size: 13.5px;
+  color: #131f15;
+}
+
+.brief-studio-success__task-row small {
+  font-size: 12px;
+  color: #68726c;
+}
+
+.brief-studio-success__actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* Home Hero Reference Project Pill (Superside Image 2 style) */
+.home-prompt-context-row {
+  width: min(706px, 100%);
+  margin: 10px auto 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.home-prompt-ref-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.home-prompt-ref-select select {
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.home-prompt-ref-select select option {
+  color: #131f15;
+  background: #fff;
+}
+

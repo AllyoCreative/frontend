@@ -93,6 +93,7 @@ export interface AccountOverview {
     contractEnd: string | null
   }
   members: UserSummary[]
+  allyoTeam: UserSummary[]
   brands: ManagedBrandSummary[]
   teams: TeamSummary[]
   contracts: ContractSummary[]
@@ -696,7 +697,7 @@ export const api = {
     })
   },
 
-  async updateTask(projectId: string, taskId: string, data: { status?: string; delivery?: string; title?: string; briefing?: TaskBriefing }) {
+  async updateTask(projectId: string, taskId: string, data: { status?: string; delivery?: string; title?: string; team?: string; assignee?: string | null; briefing?: TaskBriefing }) {
     return request<ProjectTask>(`/projects/${projectId}/tasks/${taskId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
