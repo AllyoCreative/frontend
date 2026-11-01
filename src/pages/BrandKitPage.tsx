@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, ChevronRight, Download, FolderPlus, Palette, Trash2, Upload, X } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Download, FileText, FolderPlus, LayoutGrid, List, Palette, Search, Trash2, Upload, X } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { useApp } from '../AppContext'
 import { figmaAsset } from '../assets/figma'
@@ -55,9 +55,15 @@ function BrandFolderArt({ preview }: { preview: FolderPreview }) {
   </div>
 }
 
+const fileExtension = (name: string) => (name.includes('.') ? name.split('.').pop()!.toUpperCase().slice(0, 5) : 'ARQ')
+const formatSize = (bytes: number) => bytes >= 1024 * 1024
+  ? `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(bytes / 1024 / 1024)} MB`
+  : `${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(Math.max(1, bytes / 1024))} KB`
+
 function ResourcePreview({ folder, resource }: { folder: BrandFolder; resource: BrandResource }) {
   if (resource.fileUrl && resource.contentType?.startsWith('image/')) return <img className="brand-resource__uploaded-image" src={resource.fileUrl} alt="" />
-  if (folder.preview === 'colors') return <span className="brand-resource__color" style={{ background: resource.tone }} />
+  if (folder.preview === 'colors' || resource.tone) return <span className="brand-resource__color" style={{ background: resource.tone }} />
+  if (resource.fileUrl) return <span className="bk-ext-badge"><FileText size={26} strokeWidth={1.5} />{fileExtension(resource.name)}</span>
   if (folder.preview === 'type') return <span className="brand-resource__type">Aa</span>
   if (folder.preview === 'images') return <span className="brand-resource__image" />
   if (folder.preview === 'ui') return <span className="brand-resource__ui"><i /><i /><i /></span>
@@ -77,6 +83,10 @@ export function BrandKitPage() {
   const [newColorName, setNewColorName] = useState('')
   const [newColorHex, setNewColorHex] = useState('#004c46')
   const [saving, setSaving] = useState(false)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [query, setQuery] = useState('')
+  const [dragging, setDragging] = useState(false)
+  const dragDepth = useRef(0)
   const fileInput = useRef<HTMLInputElement>(null)
   const selectedBrandId = searchParams.get('marca')
   const folders = folderResult?.brandId === selectedBrandId ? folderResult.items : []
@@ -185,29 +195,38 @@ export function BrandKitPage() {
     setFolderState(folder && selectedBrandId ? { brandId: selectedBrandId, folder } : null)
   }
 
-  const uploadResource = async (file?: File) => {
-    if (!file || !selectedFolder || !selectedBrandId) return
+  const uploadFiles = async (fileList?: FileList | File[] | null) => {
+    const files = Array.from(fileList || [])
+    if (files.length === 0 || !selectedFolder || !selectedBrandId) return
     setUploading(true)
+    let sent = 0
     try {
-      notify(`Enviando ${file.name} para o Brand Kit...`)
-      const uploaded = await api.uploadFile(file, 'brand-kit')
-      await api.addBrandKitResource({
-        folderId: selectedFolder.id,
-        name: file.name,
-        meta: `${file.type || 'Arquivo'} · ${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(file.size / 1024)} KB`,
-        fileKey: uploaded.fileKey,
-        contentType: uploaded.contentType,
-        sizeBytes: uploaded.sizeBytes,
-      })
-      await reloadFolders(selectedBrandId)
-      notify('Arquivo adicionado ao Brand Kit')
+      for (const file of files) {
+        notify(`Enviando ${file.name}${files.length > 1 ? ` (${sent + 1}/${files.length})` : ''}...`)
+        const uploaded = await api.uploadFile(file, 'brand-kit')
+        await api.addBrandKitResource({
+          folderId: selectedFolder.id,
+          name: file.name,
+          meta: `${fileExtension(file.name)} · ${formatSize(file.size)}`,
+          fileKey: uploaded.fileKey,
+          contentType: uploaded.contentType,
+          sizeBytes: uploaded.sizeBytes,
+        })
+        sent += 1
+      }
+      notify(sent === 1 ? 'Arquivo adicionado ao Brand Kit' : `${sent} arquivos adicionados ao Brand Kit`)
     } catch (error: unknown) {
       notify(error instanceof Error ? error.message : 'Não foi possível enviar o arquivo')
     } finally {
+      if (sent > 0) await reloadFolders(selectedBrandId)
       setUploading(false)
       if (fileInput.current) fileInput.current.value = ''
     }
   }
+
+  const visibleResources = selectedFolder
+    ? selectedFolder.resources.filter((resource) => `${resource.name} ${resource.meta}`.toLowerCase().includes(query.trim().toLowerCase()))
+    : []
 
   return <div className={`page brand-page${selectedFolder ? ' brand-page--open' : ''}`}>
     {!selectedBrand ? <section className="brand-selector">
@@ -251,44 +270,67 @@ export function BrandKitPage() {
       </div>
       {loadingFolders && <div className="brand-kit-empty">Carregando recursos...</div>}
       {!loadingFolders && folders.length === 0 && <div className="brand-kit-empty"><strong>Brand Kit vazio</strong><span>Crie a primeira pasta para começar a organizar os recursos desta marca.</span><button type="button" className="primary-button" onClick={() => setShowNewFolder(true)}><FolderPlus size={17} /> Nova pasta</button></div>}
-    </> : <section className="brand-folder-view" aria-labelledby="brand-folder-title">
-      <button type="button" className="brand-back" onClick={() => changeFolder(null)}>
-        <ArrowLeft size={18} /> Voltar ao Brand Kit
-      </button>
-
-      <header className="brand-folder-view__header">
-        <BrandFolderArt preview={selectedFolder.preview} />
-        <div>
-          <span className="brand-folder-view__eyebrow">Brand Kit · {selectedBrand.name}</span>
-          <h1 id="brand-folder-title">{selectedFolder.name}</h1>
-          <p>{selectedFolder.description} · {selectedFolder.count}</p>
+    </> : <section
+      className={`bk-view${dragging ? ' is-dragging' : ''}`}
+      aria-label={selectedFolder.name}
+      onDragEnter={(event) => { if (!event.dataTransfer.types.includes('Files')) return; event.preventDefault(); dragDepth.current += 1; setDragging(true) }}
+      onDragOver={(event) => { if (event.dataTransfer.types.includes('Files')) event.preventDefault() }}
+      onDragLeave={() => { dragDepth.current = Math.max(0, dragDepth.current - 1); if (dragDepth.current === 0) setDragging(false) }}
+      onDrop={(event) => { event.preventDefault(); dragDepth.current = 0; setDragging(false); void uploadFiles(event.dataTransfer.files) }}
+    >
+      <header className="bk-bar">
+        <nav className="bk-crumbs" aria-label="Navegação do Brand Kit">
+          <button type="button" onClick={() => { setQuery(''); changeFolder(null); selectBrand(null) }}>Brand Kit</button>
+          <ChevronRight size={15} />
+          <button type="button" onClick={() => { setQuery(''); changeFolder(null) }}>{selectedBrand.name}</button>
+          <ChevronRight size={15} />
+          <strong aria-current="page"><span className={`bk-crumbs__dot bk-crumbs__dot--${selectedFolder.preview}`} />{selectedFolder.name}</strong>
+          <em>{selectedFolder.count}</em>
+        </nav>
+        <div className="bk-bar__tools">
+          <label className="bk-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar nesta pasta" aria-label="Buscar nesta pasta" /></label>
+          <div className="bk-toggle" role="group" aria-label="Modo de visualização">
+            <button type="button" className={viewMode === 'grid' ? 'is-active' : ''} onClick={() => setViewMode('grid')} aria-label="Grade" title="Grade"><LayoutGrid size={16} /></button>
+            <button type="button" className={viewMode === 'list' ? 'is-active' : ''} onClick={() => setViewMode('list')} aria-label="Lista" title="Lista"><List size={16} /></button>
+          </div>
+          {selectedFolder.preview === 'colors' && <button type="button" className="bk-btn" onClick={() => setShowNewColor(true)}><Palette size={16} /> Cor</button>}
+          <button type="button" className="bk-btn bk-btn--primary" disabled={uploading} onClick={() => fileInput.current?.click()}><Upload size={16} /> {uploading ? 'Enviando...' : 'Enviar'}</button>
+          <button type="button" className="bk-icon-btn" onClick={() => void removeFolder(selectedFolder)} aria-label="Excluir pasta" title="Excluir pasta"><Trash2 size={16} /></button>
         </div>
-        <div className="brand-folder-view__actions">
-          {selectedFolder.preview === 'colors' && <button type="button" className="secondary-button" onClick={() => setShowNewColor(true)}><Palette size={17} /> Adicionar cor</button>}
-          <button type="button" className="primary-button" disabled={uploading} onClick={() => fileInput.current?.click()}>
-            <Upload size={17} /> {uploading ? 'Enviando...' : 'Adicionar arquivo'}
-          </button>
-        </div>
-        <input ref={fileInput} type="file" hidden accept="image/*,video/*,.pdf,.zip,.ai,.eps,.svg,.woff,.woff2,.txt" onChange={(event) => uploadResource(event.target.files?.[0])} />
+        <input ref={fileInput} type="file" hidden multiple accept="image/*,video/*,.pdf,.zip,.ai,.eps,.svg,.woff,.woff2,.otf,.ttf,.txt,.psd,.fig" onChange={(event) => void uploadFiles(event.target.files)} />
       </header>
 
-      <div className="brand-folder-view__toolbar">
-        <div><h2>Recursos</h2><span>{selectedFolder.resources.length === 0 ? 'Nenhum item ainda' : `${selectedFolder.resources.length} ${selectedFolder.resources.length === 1 ? 'item' : 'itens'}`}</span></div>
-        <button type="button" className="secondary-button" onClick={() => void removeFolder(selectedFolder)}><Trash2 size={17} /> Excluir pasta</button>
-      </div>
-
-      {selectedFolder.resources.length === 0 && <div className="brand-kit-empty"><strong>Pasta vazia</strong><span>{selectedFolder.preview === 'colors' ? 'Adicione cores da marca ou envie arquivos de paleta.' : 'Envie arquivos para esta pasta com o botão "Adicionar arquivo".'}</span></div>}
-
-      <div className={`brand-resource-grid brand-resource-grid--${selectedFolder.preview}`}>
-        {selectedFolder.resources.map((resource) => <div className="brand-resource-wrap" key={resource.id}>
-          <button type="button" className="brand-resource" disabled={!resource.fileUrl} onClick={() => resource.fileUrl && window.open(resource.fileUrl, '_blank', 'noopener,noreferrer')}>
-            <span className="brand-resource__preview"><ResourcePreview folder={selectedFolder} resource={resource} /></span>
-            <span className="brand-resource__copy"><strong>{resource.name}</strong><small>{resource.meta}</small></span>
-            <Download size={18} aria-hidden="true" />
+      {selectedFolder.resources.length === 0 ? <button type="button" className="bk-empty" onClick={() => fileInput.current?.click()}>
+        <span className="bk-empty__art"><BrandFolderArt preview={selectedFolder.preview} /></span>
+        <strong>{selectedFolder.name} está vazia</strong>
+        <span>Arraste arquivos para cá ou clique para enviar. {selectedFolder.description}.</span>
+      </button> : visibleResources.length === 0 ? <div className="brand-kit-empty"><strong>Nada encontrado</strong><span>Nenhum item corresponde a "{query}".</span></div> : viewMode === 'grid' ? <div className="bk-grid">
+        {visibleResources.map((resource) => <article className="bk-card" key={resource.id}>
+          <button type="button" className="bk-card__open" disabled={!resource.fileUrl} onClick={() => resource.fileUrl && window.open(resource.fileUrl, '_blank', 'noopener,noreferrer')} aria-label={`Abrir ${resource.name}`}>
+            <span className="bk-card__preview"><ResourcePreview folder={selectedFolder} resource={resource} /></span>
+            <span className="bk-card__copy"><strong title={resource.name}>{resource.name}</strong><small>{resource.meta}</small></span>
           </button>
-          <button type="button" className="brand-resource__remove" onClick={() => void removeResource(resource)} aria-label={`Remover ${resource.name}`} title="Remover"><Trash2 size={14} /></button>
+          <span className="bk-card__actions">
+            {resource.fileUrl && <a href={resource.fileUrl} download={resource.name} target="_blank" rel="noreferrer" aria-label={`Baixar ${resource.name}`} title="Baixar"><Download size={14} /></a>}
+            <button type="button" onClick={() => void removeResource(resource)} aria-label={`Remover ${resource.name}`} title="Remover"><Trash2 size={14} /></button>
+          </span>
+        </article>)}
+      </div> : <div className="bk-list" role="table">
+        <div className="bk-list__head" role="row"><span>Nome</span><span>Detalhes</span><span /></div>
+        {visibleResources.map((resource) => <div className="bk-list__row" role="row" key={resource.id}>
+          <button type="button" className="bk-list__name" disabled={!resource.fileUrl} onClick={() => resource.fileUrl && window.open(resource.fileUrl, '_blank', 'noopener,noreferrer')}>
+            <span className="bk-list__thumb"><ResourcePreview folder={selectedFolder} resource={resource} /></span>
+            <strong title={resource.name}>{resource.name}</strong>
+          </button>
+          <span className="bk-list__meta">{resource.meta}</span>
+          <span className="bk-list__actions">
+            {resource.fileUrl && <a href={resource.fileUrl} download={resource.name} target="_blank" rel="noreferrer" aria-label={`Baixar ${resource.name}`} title="Baixar"><Download size={15} /></a>}
+            <button type="button" onClick={() => void removeResource(resource)} aria-label={`Remover ${resource.name}`} title="Remover"><Trash2 size={15} /></button>
+          </span>
         </div>)}
-      </div>
+      </div>}
+
+      {dragging && <div className="bk-drop" aria-hidden="true"><Upload size={30} /><strong>Solte para enviar para {selectedFolder.name}</strong></div>}
     </section>}
 
     {showNewFolder && createPortal(<div className="account-modal" role="dialog" aria-modal="true" aria-labelledby="new-folder-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowNewFolder(false) }}>
