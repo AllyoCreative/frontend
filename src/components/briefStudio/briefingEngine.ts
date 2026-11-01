@@ -1,7 +1,7 @@
 import { CHANNEL_FORMATS, STANDARD_ADDONS } from '../formats/channelData'
 import { buildCatalogFormatOptions } from '../formats/catalogFormatOptions'
 import type { ChannelFormatOption, ConfiguredFormatItem } from '../formats/formatTypes'
-import type { CatalogProduct, CatalogScope, ManagedBrandSummary, UserSummary } from '../../services/api'
+import type { CatalogProduct, CatalogScope, ManagedBrandSummary } from '../../services/api'
 import type { Project } from '../../types'
 
 export type StudioMode = 'brief' | 'insights' | 'about'
@@ -216,6 +216,12 @@ export function matchCatalogProduct(prompt: string, products: CatalogProduct[]):
           else if (fullProd.includes(hint)) score += Math.round(rule.weight * 0.5)
         }
       }
+    }
+
+    // Penalize pure text/word-count products when the request clearly asks for visual ads/posts/design
+    const hasVisualIntent = /\b(anuncio|anuncios|ads|post|posts|stories|criativo|criativos|carrossel|banner|figma|photoshop|pecas|arte|artes)\b/.test(text)
+    if (hasVisualIntent && (prodCat === 'copywriting' || normalize(product.billing.unit || '').includes('palavra'))) {
+      score -= 60
     }
 
     // Slight preference for versatile social/campaign items when prompt is generic
@@ -877,47 +883,4 @@ export function applyChatRefinement(
   return next
 }
 
-export function pickStudioReviewers(allyoTeam: UserSummary[]) {
-  const defaults = [
-    {
-      id: 'rev-1',
-      name: 'Lucas Mendes',
-      role: 'Diretor de Arte',
-      initials: 'LM',
-      color: '#6ec3e6',
-      avatarUrl: null as string | null,
-    },
-    {
-      id: 'rev-2',
-      name: 'Marina Costa',
-      role: 'Copywriter Sênior',
-      initials: 'MC',
-      color: '#f29cb6',
-      avatarUrl: null as string | null,
-    },
-    {
-      id: 'rev-3',
-      name: 'Rafael Souza',
-      role: 'Motion & Produção',
-      initials: 'RS',
-      color: '#d99be8',
-      avatarUrl: null as string | null,
-    },
-  ]
-
-  if (!allyoTeam || allyoTeam.length === 0) return defaults
-
-  return defaults.map((fallback, index) => {
-    const member = allyoTeam[index]
-    if (!member) return fallback
-    return {
-      id: member.id || fallback.id,
-      name: member.name || fallback.name,
-      role: member.jobTitle || fallback.role,
-      initials: member.avatarInitials || fallback.initials,
-      color: member.avatarColor || fallback.color,
-      avatarUrl: member.avatarUrl || null,
-    }
-  })
-}
 

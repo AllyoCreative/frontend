@@ -1,33 +1,47 @@
 /* Allyo Brief Studio — Conversational Brief & Scope Canvas */
 
 .brief-studio-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
   width: 100%;
-  margin: 0 auto 28px;
-  animation: briefStudioReveal 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+  height: 100svh;
+  padding: 8px;
+  background: #f4f5f4;
+  display: grid;
+  overflow: hidden;
+  animation: briefStudioReveal 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 @keyframes briefStudioReveal {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.99);
+    transform: scale(0.985);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: scale(1);
   }
 }
 
 .brief-studio-frame {
   position: relative;
-  border-radius: 22px;
+  width: 100%;
+  height: calc(100svh - 16px);
+  border-radius: 14px;
   background: #274a43;
-  padding: 20px 26px 28px;
+  padding: 16px 24px 22px;
   box-shadow: 0 20px 50px rgba(13, 30, 29, 0.16);
   color: #131f15;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .brief-studio-frame--success {
   padding: 44px 32px;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Topbar (Superside Image 5 style) */
@@ -220,11 +234,13 @@
 /* Main White Sheet (Superside Image 3 & 4) */
 .brief-studio-sheet {
   position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   background: #ffffff;
-  border-radius: 18px;
-  padding: 32px 48px 28px;
+  border-radius: 16px;
+  padding: 36px 56px 24px;
   box-shadow: 0 12px 36px rgba(10, 24, 21, 0.18);
-  min-height: 440px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -337,10 +353,10 @@
 /* Generated Brief Document (Superside Image 4) */
 .brief-studio-doc {
   position: relative;
-  max-width: 780px;
+  max-width: 980px;
   margin: 0 auto;
   width: 100%;
-  padding: 6px 12px 24px;
+  padding: 6px 12px 28px;
   animation: briefFadeIn 0.35s ease both;
 }
 
@@ -719,99 +735,6 @@
   cursor: pointer;
 }
 
-/* Floating Team Reviewer Avatars with Pointer Arrows (Superside Image 4) */
-.brief-studio-floating-avatar {
-  position: absolute;
-  z-index: 5;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  pointer-events: auto;
-}
-
-.brief-studio-floating-avatar--top {
-  top: 108px;
-  right: 120px;
-}
-
-.brief-studio-floating-avatar--left {
-  top: 230px;
-  left: -32px;
-}
-
-.brief-studio-floating-avatar--mid {
-  top: 390px;
-  left: 245px;
-}
-
-.brief-studio-avatar-ring {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  border: 3px solid #6ec3e6;
-  background: #fff;
-  overflow: hidden;
-  display: grid;
-  place-items: center;
-  box-shadow: 0 6px 16px rgba(13, 30, 29, 0.16);
-}
-
-.brief-studio-avatar-ring img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.brief-studio-avatar-ring span {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  place-items: center;
-  color: #131f15;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.brief-studio-cursor-arrow {
-  width: 0;
-  height: 0;
-  border-left: 6px solid transparent;
-  border-right: 6px solid transparent;
-  border-bottom: 10px solid currentColor;
-  transform: rotate(-42deg);
-}
-
-.brief-studio-cursor-arrow--right {
-  transform: rotate(125deg);
-}
-
-.brief-studio-avatar-tooltip {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  padding: 4px 9px;
-  border-radius: 6px;
-  background: #131f15;
-  color: #fff;
-  font-size: 10.5px;
-  font-weight: 600;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease;
-}
-
-.brief-studio-floating-avatar:hover .brief-studio-avatar-tooltip {
-  opacity: 1;
-}
-
-@media (max-width: 1100px) {
-  .brief-studio-floating-avatar {
-    display: none;
-  }
-}
-
 /* Dropdowns */
 .brief-studio-format-add-wrap {
   position: relative;
@@ -881,8 +804,14 @@
 
 /* Bottom Footer: Fill in the Gaps + Conversational Bar */
 .brief-studio-footer {
-  margin-top: 18px;
-  padding-top: 16px;
+  position: sticky;
+  bottom: -24px;
+  z-index: 10;
+  max-width: 980px;
+  width: 100%;
+  margin: 18px auto 0;
+  padding: 16px 12px 6px;
+  background: #ffffff;
   border-top: 1px solid #ecefec;
 }
 

@@ -93,72 +93,72 @@ export function HomePage() {
 
   return (
     <div className="page home-page" data-node-id="1:16">
-      {activeStudioPrompt ? (
+      {activeStudioPrompt && (
         <AllyoBriefStudio
           initialPrompt={activeStudioPrompt}
           linkedProjectId={linkedRefProjectId || undefined}
           onClose={() => setActiveStudioPrompt(null)}
         />
-      ) : (
-        <section className="home-hero" data-node-id="9:12">
-          <button className="home-catalog-link" onClick={() => navigate('/novo-projeto')}>
-            Briefing do catálogo
-            <FigmaIcon asset="home.imgEvaDiagonalArrowRightUpFill" />
-          </button>
+      )}
 
-          <div className="home-hero__content">
-            <h1>Vamos arrasar nessa campanha, {firstName}.</h1>
+      <section className="home-hero" data-node-id="9:12">
+        <button className="home-catalog-link" onClick={() => navigate('/novo-projeto')}>
+          Briefing do catálogo
+          <FigmaIcon asset="home.imgEvaDiagonalArrowRightUpFill" />
+        </button>
 
-            <form className="prompt-box" onSubmit={submitPrompt}>
-              <input
-                value={prompt}
-                onChange={(event) => setPrompt(event.target.value)}
-                placeholder="O que eu posso fazer por você?"
-                aria-label="Converse com a Allyo"
-              />
-              <button type="button" className="prompt-mic" aria-label="Usar microfone">
-                <FigmaIcon asset="home.imgGroup2" />
-              </button>
-              <button type="submit" className="prompt-send" disabled={!prompt.trim()} aria-label="Enviar">
-                <FigmaIcon asset="home.imgFrame1410119641" />
-              </button>
-            </form>
+        <div className="home-hero__content">
+          <h1>Vamos arrasar nessa campanha, {firstName}.</h1>
 
-            {projects.length > 0 && (
-              <div className="home-prompt-context-row">
-                <label className="home-prompt-ref-select" title="Usar a identidade visual e referência de um projeto existente">
-                  <Link2 size={13} />
-                  <select
-                    value={linkedRefProjectId}
-                    onChange={(event) => setLinkedRefProjectId(event.target.value)}
-                  >
-                    <option value="">Seguir linha visual de um projeto (opcional)...</option>
-                    {projects.map((project) => (
-                      <option key={project.id} value={project.id}>
-                        Seguir referência: {project.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            )}
+          <form className="prompt-box" onSubmit={submitPrompt}>
+            <input
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              placeholder="O que eu posso fazer por você?"
+              aria-label="Converse com a Allyo"
+            />
+            <button type="button" className="prompt-mic" aria-label="Usar microfone">
+              <FigmaIcon asset="home.imgGroup2" />
+            </button>
+            <button type="submit" className="prompt-send" disabled={!prompt.trim()} aria-label="Enviar">
+              <FigmaIcon asset="home.imgFrame1410119641" />
+            </button>
+          </form>
 
-            <div className="home-suggestions">
-              <span className="suggestion-label">Sugestões de prompts:</span>
-              <div className="prompt-suggestions">
-                {suggestions.map(({ label, asset }) => (
-                  <button key={label} type="button" onClick={() => handleSuggestionClick(label)}>
-                    <FigmaIcon asset={asset} />
-                    <strong>{label}</strong>
-                  </button>
-                ))}
-              </div>
+          {projects.length > 0 && (
+            <div className="home-prompt-context-row">
+              <label className="home-prompt-ref-select" title="Usar a identidade visual e referência de um projeto existente">
+                <Link2 size={13} />
+                <select
+                  value={linkedRefProjectId}
+                  onChange={(event) => setLinkedRefProjectId(event.target.value)}
+                >
+                  <option value="">Seguir linha visual de um projeto (opcional)...</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      Seguir referência: {project.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
+
+          <div className="home-suggestions">
+            <span className="suggestion-label">Sugestões de prompts:</span>
+            <div className="prompt-suggestions">
+              {suggestions.map(({ label, asset }) => (
+                <button key={label} type="button" onClick={() => handleSuggestionClick(label)}>
+                  <FigmaIcon asset={asset} />
+                  <strong>{label}</strong>
+                </button>
+              ))}
             </div>
           </div>
+        </div>
 
-          <small className="hero-credit">Ilustração por {currentUser?.name || 'Allyo Creative'}, Allyo Creative</small>
-        </section>
-      )}
+        <small className="hero-credit">Ilustração por {currentUser?.name || 'Allyo Creative'}, Allyo Creative</small>
+      </section>
 
       <h2 className="home-section-title">Vamos começar</h2>
 

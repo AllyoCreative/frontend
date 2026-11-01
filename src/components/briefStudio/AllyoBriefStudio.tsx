@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
@@ -25,7 +26,6 @@ import {
   computeBriefGaps,
   computePlannedDeliverables,
   initialScopeForProduct,
-  pickStudioReviewers,
   type BriefDraftState,
 } from './briefingEngine'
 
@@ -170,7 +170,19 @@ export function AllyoBriefStudio({
     }
   }, [draft?.selectedProduct, draft?.scope, draft?.creativePath, draft?.mode])
 
-  const reviewers = useMemo(() => pickStudioReviewers(allyoTeam), [allyoTeam])
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [onClose])
+
   const deliverables = useMemo(() => (draft ? computePlannedDeliverables(draft) : []), [draft])
   const gaps = useMemo(() => (draft ? computeBriefGaps(draft) : []), [draft])
   const unresolvedGaps = useMemo(() => gaps.filter((g) => !g.resolved), [gaps])
@@ -431,8 +443,8 @@ export function AllyoBriefStudio({
 
   // Success confirmation state inside the Studio
   if (createdProjectId && draft) {
-    return (
-      <div className="brief-studio-shell" role="dialog" aria-label="Briefing enviado com sucesso">
+    return createPortal(
+      <div className="brief-studio-shell" role="dialog" aria-modal="true" aria-label="Briefing enviado com sucesso">
         <div className="brief-studio-frame brief-studio-frame--success">
           <button type="button" className="brief-studio-close" onClick={onClose} aria-label="Fechar">
             <X size={18} />
@@ -475,12 +487,13 @@ export function AllyoBriefStudio({
             </div>
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     )
   }
 
-  return (
-    <div className="brief-studio-shell" role="region" aria-label="Allyo Brief Studio">
+  return createPortal(
+    <div className="brief-studio-shell" role="dialog" aria-modal="true" aria-label="Allyo Brief Studio">
       <div className="brief-studio-frame">
         {/* Top Action Bar (Superside Image 5 style) */}
         <header className="brief-studio-topbar">
@@ -773,67 +786,6 @@ export function AllyoBriefStudio({
             /* Phase 2: The Live Brief Document (Superside Image 4 style) */
             draft && (
               <div className="brief-studio-doc">
-                {/* Floating Team Reviewer Avatars with Cursors (Superside Image 4!) */}
-                {reviewers[0] && (
-                  <div
-                    className="brief-studio-floating-avatar brief-studio-floating-avatar--top"
-                    title={`${reviewers[0].name} · ${reviewers[0].role}`}
-                  >
-                    <span className="brief-studio-cursor-arrow" style={{ color: reviewers[0].color }} />
-                    <div className="brief-studio-avatar-ring" style={{ borderColor: reviewers[0].color }}>
-                      {reviewers[0].avatarUrl ? (
-                        <img src={reviewers[0].avatarUrl} alt={reviewers[0].name} />
-                      ) : (
-                        <span style={{ background: reviewers[0].color }}>{reviewers[0].initials}</span>
-                      )}
-                    </div>
-                    <small className="brief-studio-avatar-tooltip">
-                      {reviewers[0].name} · {reviewers[0].role}
-                    </small>
-                  </div>
-                )}
-
-                {reviewers[1] && (
-                  <div
-                    className="brief-studio-floating-avatar brief-studio-floating-avatar--left"
-                    title={`${reviewers[1].name} · ${reviewers[1].role}`}
-                  >
-                    <div className="brief-studio-avatar-ring" style={{ borderColor: reviewers[1].color }}>
-                      {reviewers[1].avatarUrl ? (
-                        <img src={reviewers[1].avatarUrl} alt={reviewers[1].name} />
-                      ) : (
-                        <span style={{ background: reviewers[1].color }}>{reviewers[1].initials}</span>
-                      )}
-                    </div>
-                    <span
-                      className="brief-studio-cursor-arrow brief-studio-cursor-arrow--right"
-                      style={{ color: reviewers[1].color }}
-                    />
-                    <small className="brief-studio-avatar-tooltip">
-                      {reviewers[1].name} · {reviewers[1].role}
-                    </small>
-                  </div>
-                )}
-
-                {reviewers[2] && (
-                  <div
-                    className="brief-studio-floating-avatar brief-studio-floating-avatar--mid"
-                    title={`${reviewers[2].name} · ${reviewers[2].role}`}
-                  >
-                    <span className="brief-studio-cursor-arrow" style={{ color: reviewers[2].color }} />
-                    <div className="brief-studio-avatar-ring" style={{ borderColor: reviewers[2].color }}>
-                      {reviewers[2].avatarUrl ? (
-                        <img src={reviewers[2].avatarUrl} alt={reviewers[2].name} />
-                      ) : (
-                        <span style={{ background: reviewers[2].color }}>{reviewers[2].initials}</span>
-                      )}
-                    </div>
-                    <small className="brief-studio-avatar-tooltip">
-                      {reviewers[2].name} · {reviewers[2].role}
-                    </small>
-                  </div>
-                )}
-
                 {/* Document Title & Campaign Name */}
                 <div className="brief-studio-doc__header">
                   <div className="brief-studio-doc__title-row">
@@ -1256,6 +1208,7 @@ export function AllyoBriefStudio({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
