@@ -748,6 +748,128 @@ export function ProjectDetailPage() {
                 <div className="project-task-briefing-grid"><div><span>Público</span><p>{expandedTask.briefing?.audience || 'Herdado do projeto'}</p></div><div><span>Tom</span><p>{expandedTask.briefing?.tone || 'Herdado do projeto'}</p></div></div>
                 {expandedTask.briefing?.deliverables?.length > 0 && <div><span>Entregáveis</span><div className="project-task-briefing-tags">{expandedTask.briefing.deliverables.map((item) => <b key={item}>{item}</b>)}</div></div>}
                 {expandedTask.briefing?.formats?.length > 0 && <div><span>Formatos</span><div className="project-task-briefing-tags">{expandedTask.briefing.formats.map((item) => <b key={item}>{item}</b>)}</div></div>}
+                {(() => {
+                  const taskLinks = Array.from(
+                    new Set(
+                      [
+                        ...(expandedTask.briefing?.creativeDirection || []),
+                        ...(briefing?.creativeDirection || []),
+                      ]
+                        .filter((item) => item.startsWith('Referência: '))
+                        .map((item) => item.replace('Referência: ', '').trim())
+                        .filter(Boolean)
+                    )
+                  )
+                  const taskBriefingFiles = projectFiles.filter((file) => file.category === 'briefing')
+                  if (taskLinks.length === 0 && taskBriefingFiles.length === 0) return null
+                  return (
+                    <div className="project-task-briefing-refs">
+                      <span>Referências e arquivos de apoio</span>
+                      {taskLinks.length > 0 && (
+                        <div className="project-briefing-links" style={{ marginTop: '6px' }}>
+                          {taskLinks.map((link) => (
+                            <a
+                              href={link}
+                              target="_blank"
+                              rel="noreferrer"
+                              key={link}
+                              className="project-briefing-link-pill"
+                              title={link}
+                            >
+                              <ExternalLink size={13} />
+                              <span>{link}</span>
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                      {taskBriefingFiles.length > 0 && (
+                        <div className="project-briefing-files-grid" style={{ marginTop: '8px' }}>
+                          {taskBriefingFiles.map((file) => {
+                            const isImage =
+                              file.contentType.startsWith('image/') ||
+                              /\.(png|jpe?g|webp|gif|svg)$/i.test(file.name)
+                            const ext = file.name.split('.').pop()?.toUpperCase() || 'ARQ'
+                            const resolvedUrl = resolveStorageUrl(file.fileUrl)
+                            return (
+                              <div key={file.id} className="project-briefing-file-item">
+                                <div
+                                  className="project-briefing-file-thumb"
+                                  onClick={() =>
+                                    setFilePreview({
+                                      name: cleanDecodedText(file.name),
+                                      url: resolvedUrl,
+                                      sizeBytes: file.sizeBytes,
+                                      contentType: file.contentType,
+                                    })
+                                  }
+                                  role="button"
+                                  tabIndex={0}
+                                  title={`Visualizar ${file.name}`}
+                                >
+                                  {isImage ? (
+                                    <img src={resolvedUrl} alt={file.name} />
+                                  ) : (
+                                    <span className="project-briefing-file-badge">{ext}</span>
+                                  )}
+                                  <div className="project-briefing-file-thumb-overlay">
+                                    <Eye size={14} />
+                                  </div>
+                                </div>
+                                <div
+                                  className="project-briefing-file-info"
+                                  onClick={() =>
+                                    setFilePreview({
+                                      name: cleanDecodedText(file.name),
+                                      url: resolvedUrl,
+                                      sizeBytes: file.sizeBytes,
+                                      contentType: file.contentType,
+                                    })
+                                  }
+                                  role="button"
+                                  tabIndex={0}
+                                >
+                                  <span className="project-briefing-file-name" title={file.name}>
+                                    {cleanDecodedText(file.name)}
+                                  </span>
+                                  <small>{Math.max(1, Math.round(file.sizeBytes / 1024))} KB · Briefing</small>
+                                </div>
+                                <div className="project-briefing-file-actions">
+                                  <button
+                                    type="button"
+                                    className="project-briefing-file-btn"
+                                    onClick={() =>
+                                      setFilePreview({
+                                        name: cleanDecodedText(file.name),
+                                        url: resolvedUrl,
+                                        sizeBytes: file.sizeBytes,
+                                        contentType: file.contentType,
+                                      })
+                                    }
+                                    title="Abrir visualização"
+                                    aria-label={`Visualizar ${file.name}`}
+                                  >
+                                    <Eye size={14} />
+                                  </button>
+                                  <a
+                                    href={resolvedUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    download={file.name}
+                                    className="project-briefing-file-btn"
+                                    title="Baixar arquivo"
+                                    aria-label={`Baixar ${file.name}`}
+                                  >
+                                    <Download size={14} />
+                                  </a>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
               </div>}
             </section>}
           </article>

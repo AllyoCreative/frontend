@@ -2,23 +2,28 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import {
+  AlertCircle,
   ArrowRight,
   Check,
   CheckCircle2,
   Clock3,
+  ExternalLink,
+  FileText,
   Link2,
   Loader2,
   Mic,
+  Paperclip,
+  Plus,
   Sparkles,
   SlidersHorizontal,
+  Upload,
   X,
 } from 'lucide-react'
 import { useApp } from '../../AppContext'
-import { api, type CatalogProduct, type CatalogQuote } from '../../services/api'
+import { api, type CatalogProduct, type CatalogQuote, type CatalogScope } from '../../services/api'
 import {
   applyChatRefinement,
   buildInitialBriefState,
-  computeBriefGaps,
   computePlannedDeliverables,
   type BriefDraftState,
 } from './briefingEngine'
@@ -81,14 +86,85 @@ export function AllyoBriefStudio({
 
   const [chatInput, setChatInput] = useState('')
   const [speechBaseChat, setSpeechBaseChat] = useState('')
-  const [showGapsDrawer, setShowGapsDrawer] = useState(false)
   const [editingOverview, setEditingOverview] = useState(false)
   const [editingName, setEditingName] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [purchasingCredits, setPurchasingCredits] = useState(false)
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null)
   const [lastUpdatedBadge, setLastUpdatedBadge] = useState<string | null>(null)
+  const [referenceFiles, setReferenceFiles] = useState<File[]>([])
+  const [addingLink, setAddingLink] = useState(false)
+  const [linkInput, setLinkInput] = useState('')
 
   const chatInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const filePreviewUrls = useMemo(
+    () =>
+      referenceFiles.map((file) => ({
+        file,
+        isImage: file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(file.name),
+        url: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+      })),
+    [referenceFiles]
+  )
+
+  useEffect(() => {
+    return () => {
+      filePreviewUrls.forEach((item) => {
+        if (item.url) URL.revokeObjectURL(item.url)
+      })
+    }
+  }, [filePreviewUrls])
+
+  const handleFilesSelected = (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    const incoming = Array.from(files)
+    setReferenceFiles((current) => {
+      const existingNames = new Set(current.map((f) => `${f.name}-${f.size}`))
+      const unique = incoming.filter((f) => !existingNames.has(`${f.name}-${f.size}`))
+      return [...current, ...unique].slice(0, 12)
+    })
+    triggerUpdateFeedback(`${incoming.length} arquivo(s) de referência anexado(s)`)
+  }
+
+  const handleRemoveReferenceFile = (index: number) => {
+    setReferenceFiles((current) => current.filter((_, idx) => idx !== index))
+  }
+
+  const handleAddReferenceLink = () => {
+    if (!draft) return
+    const raw = linkInput.trim()
+    if (!raw) return
+    const normalizedUrl = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`
+    try {
+      const parsed = new URL(normalizedUrl)
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        notify('Informe um link válido começando com https://')
+        return
+      }
+      if (!draft.referenceLinks.includes(parsed.toString())) {
+        setDraft({
+          ...draft,
+          referenceLinks: [...draft.referenceLinks, parsed.toString()],
+        })
+        triggerUpdateFeedback('Link de referência adicionado')
+      }
+      setLinkInput('')
+      setAddingLink(false)
+    } catch {
+      notify('Link de referência inválido. Exemplo: https://figma.com/...')
+    }
+  }
+
+  const handleRemoveReferenceLink = (link: string) => {
+    if (!draft) return
+    setDraft({
+      ...draft,
+      referenceLinks: draft.referenceLinks.filter((item) => item !== link),
+    })
+  }
 
   const handleChatSpeech = useCallback(
     (transcript: string, isFinal: boolean) => {
@@ -159,9 +235,15 @@ export function AllyoBriefStudio({
     let active = true
     setQuoteLoading(true)
     const timer = window.setTimeout(() => {
+      const prod = draft.selectedProduct!
       api
-        .quoteCatalogProduct(draft.selectedProduct!.code, {
+        .quoteCatalogProduct(prod.code, {
           ...draft.scope,
+          quantity: prod.billing.maxQuantity
+            ? Math.min(draft.scope.quantity, prod.billing.maxQuantity)
+            : draft.scope.quantity,
+          resizeCount: prod.credits.resizeAllowed ? draft.scope.resizeCount : 0,
+          variationCount: prod.credits.variationAllowed ? draft.scope.variationCount : 0,
           creativePath: draft.creativePath,
         })
         .then((res) => {
@@ -194,8 +276,6 @@ export function AllyoBriefStudio({
   }, [onClose])
 
   const deliverables = useMemo(() => (draft ? computePlannedDeliverables(draft) : []), [draft])
-  const gaps = useMemo(() => (draft ? computeBriefGaps(draft) : []), [draft])
-  const unresolvedGaps = useMemo(() => gaps.filter((g) => !g.resolved), [gaps])
 
   const totalEstimatedCredits = useMemo(() => {
     if (quote?.totalCredits) return quote.totalCredits
@@ -245,7 +325,26 @@ export function AllyoBriefStudio({
       return
     }
 
-    const updated = applyChatRefinement(text, draft, products)
+    // Extract any URLs pasted directly in the chat bar as reference links
+    const urlMatches = text.match(/https?:\/\/[^\s"'<>]+/gi) || []
+    let nextDraft = draft
+    if (urlMatches.length > 0) {
+      const validUrls = urlMatches.filter((u) => {
+        try {
+          return ['http:', 'https:'].includes(new URL(u).protocol)
+        } catch {
+          return false
+        }
+      })
+      if (validUrls.length > 0) {
+        nextDraft = {
+          ...draft,
+          referenceLinks: Array.from(new Set([...draft.referenceLinks, ...validUrls])).slice(0, 12),
+        }
+      }
+    }
+
+    const updated = applyChatRefinement(text, nextDraft, products)
     setDraft(updated)
     if (!customCommand) setChatInput('')
     const lastTurn = updated.turns[updated.turns.length - 1]
@@ -287,11 +386,44 @@ export function AllyoBriefStudio({
     navigate('/novo-projeto')
   }
 
+  const sanitizeScopeForProduct = (rawScope: CatalogScope, product: CatalogProduct): CatalogScope => {
+    const cleanAddons: Record<string, number> = {}
+    for (const [key, val] of Object.entries(rawScope.addons || {})) {
+      const qty = Math.round(Number(val || 0))
+      if (qty <= 0) continue
+      if (product.addons.some((a) => a.code === key)) {
+        cleanAddons[key] = qty
+        continue
+      }
+      if (key === 'criacao-de-conteudo-publicitario') {
+        const mapped = product.addons.find((a) => /(^conteudo-para-|^texto-para-|^roteiro-para-video$)/i.test(a.code))
+        if (mapped) cleanAddons[mapped.code] = qty
+      } else if (key === 'legenda-para-redes-sociais') {
+        const mapped = product.addons.find((a) => /(^legenda-para-redes-sociais$|^legendagem$|^legendagem-via-ia$)/i.test(a.code))
+        if (mapped) cleanAddons[mapped.code] = qty
+      } else if (key === 'animacao-de-imagem-estatica-via-ia') {
+        const mapped = product.addons.find((a) => /(^animacao-de-imagem-estatica-via-ia$|^animacao-de-banner-em-html5$)/i.test(a.code))
+        if (mapped) cleanAddons[mapped.code] = qty
+      }
+    }
+
+    const baseQty = Math.max(1, Math.round(rawScope.quantity || product.billing.includedQuantity || 1))
+    return {
+      quantity: product.billing.maxQuantity ? Math.min(baseQty, product.billing.maxQuantity) : baseQty,
+      taskRepeats: Math.max(1, Math.min(100, Math.round(rawScope.taskRepeats || 1))),
+      resizeCount: product.credits.resizeAllowed ? Math.max(0, Math.round(rawScope.resizeCount || 0)) : 0,
+      variationCount: product.credits.variationAllowed ? Math.max(0, Math.round(rawScope.variationCount || 0)) : 0,
+      characterCount: Math.max(0, Math.round(rawScope.characterCount || 0)),
+      addons: cleanAddons,
+    }
+  }
+
   const handleSubmitBrief = async () => {
     if (!draft || submitting) return
 
     const product = draft.selectedProduct || products[0]
     if (!product) {
+      setSubmitError('Carregando catálogo de serviços... tente novamente em um instante.')
       notify('Selecione um produto do catálogo para enviar o projeto.')
       return
     }
@@ -307,7 +439,18 @@ export function AllyoBriefStudio({
         `${f.channel}: ${f.formatName} — ${f.dimension}${f.isPrincipal ? ' (Peça Principal)' : ''}`
     )
 
+    const validReferenceLinks = (draft.referenceLinks || []).filter((link) => {
+      try {
+        return ['http:', 'https:'].includes(new URL(link).protocol)
+      } catch {
+        return false
+      }
+    }).slice(0, 12)
+
+    const sanitizedScope = sanitizeScopeForProduct(draft.scope, product)
+
     setSubmitting(true)
+    setSubmitError(null)
     try {
       const created = await addProject({
         existingProjectId: !draft.creatingNewProject && draft.targetProjectId ? draft.targetProjectId : undefined,
@@ -324,26 +467,68 @@ export function AllyoBriefStudio({
         objective: draft.objective || `Criar ${product.name.toLocaleLowerCase('pt-BR')}`,
         overview: `${overviewText}\n\nDireção Criativa:\n${draft.designDirection.map((d) => `• ${d}`).join('\n')}`,
         projectGoal: draft.projectGoal || 'Engajamento',
-        audience: draft.audience || undefined,
-        tone: draft.tone || undefined,
+        audience: draft.audience?.trim() || undefined,
+        tone: draft.tone?.trim() || undefined,
         creativePath: draft.creativePath,
-        referenceLinks: draft.referenceLinks,
+        referenceLinks: validReferenceLinks,
         selectedFormats: [
           ...formattedFormats,
           `Arquivo final: ${draft.selectedFinalFormat}`,
           `Arquivo aberto: ${draft.selectedEditableFormat}`,
         ],
         catalogCode: product.code,
-        catalogScope: draft.scope,
+        catalogScope: sanitizedScope,
       })
+
+      if (referenceFiles.length > 0) {
+        const uploads = await Promise.allSettled(
+          referenceFiles.map(async (file) => {
+            const uploaded = await api.uploadFile(file, 'project-files')
+            return api.addProjectFile(created.id, {
+              name: file.name,
+              fileKey: uploaded.fileKey,
+              contentType: uploaded.contentType,
+              sizeBytes: uploaded.sizeBytes,
+              category: 'briefing',
+            })
+          })
+        )
+        const failed = uploads.filter((r) => r.status === 'rejected').length
+        if (failed > 0) {
+          notify(`Projeto criado, mas ${failed} arquivo(s) não puderam ser anexados.`)
+        }
+      }
 
       void refreshAccount()
       setCreatedProjectId(created.id)
+      onClose()
+      navigate(`/projetos/${created.id}/visao-geral`)
     } catch (error: any) {
       const msg = error?.message || 'Não foi possível criar o projeto. Verifique seu saldo de créditos.'
+      setSubmitError(msg)
       notify(msg)
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleQuickTopUpAndSubmit = async () => {
+    if (purchasingCredits) return
+    setPurchasingCredits(true)
+    try {
+      const packages = account?.creditPackages || []
+      const targetPack =
+        packages.find((p) => p.recommended) || packages[packages.length - 1] || packages[0]
+      const packageId = targetPack?.id || 'pack-50'
+      await api.purchaseCredits(packageId)
+      await refreshAccount()
+      setSubmitError(null)
+      notify(`Créditos adicionados ao seu espaço! Enviando briefing...`)
+      await handleSubmitBrief()
+    } catch (error: any) {
+      notify(error?.message || 'Não foi possível recarregar créditos automaticamente.')
+    } finally {
+      setPurchasingCredits(false)
     }
   }
 
@@ -421,20 +606,6 @@ export function AllyoBriefStudio({
           <div className="brief-studio-topbar__right">
             {!isGenerating && draft?.mode === 'brief' && (
               <>
-                {unresolvedGaps.length > 0 && (
-                  <button
-                    type="button"
-                    className={`brief-studio-gaps-toggle ${showGapsDrawer ? 'is-active' : ''}`}
-                    onClick={() => {
-                      setShowGapsDrawer((v) => !v)
-                      chatInputRef.current?.focus()
-                    }}
-                  >
-                    Preencher lacunas
-                    <span className="brief-studio-gaps-badge">{unresolvedGaps.length}</span>
-                  </button>
-                )}
-
                 <button
                   type="button"
                   className="brief-studio-configurator-btn"
@@ -448,7 +619,7 @@ export function AllyoBriefStudio({
                 <button
                   type="button"
                   className="brief-studio-submit-btn"
-                  disabled={submitting}
+                  disabled={submitting || purchasingCredits}
                   onClick={() => void handleSubmitBrief()}
                 >
                   {submitting ? (
@@ -472,6 +643,18 @@ export function AllyoBriefStudio({
             </button>
           </div>
         </header>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.fig,.ai,.psd,.zip"
+          onChange={(e) => {
+            handleFilesSelected(e.target.files)
+            e.target.value = ''
+          }}
+          style={{ display: 'none' }}
+        />
 
         {/* Main White Sheet Canvas */}
         <div className="brief-studio-sheet">
@@ -657,6 +840,50 @@ export function AllyoBriefStudio({
             /* Phase 2: Pure Editorial Brief Document (Superside Image 4 style) */
             draft && (
               <div className="brief-studio-doc">
+                {submitError && (
+                  <div className="brief-studio-error-banner" role="alert">
+                    <div className="brief-studio-error-banner__content">
+                      <AlertCircle size={17} />
+                      <span>{submitError}</span>
+                    </div>
+                    <div className="brief-studio-error-banner__actions">
+                      {/saldo|cr[eé]dito|insuficiente/i.test(submitError) ? (
+                        <button
+                          type="button"
+                          className="brief-studio-error-action-btn"
+                          disabled={purchasingCredits || submitting}
+                          onClick={() => void handleQuickTopUpAndSubmit()}
+                        >
+                          {purchasingCredits || submitting ? (
+                            <>
+                              <Loader2 size={14} className="spin" /> Recarregando e enviando...
+                            </>
+                          ) : (
+                            <>+ Recarregar créditos e enviar projeto</>
+                          )}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="brief-studio-error-action-btn"
+                          disabled={submitting}
+                          onClick={() => void handleSubmitBrief()}
+                        >
+                          Tentar novamente
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="brief-studio-error-dismiss"
+                        onClick={() => setSubmitError(null)}
+                        aria-label="Fechar aviso"
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="brief-studio-doc__header">
                   <div className="brief-studio-doc__title-row">
                     <span className="brief-studio-doc__eyebrow">Brief</span>
@@ -760,35 +987,172 @@ export function AllyoBriefStudio({
                     ))}
                   </ul>
                 </section>
+
+                {/* 5. Referências e Arquivos de Apoio */}
+                <section className="brief-studio-section brief-studio-ref-section">
+                  <div className="brief-studio-ref-header">
+                    <div>
+                      <h2>Referências e Arquivos de Apoio</h2>
+                      <p className="brief-studio-ref-subtitle">
+                        Imagens, PDFs, documentos ou links anexados aqui aparecem diretamente no painel de
+                        briefing do criativo.
+                      </p>
+                    </div>
+                    <div className="brief-studio-ref-actions">
+                      <button
+                        type="button"
+                        className="brief-studio-ref-btn"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Upload size={14} /> Anexar arquivos
+                      </button>
+                      <button
+                        type="button"
+                        className="brief-studio-ref-btn is-secondary"
+                        onClick={() => setAddingLink(true)}
+                      >
+                        <Plus size={14} /> Adicionar link
+                      </button>
+                    </div>
+                  </div>
+
+                  {addingLink && (
+                    <div className="brief-studio-ref-link-form">
+                      <input
+                        type="text"
+                        placeholder="Cole o link de referência (Figma, Drive, Behance, Instagram...)"
+                        value={linkInput}
+                        onChange={(e) => setLinkInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            handleAddReferenceLink()
+                          } else if (e.key === 'Escape') {
+                            setAddingLink(false)
+                            setLinkInput('')
+                          }
+                        }}
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        className="brief-studio-ref-link-save"
+                        onClick={() => handleAddReferenceLink()}
+                      >
+                        Adicionar
+                      </button>
+                      <button
+                        type="button"
+                        className="brief-studio-ref-link-cancel"
+                        onClick={() => {
+                          setAddingLink(false)
+                          setLinkInput('')
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  )}
+
+                  {filePreviewUrls.length === 0 && draft.referenceLinks.length === 0 && !addingLink ? (
+                    <div
+                      className="brief-studio-ref-dropzone"
+                      onClick={() => fileInputRef.current?.click()}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click()
+                      }}
+                    >
+                      <Paperclip size={16} />
+                      <span>
+                        Clique para anexar imagens de referência, apresentações, roteiros ou documentos para o
+                        time criativo
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="brief-studio-ref-lists">
+                      {filePreviewUrls.length > 0 && (
+                        <div className="brief-studio-ref-files-grid">
+                          {filePreviewUrls.map((item, idx) => (
+                            <div
+                              key={`${item.file.name}-${item.file.size}-${idx}`}
+                              className="brief-studio-ref-file-card"
+                            >
+                              {item.isImage && item.url ? (
+                                <img
+                                  src={item.url}
+                                  alt={item.file.name}
+                                  className="brief-studio-ref-file-thumb"
+                                />
+                              ) : (
+                                <div className="brief-studio-ref-file-icon">
+                                  <FileText size={20} />
+                                </div>
+                              )}
+                              <div className="brief-studio-ref-file-meta">
+                                <strong title={item.file.name}>{item.file.name}</strong>
+                                <small>{Math.max(1, Math.round(item.file.size / 1024))} KB · Briefing</small>
+                              </div>
+                              <button
+                                type="button"
+                                className="brief-studio-ref-remove"
+                                onClick={() => handleRemoveReferenceFile(idx)}
+                                aria-label={`Remover ${item.file.name}`}
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {draft.referenceLinks.length > 0 && (
+                        <div className="brief-studio-ref-links-list">
+                          {draft.referenceLinks.map((link) => (
+                            <div key={link} className="brief-studio-ref-link-pill">
+                              <ExternalLink size={13} />
+                              <a href={link} target="_blank" rel="noreferrer">
+                                {link}
+                              </a>
+                              <button
+                                type="button"
+                                className="brief-studio-ref-remove"
+                                onClick={() => handleRemoveReferenceLink(link)}
+                                aria-label="Remover link"
+                              >
+                                <X size={13} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </section>
               </div>
             )
           )}
 
           {/* Bottom Conversational Bar */}
           <div className="brief-studio-footer">
-            {!isGenerating && draft?.mode === 'brief' && showGapsDrawer && unresolvedGaps.length > 0 && (
-              <div className="brief-studio-gaps-bar">
-                <div className="brief-studio-gaps-chips">
-                  {unresolvedGaps.flatMap((gap) =>
-                    gap.options.slice(0, 1).map((opt) => (
-                      <button
-                        type="button"
-                        key={`${gap.id}-${opt.label}`}
-                        className="brief-studio-gap-chip"
-                        onClick={() => handleSendRefinement(undefined, opt.command)}
-                      >
-                        {opt.label}
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-
             <form
               className={`brief-studio-chat-form ${isChatListening ? 'is-listening' : ''}`}
               onSubmit={(e) => handleSendRefinement(e)}
             >
+              <button
+                type="button"
+                className="brief-studio-chat-attach"
+                disabled={isGenerating}
+                onClick={() => fileInputRef.current?.click()}
+                title="Anexar imagens ou documentos de referência"
+                aria-label="Anexar arquivos de referência"
+              >
+                <Paperclip size={18} strokeWidth={2} />
+                {referenceFiles.length > 0 && (
+                  <span className="brief-studio-chat-attach-count">{referenceFiles.length}</span>
+                )}
+              </button>
               <input
                 ref={chatInputRef}
                 value={chatInput}

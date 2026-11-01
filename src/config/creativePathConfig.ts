@@ -40,8 +40,14 @@ export const CONCEPT_VISUAL_CODES = new Set([
   '219', // Embalagem
   '221', // Wobbler
   '241', // OOH Impresso
+  '152', // Style Guide
+  '153', // Logo
+  '154', // Mockup
   '156', // Ilustração
+  '157', // Key visual
   '161', // Infográfico
+  '226', // Geração de imagem via IA
+  '228', // Mascote via IA
 ])
 
 export const VIDEO_STORYBOARD_CODES = new Set([
@@ -52,6 +58,8 @@ export const VIDEO_STORYBOARD_CODES = new Set([
   '176', // Edição de vídeo
   '222', // Edição de vídeo Lite
   '225', // Geração de vídeo via IA
+  '227', // Animação de imagem via IA
+  '229', // Avatar via IA
   '242', // DOOH Animado
 ])
 
