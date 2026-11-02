@@ -705,6 +705,14 @@ export const api = {
     })
   },
 
+  async updateBrand(brandId: string, data: { name: string; description: string; color: string }) {
+    return request<ManagedBrandSummary>(`/account/brands/${brandId}`, { method: 'PATCH', body: JSON.stringify(data) })
+  },
+
+  async archiveBrand(brandId: string) {
+    return request<void>(`/account/brands/${brandId}`, { method: 'DELETE' })
+  },
+
   async createTeam(data: { name: string; color: string }) {
     return request<TeamSummary>('/account/teams', {
       method: 'POST',

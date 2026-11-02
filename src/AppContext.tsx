@@ -32,6 +32,8 @@ interface AppContextValue {
   updateProfile: (data: ProfileUpdate) => Promise<void>
   addMember: (data: { name: string; email: string; jobTitle?: string }) => Promise<void>
   addBrand: (data: Pick<ManagedBrand, 'name' | 'description' | 'color'>) => Promise<void>
+  updateBrand: (id: string, data: Pick<ManagedBrand, 'name' | 'description' | 'color'>) => Promise<void>
+  archiveBrand: (id: string) => Promise<void>
   createTask: (projectId: string, title: string, team?: string) => Promise<ProjectTask>
   toggleTaskStatus: (projectId: string, taskId: string, currentStatus: string) => Promise<ProjectTask>
   toggleProjectFavorite: (projectId: string) => Promise<boolean>
@@ -287,6 +289,20 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
     }
   }, [notify])
 
+  const updateBrand = useCallback(async (id: string, data: Pick<ManagedBrand, 'name' | 'description' | 'color'>) => {
+    const brand = await api.updateBrand(id, data)
+    setBrands((current) => current.map((item) => item.id === id ? brand : item))
+    setAccount((current) => current ? { ...current, brands: current.brands.map((item) => item.id === id ? brand : item) } : current)
+    notify('Brand Kit atualizado')
+  }, [notify])
+
+  const archiveBrand = useCallback(async (id: string) => {
+    await api.archiveBrand(id)
+    setBrands((current) => current.filter((item) => item.id !== id))
+    setAccount((current) => current ? { ...current, brands: current.brands.filter((item) => item.id !== id) } : current)
+    notify('Brand Kit arquivado')
+  }, [notify])
+
   const addMember = useCallback(async (data: { name: string; email: string; jobTitle?: string }) => {
     try {
       const newMember = await api.addMember(data)
@@ -382,6 +398,8 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
     updateProfile,
     addMember,
     addBrand,
+    updateBrand,
+    archiveBrand,
     createTask,
     toggleTaskStatus,
     toggleProjectFavorite,
@@ -404,6 +422,8 @@ export function AppProvider({ children, onLogout }: { children: ReactNode; onLog
     updateProfile,
     addMember,
     addBrand,
+    updateBrand,
+    archiveBrand,
     createTask,
     toggleTaskStatus,
     toggleProjectFavorite,

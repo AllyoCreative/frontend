@@ -2080,6 +2080,9 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .managed-brand-grid article > span { width: 60px; height: 60px; display: grid; place-items: center; border-radius: 14px; color: #ffffff; font-size: 18px; font-weight: 800; flex-shrink: 0; }
 .managed-brand-grid h3 { margin: 0 0 6px; font-size: 16px; font-weight: 700; color: #131f15; }
 .managed-brand-grid p { margin: 0; color: #53605a; font-size: 13px; line-height: 1.4; }
+.managed-brand-actions { display: flex; align-items: center; gap: 8px; }
+.managed-brand-actions > button:not(.secondary-button) { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid #d8dcd5; border-radius: 8px; background: #ffffff; color: #53605a; cursor: pointer; }
+.managed-brand-actions > button:not(.secondary-button):hover { border-color: #004c46; color: #004c46; }
 
 /* Account Modals */
 .account-modal { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 24px; overflow-y: auto; overscroll-behavior: contain; background: rgba(16,29,23,.65); backdrop-filter: blur(5px); }
@@ -2199,6 +2202,7 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
   .managed-brand-grid article { grid-template-columns: 56px minmax(0, 1fr); }
   .managed-brand-grid article > span { width: 56px; height: 56px; }
   .managed-brand-grid article button { grid-column: 1 / -1; }
+  .managed-brand-actions { grid-column: 1 / -1; flex-wrap: wrap; }
   .credit-packages { grid-template-columns: 1fr; max-height: 65vh; overflow-y: auto; padding: 15px 2px 2px; }
   .credit-packages article { min-height: 240px; }
   .brand-selector__grid { grid-template-columns: 1fr; }

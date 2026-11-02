@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 're
 import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
-import { Building2, Check, ChevronRight, CircleDollarSign, Download, Eye, FileText, Layers3, LogOut, Plus, ReceiptText, ShoppingBag, Sparkles, UserPlus, Users, X } from 'lucide-react'
+import { Building2, Check, ChevronRight, CircleDollarSign, Download, Eye, FileText, Layers3, LogOut, Pencil, Plus, ReceiptText, ShoppingBag, Sparkles, Trash2, UserPlus, Users, X } from 'lucide-react'
 import { useApp } from '../AppContext'
 import { allyoPlanEntitlements } from '../config/allyoPlans'
-import { api } from '../services/api'
+import { api, type ManagedBrandSummary } from '../services/api'
 
 type AccountTab = 'visao' | 'creditos' | 'contratos' | 'time' | 'marcas'
 const TEAM_COLORS = ['#cfe8df', '#d9defb', '#f7d5e8', '#f8e5bd', '#cfe5f4', '#dcebc8']
@@ -44,11 +44,12 @@ function Modal({ children, className = '', onClose, labelId }: { children: React
 export function AccountPage({ onLogout }: { onLogout: () => void }) {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { workspace, members, brands, account, addMember, addBrand, refreshAccount, notify } = useApp()
+  const { workspace, members, brands, account, addMember, addBrand, updateBrand, archiveBrand, refreshAccount, notify } = useApp()
   const requestedTab = searchParams.get('tab')
   const tab: AccountTab = accountNav.some((item) => item.id === requestedTab) ? requestedTab as AccountTab : 'visao'
   const [showInvite, setShowInvite] = useState(false)
   const [showBrand, setShowBrand] = useState(false)
+  const [editingBrandId, setEditingBrandId] = useState<string | null>(null)
   const [showTeam, setShowTeam] = useState(false)
   const [showCredits, setShowCredits] = useState(false)
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null)
@@ -74,6 +75,7 @@ export function AccountPage({ onLogout }: { onLogout: () => void }) {
   const creditsUsed = accountWorkspace?.creditsUsed ?? 0
   const boosters = accountWorkspace?.monthlyBoosterUnits ?? accountWorkspace?.boosters ?? 0
   const plan = accountWorkspace?.plan ?? workspace?.plan ?? 'Sem plano'
+  const isLiteBrandLimitReached = plan.trim().toLocaleLowerCase('pt-BR') === 'lite' && brands.length >= 1
   const planUsage = allowance > 0 ? Math.min(100, Math.round((creditsUsed / allowance) * 100)) : 0
   const statementMovement = creditEntries.reduce((total, entry) => total + entry.amount, 0)
   const statementOpeningBalance = credits - statementMovement
@@ -127,13 +129,38 @@ export function AccountPage({ onLogout }: { onLogout: () => void }) {
     event.preventDefault()
     setSaving(true)
     try {
-      await addBrand({ name: brandName, description: brandDescription || 'Marca gerenciada', color: brandColor })
+      const data = { name: brandName, description: brandDescription || 'Marca gerenciada', color: brandColor }
+      if (editingBrandId) await updateBrand(editingBrandId, data)
+      else await addBrand(data)
       setBrandName('')
       setBrandDescription('')
+      setEditingBrandId(null)
       setShowBrand(false)
     } catch {
       // A mensagem específica já é exibida pelo contexto.
     } finally { setSaving(false) }
+  }
+
+  const openBrandEditor = (brand: ManagedBrandSummary) => {
+    setEditingBrandId(brand.id)
+    setBrandName(brand.name)
+    setBrandDescription(brand.description)
+    setBrandColor(brand.color)
+    setShowBrand(true)
+  }
+
+  const openNewBrand = () => {
+    if (isLiteBrandLimitReached) return notify('O plano Lite permite apenas 1 Brand Kit.')
+    setEditingBrandId(null)
+    setBrandName('')
+    setBrandDescription('')
+    setBrandColor('#004c46')
+    setShowBrand(true)
+  }
+
+  const removeBrand = async (brand: ManagedBrandSummary) => {
+    if (!window.confirm(`Arquivar o Brand Kit ${brand.name}? Os arquivos serão preservados.`)) return
+    await archiveBrand(brand.id)
   }
 
   const createTeam = async (event: FormEvent) => {
@@ -249,13 +276,13 @@ export function AccountPage({ onLogout }: { onLogout: () => void }) {
     </section>}
 
     {tab === 'marcas' && <section className="account-section">
-      <header className="account-section__header"><div><h2>Marcas gerenciadas</h2><p>Cada marca possui seu próprio Brand Kit e recursos.</p></div><button className="primary-button" type="button" onClick={() => setShowBrand(true)}><Plus size={16} /> Nova marca</button></header>
-      <div className="managed-brand-grid">{brands.map((brand) => <article key={brand.id}><span style={{ background: brand.color }}>{brand.initials}</span><div><h3>{brand.name}</h3><p>{brand.description}</p></div><button className="secondary-button" type="button" onClick={() => navigate(`/brand-kit?marca=${encodeURIComponent(brand.id)}`)}>Gerenciar <ChevronRight size={14} /></button></article>)}{brands.length === 0 && <EmptyState icon={<Building2 size={24} />} title="Nenhuma marca cadastrada" text="Crie a primeira marca para liberar seu Brand Kit." />}</div>
+      <header className="account-section__header"><div><h2>Marcas gerenciadas</h2><p>{isLiteBrandLimitReached ? 'Seu plano Lite inclui 1 Brand Kit.' : 'Cada marca possui seu próprio Brand Kit e recursos.'}</p></div><button className="primary-button" type="button" onClick={openNewBrand} disabled={isLiteBrandLimitReached} title={isLiteBrandLimitReached ? 'O plano Lite permite apenas 1 Brand Kit' : undefined}><Plus size={16} /> Nova marca</button></header>
+      <div className="managed-brand-grid">{brands.map((brand) => <article key={brand.id}><span style={{ background: brand.color }}>{brand.initials}</span><div><h3>{brand.name}</h3><p>{brand.description}</p></div><div className="managed-brand-actions"><button type="button" onClick={() => openBrandEditor(brand)} aria-label={`Editar ${brand.name}`}><Pencil size={15} /></button><button type="button" onClick={() => removeBrand(brand)} aria-label={`Arquivar ${brand.name}`}><Trash2 size={15} /></button><button className="secondary-button" type="button" onClick={() => navigate(`/brand-kit?marca=${encodeURIComponent(brand.id)}`)}>Gerenciar <ChevronRight size={14} /></button></div></article>)}{brands.length === 0 && <EmptyState icon={<Building2 size={24} />} title="Nenhuma marca cadastrada" text="Crie a primeira marca para liberar seu Brand Kit." />}</div>
     </section>}
 
     {showInvite && <Modal onClose={() => setShowInvite(false)} labelId="invite-title"><form onSubmit={submitInvite}><ModalHeader id="invite-title" title="Convidar usuário" text="O usuário receberá acesso ao workspace." onClose={() => setShowInvite(false)} /><label>Nome<input value={inviteName} onChange={(event) => setInviteName(event.target.value)} required /></label><label>E-mail<input type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} required /></label><label>Função<select value={inviteRole} onChange={(event) => setInviteRole(event.target.value)}><option>Membro</option><option>Gestor</option><option>Aprovador</option></select></label><ModalFooter onClose={() => setShowInvite(false)} saving={saving} action="Enviar convite" /></form></Modal>}
 
-    {showBrand && <Modal onClose={() => setShowBrand(false)} labelId="brand-title"><form onSubmit={submitBrand}><ModalHeader id="brand-title" title="Criar nova marca" text="Ela ficará disponível na entrada do Brand Kit." onClose={() => setShowBrand(false)} /><label>Nome da marca<input value={brandName} onChange={(event) => setBrandName(event.target.value)} required /></label><label>Descrição<input value={brandDescription} onChange={(event) => setBrandDescription(event.target.value)} placeholder="Ex.: Marca de produtos digitais" /></label><label>Cor da marca<div className="color-field"><input type="color" value={brandColor} onChange={(event) => setBrandColor(event.target.value)} /><span>{brandColor}</span></div></label><ModalFooter onClose={() => setShowBrand(false)} saving={saving} action="Criar marca" /></form></Modal>}
+    {showBrand && <Modal onClose={() => setShowBrand(false)} labelId="brand-title"><form onSubmit={submitBrand}><ModalHeader id="brand-title" title={editingBrandId ? 'Editar Brand Kit' : 'Criar nova marca'} text="Nome, descrição e cor de identificação da marca." onClose={() => setShowBrand(false)} /><label>Nome da marca<input value={brandName} onChange={(event) => setBrandName(event.target.value)} required /></label><label>Descrição<input value={brandDescription} onChange={(event) => setBrandDescription(event.target.value)} placeholder="Ex.: Marca de produtos digitais" /></label><label>Cor da marca<div className="color-field"><input type="color" value={brandColor} onChange={(event) => setBrandColor(event.target.value)} /><span>{brandColor}</span></div></label><ModalFooter onClose={() => setShowBrand(false)} saving={saving} action={editingBrandId ? 'Salvar alterações' : 'Criar marca'} /></form></Modal>}
 
     {showTeam && <Modal onClose={() => setShowTeam(false)} labelId="create-team-title"><form onSubmit={createTeam}><ModalHeader id="create-team-title" title="Criar equipe" text="Informe um nome e escolha uma cor de identificação." onClose={() => setShowTeam(false)} /><label>Nome da equipe<input value={newTeam} onChange={(event) => setNewTeam(event.target.value)} placeholder="Ex.: Conteúdo" required /></label><fieldset className="team-color-picker"><legend>Cor da equipe</legend><div>{TEAM_COLORS.map((color) => <label key={color} title={color}><input type="radio" name="team-color" value={color} checked={teamColor === color} onChange={() => setTeamColor(color)} /><span style={{ background: color }}><Check size={15} /></span></label>)}</div></fieldset><ModalFooter onClose={() => setShowTeam(false)} saving={saving} action="Criar equipe" /></form></Modal>}
 
