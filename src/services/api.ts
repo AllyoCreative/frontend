@@ -411,6 +411,20 @@ export const api = {
     return res
   },
 
+  async consumeImpersonation(code: string) {
+    const res = await request<{
+      success: boolean
+      token: string
+      user: UserSummary
+      workspace: WorkspaceSummary
+    }>('/auth/impersonation/consume', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    })
+    if (res.token) setAuthToken(res.token)
+    return res
+  },
+
   async demoSession() {
     const res = await request<{
       success: boolean
