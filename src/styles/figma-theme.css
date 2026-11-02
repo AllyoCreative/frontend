@@ -3380,8 +3380,10 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 
 /* Moldura de segurança exibida apenas durante uma sessão personificada. */
 .impersonation-frame {
-  min-height: 100vh;
-  padding: 40px 10px 10px;
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  overflow: hidden;
   background: #214b40;
 }
 .impersonation-frame__banner {
@@ -3402,42 +3404,45 @@ h1, h2, h3, .logo { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
 .impersonation-frame__banner strong { color: #9dffca; font-weight: 800; }
 .impersonation-frame__banner button {
   position: absolute;
-  top: 9px;
-  right: 12px;
+  top: 50%;
+  right: 14px;
   width: 22px;
   height: 22px;
   display: grid;
   place-items: center;
-  padding: 0 0 1px;
+  padding: 0;
   border: 0;
   border-radius: 50%;
   background: #78ffb7;
   color: #163c32;
-  font-size: 17px;
-  font-weight: 800;
-  line-height: 1;
+  transform: translateY(-50%);
   transition: transform .16s ease, background-color .16s ease;
 }
-.impersonation-frame__banner button:hover { background: #b5ffd5; transform: scale(1.06); }
+.impersonation-frame__banner button:hover { background: #b5ffd5; transform: translateY(-50%) scale(1.06); }
 .impersonation-frame__surface {
-  min-height: calc(100vh - 50px);
+  position: fixed;
+  inset: 40px 10px 10px;
   overflow: hidden;
   border-radius: 24px;
   background: #f4f5f4;
   box-shadow: 0 10px 34px rgba(8, 34, 28, .2);
 }
-.impersonation-frame :is(.app-shell, .app-main, .page) { min-height: calc(100vh - 50px); }
+.impersonation-frame__app { width: 100%; height: 100%; overflow: hidden; }
+.impersonation-frame__app.is-standalone { overflow-y: auto; overscroll-behavior: contain; }
+.impersonation-frame :is(.app-shell, .app-main) { height: 100%; min-height: 0; }
+.impersonation-frame .app-main { overflow-y: auto; overscroll-behavior: contain; }
+.impersonation-frame .page { min-height: 100%; }
 .impersonation-frame .sidebar {
-  inset: 40px auto 10px 10px;
-  height: auto;
+  position: absolute;
+  inset: 0 auto 0 0;
+  height: 100%;
   border-radius: 24px 0 0 24px;
 }
+.impersonation-frame .sidebar-scrim { position: absolute; inset: 0; }
 
 @media (max-width: 720px) {
-  .impersonation-frame { padding: 46px 6px 6px; }
   .impersonation-frame__banner { height: 46px; padding: 0 42px 0 12px; font-size: 10px; text-align: center; }
-  .impersonation-frame__banner button { top: 12px; right: 10px; }
-  .impersonation-frame__surface { min-height: calc(100vh - 52px); border-radius: 18px; }
-  .impersonation-frame :is(.app-shell, .app-main, .page) { min-height: calc(100vh - 52px); }
-  .impersonation-frame .sidebar { inset: 46px auto 6px 6px; border-radius: 18px 0 0 18px; }
+  .impersonation-frame__banner button { right: 10px; }
+  .impersonation-frame__surface { inset: 46px 6px 6px; border-radius: 18px; }
+  .impersonation-frame .sidebar { inset: 0 auto 0 0; border-radius: 18px 0 0 18px; }
 }

@@ -1,5 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { X } from 'lucide-react'
 import { AppProvider, GlobalToast } from './AppContext'
 import { AppShell } from './components/AppShell'
 import { Logo } from './components/Logo'
@@ -132,47 +133,49 @@ export default function App() {
       <header className="impersonation-frame__banner" aria-label="Sessão personificada">
         <span>Você está acessando como: <strong>{impersonation.workspaceName}</strong></span>
         <button type="button" onClick={endImpersonation} aria-label="Encerrar personificação" title="Encerrar personificação">
-          ×
+          <X size={14} strokeWidth={3} />
         </button>
       </header>
     )}
     <div className={impersonation ? 'impersonation-frame__surface' : undefined}>
-      <AppProvider onLogout={logout}>
-        <Suspense fallback={<LoadingScreen />}>
-          {location.pathname === '/novo-projeto' ? (
-            <Routes>
-              <Route path="/novo-projeto" element={<NewProjectPage />} />
-              <Route path="*" element={<Navigate to="/novo-projeto" replace />} />
-              </Routes>
-          ) : (
-            <AppShell>
+      <div className={impersonation ? `impersonation-frame__app${location.pathname === '/novo-projeto' ? ' is-standalone' : ''}` : undefined}>
+        <AppProvider onLogout={logout}>
+          <Suspense fallback={<LoadingScreen />}>
+            {location.pathname === '/novo-projeto' ? (
               <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/projetos" element={<ProjectsPage />} />
-                <Route path="/projetos/:id" element={<ProjectDetailPage />} />
-                <Route path="/projetos/:id/:tab" element={<ProjectDetailPage />} />
-                <Route path="/brand-kit" element={<BrandKitPage />} />
-                {canAccessBrandBrain && <Route path="/brand-brain" element={<BrandBrainPage />} />}
-                <Route path="/conta" element={<AccountPage onLogout={logout} />} />
-                <Route path="/perfil" element={<ProfilePage />} />
+                <Route path="/novo-projeto" element={<NewProjectPage />} />
+                <Route path="*" element={<Navigate to="/novo-projeto" replace />} />
               </Routes>
-            </AppShell>
-          )}
-        </Suspense>
-        <GlobalToast />
-      </AppProvider>
+            ) : (
+              <AppShell>
+                <Routes>
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/projetos" element={<ProjectsPage />} />
+                  <Route path="/projetos/:id" element={<ProjectDetailPage />} />
+                  <Route path="/projetos/:id/:tab" element={<ProjectDetailPage />} />
+                  <Route path="/brand-kit" element={<BrandKitPage />} />
+                  {canAccessBrandBrain && <Route path="/brand-brain" element={<BrandBrainPage />} />}
+                  <Route path="/conta" element={<AccountPage onLogout={logout} />} />
+                  <Route path="/perfil" element={<ProfilePage />} />
+                </Routes>
+              </AppShell>
+            )}
+          </Suspense>
+          <GlobalToast />
+        </AppProvider>
 
-      {revealingPlatform && (
-        <div
-          className="platform-reveal-curtain"
-          aria-hidden="true"
-          onAnimationEnd={(event) => {
-            if (event.target === event.currentTarget) setRevealingPlatform(false)
-          }}
-        >
-          <Logo />
-        </div>
-      )}
+        {revealingPlatform && (
+          <div
+            className="platform-reveal-curtain"
+            aria-hidden="true"
+            onAnimationEnd={(event) => {
+              if (event.target === event.currentTarget) setRevealingPlatform(false)
+            }}
+          >
+            <Logo />
+          </div>
+        )}
+      </div>
     </div>
   </div>
 }
