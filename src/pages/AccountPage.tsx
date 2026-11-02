@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import { Building2, Check, ChevronRight, CircleDollarSign, Download, Eye, FileText, Layers3, LogOut, Plus, ReceiptText, ShoppingBag, Sparkles, UserPlus, Users, X } from 'lucide-react'
 import { useApp } from '../AppContext'
+import { allyoPlanEntitlements } from '../config/allyoPlans'
 import { api } from '../services/api'
 
 type AccountTab = 'visao' | 'creditos' | 'contratos' | 'time' | 'marcas'
@@ -16,6 +17,9 @@ const accountNav: Array<{ id: AccountTab; icon: LucideIcon; label: string }> = [
   { id: 'time', icon: Users, label: 'Time' },
   { id: 'marcas', icon: Building2, label: 'Marcas' },
 ]
+
+const CONTRACT_STATUS_LABELS = { VIGENTE: 'Contrato vigente', EM_RENOVACAO: 'Contrato em renovação', SUSPENSO: 'Contrato suspenso', ENCERRADO: 'Contrato encerrado' } as const
+const PLAN_STATUS_LABELS = { ATIVO: 'Plano ativo', PAUSADO: 'Plano pausado', CANCELADO: 'Plano cancelado' } as const
 
 function formatDate(value: string | null | undefined, includeTime = false) {
   if (!value) return 'Não informado'
@@ -68,7 +72,7 @@ export function AccountPage({ onLogout }: { onLogout: () => void }) {
   const allowance = accountWorkspace?.creditAllowance ?? 0
   const creditBank = accountWorkspace?.creditBank ?? 0
   const creditsUsed = accountWorkspace?.creditsUsed ?? 0
-  const boosters = accountWorkspace?.boosters ?? 0
+  const boosters = accountWorkspace?.monthlyBoosterUnits ?? accountWorkspace?.boosters ?? 0
   const plan = accountWorkspace?.plan ?? workspace?.plan ?? 'Sem plano'
   const planUsage = allowance > 0 ? Math.min(100, Math.round((creditsUsed / allowance) * 100)) : 0
   const statementMovement = creditEntries.reduce((total, entry) => total + entry.amount, 0)
@@ -77,6 +81,19 @@ export function AccountPage({ onLogout }: { onLogout: () => void }) {
     ? `Período atual: ${formatDate(accountWorkspace.cycleStart)} a ${formatDate(accountWorkspace.cycleEnd)}`
     : 'Movimentações exibidas'
   const currentContract = contracts.find((contract) => contract.status === 'Vigente') ?? contracts[0]
+  const contractStatus = accountWorkspace?.contractStatus ?? (currentContract ? 'VIGENTE' : 'ENCERRADO')
+  const planStatus = accountWorkspace?.planStatus ?? 'ATIVO'
+  const boosterIncluded = accountWorkspace?.boosterIncluded ?? (boosters > 0)
+  const contractPeriod = accountWorkspace?.contractEnd
+    ? `${CONTRACT_STATUS_LABELS[contractStatus]} até ${formatDate(accountWorkspace.contractEnd)}`
+    : CONTRACT_STATUS_LABELS[contractStatus]
+  const planEntitlements = allyoPlanEntitlements({
+    plan,
+    creditAllowance: allowance,
+    simultaneousTaskLimit: accountWorkspace?.simultaneousTaskLimit ?? 1,
+    boosterIncluded,
+    monthlyBoosterUnits: boosters,
+  })
   const editingTeam = teams.find((team) => team.id === editingTeamId)
   const assignedMembers = useMemo(() => new Set(teams.flatMap((team) => team.memberIds)).size, [teams])
   const hasOpenModal = showInvite || showBrand || showTeam || showCredits || Boolean(editingTeam)
@@ -194,13 +211,13 @@ export function AccountPage({ onLogout }: { onLogout: () => void }) {
 
     {tab === 'visao' && <section className="account-overview">
       <div className="account-metric-grid">
-        <article><span>Plano atual</span><strong>{plan}</strong><small>{currentContract?.endsAt ? `Contrato ativo até ${formatDate(currentContract.endsAt)}` : 'Sem vigência cadastrada'}</small><button type="button" onClick={() => openTab('contratos')}>Ver contrato <ChevronRight size={14} /></button></article>
+        <article><span>Plano atual</span><strong>{plan}</strong><small>{PLAN_STATUS_LABELS[planStatus]} · {contractPeriod.toLocaleLowerCase('pt-BR')}</small><button type="button" onClick={() => openTab('contratos')}>Ver plano <ChevronRight size={14} /></button></article>
         <article><span>Saldo disponível</span><strong>{credits}</strong><small>{allowance} contratados · {creditBank} no banco</small><button type="button" onClick={() => openTab('creditos')}>Gerenciar créditos <ChevronRight size={14} /></button></article>
         <article><span>Pessoas</span><strong>{members.length}</strong><small>{assignedMembers} distribuídas em {teams.length} equipe(s)</small><button type="button" onClick={() => openTab('time')}>Gerenciar time <ChevronRight size={14} /></button></article>
         <article><span>Marcas</span><strong>{brands.length}</strong><small>Brand Kits disponíveis</small><button type="button" onClick={() => openTab('marcas')}>Gerenciar marcas <ChevronRight size={14} /></button></article>
       </div>
       <div className="contract-highlight">
-        <div><span className="plan-badge">{plan}</span><h2>{currentContract ? 'Contrato vigente' : 'Nenhum contrato vigente'}</h2><p>Você utilizou {creditsUsed} de {allowance} créditos neste ciclo.</p></div>
+        <div><span className="plan-badge">{plan}</span><h2>{CONTRACT_STATUS_LABELS[contractStatus]}</h2><p>{PLAN_STATUS_LABELS[planStatus]}. Você utilizou {creditsUsed} de {allowance} créditos neste ciclo.</p></div>
         <div className="contract-highlight__usage"><span><b>Uso no ciclo</b><strong>{planUsage}%</strong></span><i><em style={{ width: `${planUsage}%` }} /></i><small>Fechamento em {formatDate(accountWorkspace?.cycleEnd)}</small></div>
       </div>
     </section>}
@@ -219,7 +236,7 @@ export function AccountPage({ onLogout }: { onLogout: () => void }) {
 
     {tab === 'contratos' && <section className="account-section">
       <header className="account-section__header"><div><h2>Planos e contratos</h2><p>Acompanhe valores, vigência, upgrades e downgrades registrados.</p></div></header>
-      {currentContract ? <article className="current-contract"><div><span className="plan-badge">{currentContract.plan}</span><strong>{formatCurrency(currentContract.amountCents)}</strong><small>{currentContract.endsAt ? `Contrato ativo até ${formatDate(currentContract.endsAt)}` : 'Contrato sem data final'}</small></div>{currentContract.documentUrl && <a className="secondary-button" href={currentContract.documentUrl} target="_blank" rel="noreferrer"><Eye size={16} /> Visualizar contrato</a>}<footer><span><b>Créditos usados no ciclo</b><strong>{planUsage}%</strong><i><em style={{ width: `${planUsage}%` }} /></i></span><span><b>Benefícios por ciclo</b><small><Check size={13} /> {allowance} créditos</small><small><Check size={13} /> {boosters} Booster(s)</small></span></footer></article> : <EmptyState icon={<FileText size={24} />} title="Nenhum contrato cadastrado" text="Quando um contrato for registrado, seus dados aparecerão aqui." />}
+      {accountWorkspace ? <article className="current-contract"><div><span className="plan-badge">{plan}</span><strong>{CONTRACT_STATUS_LABELS[contractStatus]}</strong><small>{PLAN_STATUS_LABELS[planStatus]} · {accountWorkspace.contractStart ? `desde ${formatDate(accountWorkspace.contractStart)}` : 'início não informado'}{accountWorkspace.contractEnd ? ` até ${formatDate(accountWorkspace.contractEnd)}` : ''}</small>{currentContract?.amountCents ? <small>Valor registrado: {formatCurrency(currentContract.amountCents)}</small> : null}</div>{currentContract?.documentUrl && <a className="secondary-button" href={currentContract.documentUrl} target="_blank" rel="noreferrer"><Eye size={16} /> Visualizar contrato</a>}<footer><span><b>Créditos usados no ciclo</b><strong>{planUsage}%</strong><i><em style={{ width: `${planUsage}%` }} /></i><small>{creditsUsed} de {allowance} créditos utilizados</small></span><span><b>Limites operacionais</b><small><Check size={13} /> {accountWorkspace.simultaneousTaskLimit ?? 1} tarefa(s) simultânea(s)</small><small>{boosterIncluded ? <Check size={13} /> : <X size={13} />} {boosterIncluded ? `${boosters} Booster(s) por ciclo` : 'Booster não incluso'}</small></span><div className="plan-entitlements"><b>Serviços incluídos no plano {plan}</b><div>{planEntitlements.map((benefit) => <span className={benefit.included ? '' : 'is-excluded'} key={benefit.label}>{benefit.included ? <Check size={14} /> : <X size={14} />} {benefit.label}</span>)}</div></div></footer></article> : <EmptyState icon={<FileText size={24} />} title="Plano não encontrado" text="O plano operacional desta conta ainda não foi sincronizado." />}
       <div className="contract-history"><h3>Histórico de contratos</h3>{contracts.map((contract) => <div key={contract.id}><ReceiptText size={19} /><span><b>{contract.title}</b><small>{formatDate(contract.startsAt)}{contract.endsAt ? ` — ${formatDate(contract.endsAt)}` : ''} · {contract.changeType}</small></span><em className={contract.status === 'Vigente' ? 'active' : ''}>{contract.status}</em>{contract.documentUrl ? <a href={contract.documentUrl} target="_blank" rel="noreferrer" aria-label={`Visualizar ${contract.title}`}><Eye size={16} /></a> : <span className="contract-document-missing" title="Documento não anexado">—</span>}</div>)}{contracts.length === 0 && <div className="account-empty-row">Nenhum histórico de contrato registrado.</div>}</div>
     </section>}
 

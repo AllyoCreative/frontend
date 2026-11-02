@@ -82,6 +82,11 @@ export interface AccountOverview {
     id: string
     name: string
     plan: string
+    contractStatus: 'VIGENTE' | 'EM_RENOVACAO' | 'SUSPENSO' | 'ENCERRADO'
+    planStatus: 'ATIVO' | 'PAUSADO' | 'CANCELADO'
+    boosterIncluded: boolean
+    monthlyBoosterUnits: number
+    simultaneousTaskLimit: number
     creditsAvailable: number
     creditAllowance: number
     creditBank: number
